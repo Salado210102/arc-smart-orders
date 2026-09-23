@@ -329,6 +329,22 @@ public keeper API (`https://api.basepump.dev/arc-keeper`).
 `0x6fd5F2fb831940DcD61A98c5B3aCB7D8C6f3bFc1`. Keeper: `SWAP_VENUE=uniswap-v3`, `DRY=0`.
 See [`docs/VENUE_INTEGRATION.md`](docs/VENUE_INTEGRATION.md).
 
+---
+
+# Demo agent — Staking & Yield pilot (mainnet) — 2026-09-23
+
+Enabled per-agent staking for the demo agent (`AgentToken 0xD81d4A4e…60De`, curve `0xf2da5A5F…fd6F`).
+
+| Contract | Address |
+|---|---|
+| **AgentStakingVault** (asset = agent token, USDC rewards) | `0x5E9dCd592B37fda481Fc203756DA4D990cE438bA` |
+| **RevenueSplitter** (70% vault / 30% Safe) | `0xE74A66928aa049C78D271d02427b10c37eC1C51b` |
+
+- `owner` / `treasury` = Safe 2/2; `stakerShareBps = 7000` (70% to stakers).
+- Curve `agentTreasury` → `RevenueSplitter` (Safe tx): [`0x17d87c71…503f`](https://explorer.arc.io/tx/0x17d87c71c754a5274a1a1c4b068a071e8a1f1305fc7b576ae3fdeba771fe503f)
+- Seed flow verified: `approve` [`0x36347551…5848`](https://explorer.arc.io/tx/0x363475516f4b68965d9420400d1b1ea02ff0e61fc80d0f3b471c798748205848) + `RevenueSplitter.distribute(0.2 USDC)` [`0x1522007b…ab2f`](https://explorer.arc.io/tx/0x1522007bda686d3210692a10c7676b4f6b17d000836b7af14c6b542c7606ab2f) → **0.14 USDC vault (`pool`) / 0.06 USDC Safe**.
+- UI: **Staking & Yield** tab live at <https://arc.basepump.dev> (approve+stake, claim USDC, unstake).
+
 
 
 

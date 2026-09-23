@@ -6,9 +6,9 @@ export const ADDR = {
   registry: "0x8aE509565397C62a585c74aA44f7E3bFEab3Bb01",
   module: "0x1B8CA122DFd1100C0873A517b4875611Ed9De792",
   locker: "0x9cb011A46A1127202Bc92F48f70Bf7010F1f9B6C",
-  vault: "0x0000000000000000000000000000000000000000", // per-agent, deployed on demand (none yet)
-  splitter: "0x0000000000000000000000000000000000000000", // per-agent
-  vaultAsset: "0x0000000000000000000000000000000000000000", // per-agent
+  vault: "0x5E9dCd592B37fda481Fc203756DA4D990cE438bA", // demo agent staking vault (ERC-4626-ish)
+  splitter: "0xE74A66928aa049C78D271d02427b10c37eC1C51b", // demo agent RevenueSplitter (70/30)
+  vaultAsset: "0xD81d4A4e6e91977cEf71b81259BF0a627e3E60De", // demo agent token (staked asset)
   usdc: "0x3600000000000000000000000000000000000000",
   safe: "0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93", // Safe 2/2 — owner / treasury / feeRecipient
 } as const satisfies Record<string, Address>;
@@ -18,6 +18,7 @@ export const vaultAbi = [
   { type: "function", name: "withdraw", stateMutability: "nonpayable", inputs: [{ name: "assets", type: "uint256" }, { name: "receiver", type: "address" }, { name: "owner", type: "address" }], outputs: [{ name: "shares", type: "uint256" }] },
   { type: "function", name: "claim", stateMutability: "nonpayable", inputs: [], outputs: [{ name: "p", type: "uint256" }] },
   { type: "function", name: "pendingRewards", stateMutability: "view", inputs: [{ name: "user", type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "pool", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ type: "uint256" }] },
   { type: "function", name: "totalAssets", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "totalSupply", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
