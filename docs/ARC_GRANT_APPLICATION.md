@@ -1,8 +1,8 @@
-# Arc / Circle — grant & partnership pitch
+# Arc / Circle — grant & partnership pitch + funding-channel matrix
 
-> Ready-to-send blurb for the **Arc ecosystem** (Arc Discord `discord.com/invite/buildonarc`,
-> `community.arc.io`, or a Circle partnership contact). Circle/Arc have **no public grant form** at the
-> time of writing — this text is the submission payload for whichever channel is available.
+> Pitch + **verified funding-channel matrix** for the Arc/Circle ecosystem. The official channels are
+> **Arc House events/forms** (there is **no public grants email**). Dates/eligibility verified **2026-09-23**.
+> For the Microgrants field-by-field answers see [`ARC_MICROGRANTS_FORM.md`](ARC_MICROGRANTS_FORM.md).
 
 ---
 
@@ -51,10 +51,24 @@ and an ERC-4626 vault that pays the agent's USDC revenue to stakers**.
    on Arc mainnet** yet, which blocks the launchpad from going live there — guidance/coordination welcome.
 3. Optional: **App Kit Swap / StableFX** integration as the production execution venue.
 
-## Channels (verified)
+## Funding channels — matrix (verified 2026-09-23)
 
-- Arc community: https://community.arc.io/ · Discord `discord.com/invite/buildonarc` · X `@arc`
-- Circle developer platform: https://developers.circle.com/ (no public grant form; "Agent Marketplace →
-  Get listed" exists for distribution)
-- UFSF (audit subsidy): `https://areta.fillout.com/ufsf-projects` — **requires a registered legal entity**;
-  keep ready until incorporated.
+| Program | What you get | Key requirements | Individual-OK? | Deadline | Link |
+|---|---|---|---|---|---|
+| **Arc Microgrants** | **$500 USDC** (20 of a $10k pool), non-dilutive · route into the **Circle Grant Program** | **Live on Arc MAINNET** + public repo + builder profile (GitHub/X/Farcaster); 1 submission/project | ✅ yes — individuals, teams, pseudonymous, **no company** | **closes Oct 14 2026** 23:59 ET (decisions by Oct 21) | [event](https://community.arc.io/public/events/arc-microgrants-f8tijfjhyq) |
+| **Arc Acceleration Season** | 6-week program · up to **$1M** access · Demo Day | LatAm fintech/AI startup; ship a live integration | teams/startups | **closed Sep 22 2026** | [event](https://community.arc.io/public/events/arc-acceleration-season-vanemu91dk) · [Airtable](https://airtable.com/appGGpgjSlDjntK7k/pagAoXwWYkoVVGbuB/form) |
+| **Agentic Economy Prize** | **$50,000** (Circle-funded bonus) | Registered in *Build with Gemini XPRIZE* + use **Circle Agent Stack** + GCP hosting + a real USDC tx + public repo | teams | **Sep 25 2026** | [event](https://community.arc.io/public/events/the-agentic-economy-prize-aignfyumkq) |
+| **UFSF** (audit subsidy) | up to **100%** of audit cost | **Registered legal entity** + KYB; not deployed on a non-Uniswap DEX | ❌ no (needs entity) | monthly cohorts (closes 7th) | [`areta.fillout.com/ufsf-projects`](https://areta.fillout.com/ufsf-projects) |
+| **Uniswap Foundation Grants** | funding based on scope | Deploy to Unichain and/or Uniswap v4; docs; impact | (rolling) | rolling | [form](https://share.hsforms.com/1fxQjPQTgTYmPwlYxxKlSGQsdca9) |
+| **Circle Grant Program** | path-to-production funding | via Microgrants referral / further-along project | — | — | (referred from Microgrants) |
+
+### Read-out
+- **Best fit right now = Arc Microgrants** (accepts individuals) → but the project must be **deployed on
+  Arc mainnet**, which is **currently blocked** by the missing ERC-8004/8183 registries + a real DEX venue.
+  → **Unblocking mainnet is the gating task.**
+- **UFSF** stays blocked until a legal entity exists.
+- **No public email exists** for any of these; do not chase one.
+
+## Community channels (not funding)
+- Arc House: https://community.arc.io/ · Discord `discord.com/invite/buildonarc` · X `@arc`
+- Circle developer platform: https://developers.circle.com/ (distribution: "Agent Marketplace → Get listed")
