@@ -31,12 +31,14 @@ Three layers, one repo:
 | Layer | What | Where | State |
 |---|---|---|---|
 | **1 · Core protocol** | Smart orders (Permit2 witness + EIP-712 **intent engine**) + **Agent Launchpad** | `contracts/src/OrderExecutor.sol`, `contracts/src/launchpad/*` | ✅ **live on Arc mainnet** |
+| **1b · Cross-chain orders** | Sign an intent on a **source** chain, fill it **atomically on Arc** (interop/CCTP delivery) | `contracts/src/CrossChainOrderExecutor.sol` | 🧪 draft (not deployed) |
 | **2 · Monetization & agentic credit** | **`AgentCreditPool`** (peer-to-contract USDC micro-loans), **`RevenueSplitter`** + **`AgentStakingVault`** (ERC-4626 yield accumulator) | `contracts/src/credit/*`, `contracts/src/launchpad/*` | 🧪 Phase 2 (draft, not deployed) |
 | **3 · Agent SDK** | **`arc-agent-treasury`** — check balance / borrow / repay from an AI agent | `sdk-python/` | 🧪 Phase 2 |
 
 - **Smart Orders** → [`contracts/src/OrderExecutor.sol`](contracts/src/OrderExecutor.sol) · [SDK](sdk/src/index.ts) · [Keeper](keeper/src/index.ts)
 - **Agent Launchpad** → [`docs/AGENT_LAUNCHPAD.md`](docs/AGENT_LAUNCHPAD.md)
 - **Agent Credit Pool** → [`contracts/src/credit/AgentCreditPool.sol`](contracts/src/credit/AgentCreditPool.sol) · [`docs/AGENT_CREDIT_POOL.md`](docs/AGENT_CREDIT_POOL.md)
+- **Cross-chain orders (draft)** → [`contracts/src/CrossChainOrderExecutor.sol`](contracts/src/CrossChainOrderExecutor.sol) · [`docs/CROSS_CHAIN_ORDERS.md`](docs/CROSS_CHAIN_ORDERS.md)
 - **Python SDK** → [`sdk-python/`](sdk-python/)
 
 ---
@@ -150,6 +152,25 @@ Domain: `name="ArcSmartOrders", version="1", verifyingContract=executor` — mus
 
 ---
 
+## Cross-chain orders (draft)
+
+Sign an order on a **source** chain, fill it **atomically on Arc**. The input USDC is delivered to
+[`CrossChainOrderExecutor`](contracts/src/CrossChainOrderExecutor.sol) by an interop/CCTP message, and
+the swap runs on arrival, paying the output to the user's wallet.
+
+- **Not Permit2** — Permit2 signatures are chain-bound; the order is a signed `CrossChainIntent` with a
+  **standard 4-field EIP-712 domain** (`chainId` = destination) so viem/wallets can sign it.
+- **Anti-replay** — domain `chainId` = destination + signed `sourceChainId`/`destinationChainId` +
+  single-use nonce.
+- **Guarantees** — onlyKeeper (optionally onlyInterop), whitelisted `swapTarget`, 0.30% input-side fee
+  retained before the swap, `minOut` enforced on the **net**, ECDSA + EIP-1271, reentrancy guard.
+- **Builder** — [`keeper/src/crosschain-builder.ts`](keeper/src/crosschain-builder.ts)
+  (`signCrossChainIntent` + `buildExecuteCrossChainData`).
+
+Draft — not deployed; see [`docs/CROSS_CHAIN_ORDERS.md`](docs/CROSS_CHAIN_ORDERS.md).
+
+---
+
 ## Agent Launchpad
 
 A complete launchpad for AI agents, built on the same non-custodial primitives.
@@ -236,6 +257,7 @@ income.
 ```
 contracts/                          Foundry — solc 0.8.26, via-ir, optimizer 200, bytecode_hash=none
   src/OrderExecutor.sol               executor (Permit2 witness + DcaIntent + input-side fee + whitelist)
+  src/CrossChainOrderExecutor.sol     cross-chain intent executor (sign on source chain, fill on Arc) — DRAFT
   src/agentic/IERC8004.sol            interfaces for the deployed ERC-8004 registries
   src/agentic/IAgenticCommerce.sol    interfaces for ERC-8183 + IACPHook
   src/credit/AgentCreditPool.sol      peer-to-contract USDC micro-credit (LP shares, bond, caps, first-loss reserve)
@@ -255,6 +277,7 @@ contracts/                          Foundry — solc 0.8.26, via-ir, optimizer 2
   test/LaunchpadGraduation.t.sol      3 tests  (graduation + LP lock)
   test/Staking.t.sol                  5 tests  (revenue split -> staking yield)
   test/RevenueWiring.t.sol            1 test   (order fee -> splitter -> vault)
+  test/CrossChainOrderExecutor.t.sol  6 tests  (cross-chain fill, source/dest chain, replay, signature, access)
   test/Permit2WitnessFork.t.sol       fork test vs the real Permit2
   test/DeployMainnetFork.t.sol        mainnet-fork dry-run of the deploy script
   test/AgentCreditPool.t.sol          21 tests (credit pool: shares, whitelist, bond, caps, repay split, default, pause)
@@ -273,10 +296,11 @@ keeper/                             TypeScript (viem)
   src/{server,worker,db,agentic,events}.ts  persistent keeper: HTTP API + WebSocket + SQLite worker
   src/agentic.ts                      ERC-8004 identity/reputation + ERC-8183 job lifecycle
   src/setup-order.ts                  E2E: approve Permit2 + sign a LIMIT order
+  src/crosschain-builder.ts           sign a CrossChainIntent + encode executeCrossChain (draft)
 apps/launchpad/                     Vite + React + Tailwind launchpad UI (Vercel)
 ops/                                ops tooling (Safe execTransaction signer, reminder bot)
 examples/python/sign_limit_order.py Python EIP-712 signing recipe (verified to match the TS SDK)
-docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · SDK_INTEGRATION · SAFE_TREASURY · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
+docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · CROSS_CHAIN_ORDERS · SDK_INTEGRATION · SAFE_TREASURY · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
 ```
 
 ---
@@ -306,6 +330,7 @@ forge install foundry-rs/forge-std     # once
 forge test -vv                         # core: 34/34 (+1 fork skipped unless env set)
 forge test --match-contract AgentCreditPoolTest -vvv   # Phase 2: 21 credit-pool tests
 forge test --match-contract RevenueRouterTest -vvv     # Phase 2: 3 repay-before-split tests
+forge test --match-contract CrossChainOrderExecutorTest -vvv   # cross-chain: 6 intent-executor tests
 ```
 > CI runs all of this on every push — see the **CI badge** at the top (`.github/workflows/ci.yml`).
 

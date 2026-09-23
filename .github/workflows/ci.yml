@@ -52,3 +52,6 @@ jobs:
 
       - name: RevenueRouter integration tests (verbose)
         run: forge test --match-contract RevenueRouterTest -vvv
+
+      - name: CrossChainOrderExecutor tests (verbose)
+        run: forge test --match-contract CrossChainOrderExecutorTest -vvv
