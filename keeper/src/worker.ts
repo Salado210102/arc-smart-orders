@@ -5,9 +5,10 @@ import { privateKeyToAccount } from "viem/accounts";
 import { listPending, markFilled, markFailed, expireOld, type OrderRow } from "./db.ts";
 import { submitDeliverable } from "./agentic.ts";
 import { emitEvent } from "./events.ts";
-import { ARC_TESTNET_CHAIN_ID } from "../../sdk/src/index.ts";
+import { ARC_MAINNET_CHAIN_ID, RPC as RPCS } from "../../sdk/src/index.ts";
 
-const RPC = process.env.ARC_TESTNET_RPC ?? "https://rpc.testnet.arc.io";
+const RPC = process.env.ARC_RPC ?? RPCS.mainnet;
+const CHAIN_ID = Number(process.env.CHAIN_ID ?? ARC_MAINNET_CHAIN_ID);
 const EXECUTOR = (process.env.EXECUTOR ?? "") as `0x${string}`;
 const ROUTER = (process.env.ROUTER ?? "") as `0x${string}`;
 const MIN_FEE_GWEI = BigInt(process.env.MIN_FEE_GWEI ?? "20");
@@ -15,7 +16,7 @@ const LOOP_MS = Number(process.env.LOOP_MS ?? 8000);
 const DRY = process.env.DRY === "1";
 
 const chain = defineChain({
-  id: ARC_TESTNET_CHAIN_ID,
+  id: CHAIN_ID,
   name: "Arc",
   nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
   rpcUrls: { default: { http: [RPC] } },

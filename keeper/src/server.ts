@@ -3,13 +3,13 @@ import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import websocket from "@fastify/websocket";
 import { createPublicClient, http, defineChain, verifyTypedData } from "viem";
-import { PERMIT2, USDC, EURC, ARC_TESTNET_CHAIN_ID } from "../../sdk/src/index.ts";
+import { PERMIT2, USDC, EURC, ARC_MAINNET_CHAIN_ID, RPC as RPCS } from "../../sdk/src/index.ts";
 import { WITNESS_TYPES } from "../../sdk/src/index.ts";
 import { insertOrder, getOrder, listByMaker, listPending } from "./db.ts";
 import { bus, emitEvent } from "./events.ts";
 
-const RPC = process.env.ARC_TESTNET_RPC ?? "https://rpc.testnet.arc.io";
-const CHAIN_ID = Number(process.env.CHAIN_ID ?? ARC_TESTNET_CHAIN_ID);
+const RPC = process.env.ARC_RPC ?? RPCS.mainnet;
+const CHAIN_ID = Number(process.env.CHAIN_ID ?? ARC_MAINNET_CHAIN_ID);
 const EXECUTOR = (process.env.EXECUTOR ?? "") as `0x${string}`;
 const PORT = Number(process.env.PORT ?? 8788);
 
