@@ -23,7 +23,7 @@
 
 **Status (honest):** the launchpad (create + curve trading) is LIVE on mainnet. Smart-order fills + graduation are pending the Arc FX venue (StableFX is permissioned; no public AMM yet).
 
-🔗 DApp: https://launchpad-neon-chi.vercel.app
+🔗 DApp: https://arc.basepump.dev
 🔗 Code: https://github.com/Salado210102/arc-smart-orders
 ```
 
@@ -54,7 +54,7 @@ An agent launches on its own **USDC bonding curve**. As the infrastructure ships
 
 **Honest status:** the launchpad — creating an agent and trading on its curve — is **live on mainnet**. Smart-order fills and graduation are **pending the Arc FX venue** (StableFX is permissioned and there is no public AMM yet). I'd love feedback, and I'm happy to use App Kit Swap / a public AMM as soon as it's available.
 
-🔗 DApp: https://launchpad-neon-chi.vercel.app
+🔗 DApp: https://arc.basepump.dev
 🔗 Code: https://github.com/Salado210102/arc-smart-orders
 🔗 Audit package: https://github.com/Salado210102/arc-smart-orders/blob/pre-audit-v2/docs/AUDIT_PACKAGE.md
 ```

@@ -1,7 +1,7 @@
 # X (Twitter) thread — Arc Smart Orders + Agent Launchpad
 
 > Post as a thread. Keep each tweet < 280 chars. Attach 1 screenshot (the DApp Agents tab) to tweet 1/.
-> Live DApp: https://launchpad-neon-chi.vercel.app · Repo: https://github.com/Salado210102/arc-smart-orders
+> Live DApp: https://arc.basepump.dev · Repo: https://github.com/Salado210102/arc-smart-orders
 
 ---
 
@@ -37,7 +37,7 @@ Engineering: Safe 2/2 owns every contract, deterministic env-validated deploy, 3
 Honest status: the launchpad (create + curve trading) is LIVE on Arc mainnet. Smart-order fills + graduation are pending the Arc FX venue — StableFX is permissioned and there's no public AMM yet. We say so, plainly.
 
 **8/**
-Live: https://launchpad-neon-chi.vercel.app
+Live: https://arc.basepump.dev
 Code: https://github.com/Salado210102/arc-smart-orders
 Built solo on Circle's Arc. Feedback welcome. 🚀
 

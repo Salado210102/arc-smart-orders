@@ -4,7 +4,7 @@
 > **Status: reference implementation, open source (MIT), NOT audited.** Some features are
 > **testnet-only** or **pending external infra** — stated plainly below.
 
-**Repo:** https://github.com/Salado210102/arc-smart-orders · **DApp:** https://launchpad-neon-chi.vercel.app
+**Repo:** https://github.com/Salado210102/arc-smart-orders · **DApp:** https://arc.basepump.dev
 
 ## 1. Summary
 

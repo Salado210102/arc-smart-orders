@@ -29,7 +29,7 @@ settlement contract.
 **Links:**
 - Repo: https://github.com/Salado210102/arc-smart-orders (frozen tag `pre-audit-v2`)
 - Audit package: https://github.com/Salado210102/arc-smart-orders/blob/pre-audit-v2/docs/AUDIT_PACKAGE.md
-- Live UI (mainnet): https://launchpad-neon-chi.vercel.app
+- Live UI (mainnet): https://arc.basepump.dev
 
 Happy to complete any KYB/onboarding step required for StableFX access.
 

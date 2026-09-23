@@ -23,7 +23,7 @@ Goal: a tight ~60s clip showing the DApp flow **and** the Telegram alert firing 
 ## Edit tips
 - Add **captions** for each step (many watch muted).
 - Speed-ramp the waiting (tx confirmations) to stay under 60s.
-- End card (2s): `launchpad-neon-chi.vercel.app` · `github.com/Salado210102/arc-smart-orders`.
+- End card (2s): `arc.basepump.dev` · `github.com/Salado210102/arc-smart-orders`.
 - Export as **MP4 (1080p)**; for X, also a **GIF** of the 0:45–0:55 alert moment.
 
 ## Shot list (files)

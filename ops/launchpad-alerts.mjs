@@ -168,7 +168,7 @@ async function tick() {
         `• token: <a href="${EXPLORER}/address/${token}">${token}</a>\n` +
         `• curve: <a href="${EXPLORER}/address/${curve}">${curve}</a>\n` +
         `• creator: <code>${creator}</code>\n` +
-        `<a href="https://launchpad-neon-chi.vercel.app">Open Launchpad →</a>`;
+        `<a href="https://arc.basepump.dev">Open Launchpad →</a>`;
       console.log(`[alert] agent ${agentId} token ${token}`);
       const sent = await notify(msg);
       if (sent.length) console.log("[alerts] →", sent.join(", "));

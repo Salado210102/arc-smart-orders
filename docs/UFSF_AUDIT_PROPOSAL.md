@@ -3,7 +3,7 @@
 **Project:** Arc Smart Orders + Agent Launchpad
 **Applicant:** BasePump (independent builder) · hello@basepump.dev · X @VICENTEGon651262 · Telegram @Cryptofun2026
 **Repo (MIT):** https://github.com/Salado210102/arc-smart-orders
-**Live UI:** https://launchpad-neon-chi.vercel.app
+**Live UI:** https://arc.basepump.dev
 **Network:** Arc mainnet (5042, live) + testnet (5042002)
 **Request:** audit subsidy (UFSF covers up to 100% of audit cost) · **scope: 9 contracts / 1,411 SLOC**
 
@@ -79,7 +79,7 @@ also co-fund a portion.
 - Repo: https://github.com/Salado210102/arc-smart-orders (frozen tag: `pre-audit-v2`; package: `AUDIT_PACKAGE.md`)
 - Scope: `docs/AUDIT_SCOPE.md` · Runbook: `docs/MAINNET_RUNBOOK.md`
 - Deployments & tx hashes: `DEPLOYMENTS.md`
-- Live UI: https://launchpad-neon-chi.vercel.app
+- Live UI: https://arc.basepump.dev
 
 ## 8. UFSF portal — submission requirements & eligibility
 

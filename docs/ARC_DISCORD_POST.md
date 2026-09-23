@@ -15,7 +15,7 @@
 > bonding-curve token, ERC-8183 job escrow, locked LP, and an ERC-4626 vault that pays the agent's USDC
 > revenue to stakers**.
 >
-> Live on **Arc testnet** (deployed + verified, full agentic E2E with tx hashes) → UI: https://launchpad-neon-chi.vercel.app
+> Live on **Arc testnet** (deployed + verified, full agentic E2E with tx hashes) → UI: https://arc.basepump.dev
 > Code: https://github.com/Salado210102/arc-smart-orders
 >
 > Two questions for the team 👇
@@ -48,7 +48,7 @@
 > **Asks:** (1) ERC-8004/8183 on **mainnet** ETA? (2) grants/ecosystem channel? (3) interest in App Kit
 > Swap / StableFX as the production venue?
 >
-> Links: UI https://launchpad-neon-chi.vercel.app · code https://github.com/Salado210102/arc-smart-orders ·
+> Links: UI https://arc.basepump.dev · code https://github.com/Salado210102/arc-smart-orders ·
 > contact hello@basepump.dev
 
 ---

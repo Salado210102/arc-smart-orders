@@ -159,7 +159,7 @@ sequence + ownership wiring.
 
 **Per-agent vault+splitter:** `AgentStakingVault 0x5D5e48336589f3d9fdC4EABd986a526D7BF1FE6d` · `RevenueSplitter 0xad5ad6b09d52FA8BD5Acd7d0954da783e7a7b2dc`.
 
-**UI:** repointed to the dry-run deployment and redeployed → **https://launchpad-neon-chi.vercel.app** (200; the Agents tab reads the new registry).
+**UI:** repointed to the dry-run deployment and redeployed → **https://arc.basepump.dev** (200; the Agents tab reads the new registry).
 
 ---
 

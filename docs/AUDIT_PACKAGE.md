@@ -8,7 +8,7 @@
 | Repo (MIT) | https://github.com/Salado210102/arc-smart-orders |
 | Scope | [`AUDIT_SCOPE.md`](AUDIT_SCOPE.md) — **9 contracts / 1,411 SLOC** |
 | Network | Arc testnet `5042002` (manager: mainnet `5042`) |
-| Live UI | https://launchpad-neon-chi.vercel.app |
+| Live UI | https://arc.basepump.dev |
 | Treasury | Safe 2/2 `0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93` |
 
 ---

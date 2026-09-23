@@ -12,7 +12,7 @@
 > **No company needed** · individuals/pseudonymous welcome.
 >
 > ✅ **Eligible:** the protocol is **live on Arc mainnet (5042)** — contracts + DApp at
-> `https://launchpad-neon-chi.vercel.app` — since 2026-09-23.
+> `https://arc.basepump.dev` — since 2026-09-23.
 
 ---
 
@@ -21,7 +21,7 @@
 | Form field | Answer |
 |---|---|
 | **Project name** | Arc Smart Orders + Agent Launchpad |
-| **Live deployment link (Arc mainnet)** | https://launchpad-neon-chi.vercel.app (DApp on Arc mainnet, chain 5042) |
+| **Live deployment link (Arc mainnet)** | https://arc.basepump.dev (DApp on Arc mainnet, chain 5042) |
 | **Public repo** | https://github.com/Salado210102/arc-smart-orders (frozen tag `pre-audit-v2`) |
 | **Builder profile** | GitHub `Salado210102` · X `@VICENTEGon651262` · LinkedIn `vicente-gonzalez-4a051b2a3` · Telegram `@Cryptofun2026` |
 | **Contact email** | hello@basepump.dev |
@@ -74,7 +74,7 @@ All verified on-chain at `https://explorer.arc.io` (see `DEPLOYMENTS.md`).
 
 ## Supporting evidence (paste links if the form allows)
 
-- Live DApp (Arc mainnet): https://launchpad-neon-chi.vercel.app
+- Live DApp (Arc mainnet): https://arc.basepump.dev
 - Audit package (scope, sizes, tests): https://github.com/Salado210102/arc-smart-orders/blob/pre-audit-v2/docs/AUDIT_PACKAGE.md
 - Mainnet deployment + tx hashes: https://github.com/Salado210102/arc-smart-orders/blob/pre-audit-v2/DEPLOYMENTS.md
 - Tests: **34/34** Foundry + **1** Arc-mainnet-fork dry-run (deploy invariants verified).
@@ -84,7 +84,7 @@ All verified on-chain at `https://explorer.arc.io` (see `DEPLOYMENTS.md`).
 ## Pre-submit checklist
 
 - [x] Mainnet deploy done (Safe 2/2 + 5 contracts on Arc 5042)
-- [x] Live mainnet link opens (`launchpad-neon-chi.vercel.app`)
+- [x] Live mainnet link opens (`arc.basepump.dev`)
 - [x] Repo public + frozen tag `pre-audit-v2` pushed
 - [x] Builder profile set (GitHub `Salado210102` / X `@VICENTEGon651262` · Telegram `@Cryptofun2026`)
 - [x] Payout wallet can receive USDC on Arc

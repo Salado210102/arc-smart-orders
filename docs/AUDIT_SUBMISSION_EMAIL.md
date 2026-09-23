@@ -43,7 +43,7 @@ Vicente — Lead Quantitative Engineer
 - [ ] **UFSF eligibility:** the UFSF portal requires the applicant to be a **registered legal entity**
       (LLC/corp) + KYB. As an independent builder with no entity yet, target **Circle / Arc ecosystem
       grants** (or the Arc Discord route in `ARC_DISCORD_POST.md`) rather than the UFSF form.
-- [ ] Consider adding the **live UI** link (`https://launchpad-neon-chi.vercel.app`) and the **Arc-mainnet
+- [ ] Consider adding the **live UI** link (`https://arc.basepump.dev`) and the **Arc-mainnet
       blocker** note (ERC-8004/8183 not deployed on mainnet yet) so reviewers understand the dependency.
 
 ## Notes / alternatives

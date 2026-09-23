@@ -168,7 +168,7 @@ A complete launchpad for AI agents, built on the same non-custodial primitives.
 - **Revenue + staking** — `RevenueSplitter` (agent USDC revenue → 70% stakers / 30% treasury),
   `AgentStakingVault` (ERC-4626-style, deposit the agent token, earn USDC yield).
 - **UI** — Create · Trade (curve buy/sell) · **Staking & Yield** (stake/unstake/claim) with IPFS
-  (Pinata) metadata, at **https://launchpad-neon-chi.vercel.app**.
+  (Pinata) metadata, at **https://arc.basepump.dev**.
 - **Tests** — **34/34** Foundry (orders 17 · launchpad 8 · graduation 3 · staking 5 · revenue-wiring 1) **+ 1 mainnet-fork dry-run** (`test/DeployMainnetFork.t.sol`, [audit package](docs/AUDIT_PACKAGE.md) §4).
 
 Addresses & tx hashes: [`DEPLOYMENTS.md`](DEPLOYMENTS.md). Architecture: [`docs/AGENT_LAUNCHPAD.md`](docs/AGENT_LAUNCHPAD.md).

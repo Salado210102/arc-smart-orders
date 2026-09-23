@@ -20,7 +20,7 @@ Verifiable on-chain (Arc mainnet, chain 5042):
 
 Honest status: launchpad (create + curve trading) is LIVE on mainnet; smart-order fills + graduation are pending a venue (StableFX is permissioned; no public AMM yet). 34/34 Foundry tests, MIT, Safe 2/2 owns everything.
 
-🔗 DApp: https://launchpad-neon-chi.vercel.app
+🔗 DApp: https://arc.basepump.dev
 🔗 Repo: https://github.com/Salado210102/arc-smart-orders
 
 Feedback welcome — especially on the witness/intent design and on the graduation-venue question. 🛠️
@@ -59,7 +59,7 @@ Onchain stablecoin FX today is custodial or relies on thin AMM liquidity, and th
 ## Verify
 - OrderExecutor: `0x9b3a990d1a31Ff5E01ddB8702e10F2529811FDb7`
 - AgentFactory: `0x4A80a4748A1d2AB37300780FcBC2FD28d2Ed393B`
-- DApp: https://launchpad-neon-chi.vercel.app
+- DApp: https://arc.basepump.dev
 - Repo: https://github.com/Salado210102/arc-smart-orders
 
 ## Honest status & open questions
