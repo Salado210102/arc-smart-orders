@@ -244,6 +244,32 @@ created on mainnet). Graduation is **gated**; enable later via Safe: `module.set
 > **unreachable** `graduationUsdc` (1,000,000,000 USDC) so curve trading stays open indefinitely until a
 > real venue is wired. (`AgentBondingCurve.buy/sell` revert once `graduated`.)
 
+---
+
+# OrderExecutor + MockStableRouter — fresh deploy + keeper E2E — 2026-09-23
+
+Deployed **from the VPS (Ubuntu + Foundry)** because local Windows `forge` is blocked by WDAC.
+Chain **5042002** (Arc Testnet).
+
+| Contract | Address |
+|---|---|
+| **OrderExecutor** | `0xB19F1193BcC50c2aC0fdD9f1a28F95f7493f6Ee3` |
+| **MockStableRouter** (USDC→EURC, test-only) | `0x228bea1763e9D52dF82714Cde250B12f1f175489` |
+
+Config: owner = A, **keeper = B**, feeRecipient = A, swapTarget = router.
+
+| Step | Tx |
+|---|---|
+| Fund router with **5 EURC** (from A) | `0xdf9db815a85e15dd3d71b219cf45117243a8a5988a2d373aa161895ae3178dbe` |
+| Approve **Permit2** for USDC (from A) | `0xfe06dc9d8a9a61fdace594ec5fcd3b48f9278a10e1184b932c7afc38e2df94d1` |
+| **Fill LIMIT 1 USDC → min 0.90 EURC** (keeper B, **DRY=0**) | `0xb075e97c8d7ce1693f750f8407e4b9785bec61a2011b289497069203dd6d71a8` |
+
+**Verified on-chain:** fill tx success · A USDC `4.555472 → 3.552141` (−1 USDC −0.003 fee) ·
+A EURC `8.674480 → 9.591720` (**+0.917240**, after funding the router with 5) ·
+router EURC `5.0 → 4.082760`. The Permit2 **witness (`tokenOut=EURC`, `minOut`) was enforced**.
+
+Keeper ran from the VPS (`/tmp/k`, port 8789, testnet RPC, keeper=B). Deploy key A was used on the VPS only.
+
 
 
 
