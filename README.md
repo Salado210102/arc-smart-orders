@@ -199,6 +199,14 @@ staking vault** and 30% to the treasury. Verified by `test/RevenueWiring.t.sol`.
 remainder to the `RevenueSplitter`, in the **same transaction** — so the pool is settled first and
 dividends are computed only on **net** revenue. (`contracts/src/credit/RevenueRouter.sol`)
 
+### cirBTC collateral & yield vault (draft)
+- **cirBTC collateral** in `AgentCreditPool`: agents post **cirBTC** (Arc mainnet `0x171A…bAA0`, 8 dec) to
+  borrow USDC — **LTV ≤ 70%**, liquidation at **80%**, **5% penalty → treasury**; `liquidate()` is
+  permissionless. Prices come from an **`IPriceOracle`**; **no public Arc oracle exists yet** → a real
+  Pyth/Chainlink feed is wired via `setCollateralConfig` (`MockPriceOracle` in tests).
+- **`AgentYieldVault`** (ERC-4626, asset = cirBTC) with a pluggable **`IYieldStrategy`** (Uniswap v4 / Arc
+  AMM concentrated liquidity when available; `MockYieldStrategy` until then). Draft — **not deployed**.
+
 ### Unified economic flow
 Credit is returned to the pool **before** any dividend is distributed:
 
