@@ -77,7 +77,7 @@ contract AgentCreditPool {
     mapping(address => uint256) public agentOutstanding;
     mapping(address => uint256[]) internal agentLoans; // loan ids per agent (for repayOnBehalf)
 
-    uint256 private _locked;
+    bool private _locked;
 
     // --------------------------------------------------------------------- events
     event Deposited(address indexed lp, uint256 amount, uint256 mintedShares);
