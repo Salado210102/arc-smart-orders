@@ -132,6 +132,9 @@ contracts/                        Foundry
   src/mocks/MockStableRouter.sol      fixed-rate USDC->EURC router for testnet/local
   src/agentic/IERC8004.sol            interfaces for the deployed ERC-8004 registries
   src/agentic/IAgenticCommerce.sol    interfaces for ERC-8183 + IACPHook
+  src/launchpad/AgentToken.sol        ERC-20 (fixed supply, anti-sniper limits)
+  src/launchpad/AgentBondingCurve.sol USDC bonding curve (virtual reserves, fees, graduation)
+  src/launchpad/AgentFactory.sol      launch orchestrator (token + curve + ERC-8004 identity)
   test/OrderExecutor.t.sol            11 tests
   script/Deploy.s.sol                 deploy to Arc (+ optional mock router)
 sdk/                              TypeScript (viem)

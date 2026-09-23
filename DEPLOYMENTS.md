@@ -85,4 +85,24 @@ Other txs (v2 run): setKeeper `0x93b7ffea…2ebc` · setBudget `0x5e54d3c0…472
 
 `feeBps` and `feeRecipient` are read live from the contract; `feeBps = 30`, `feeRecipient = 0x59FbA0e7…d5C0`.
 
+---
+
+# Agent Launchpad (P1) — 2026-09-22
+
+| Contract | Address |
+|---|---|
+| **AgentFactory** | [`0x9960c81d15C7A3d5485C7a118f18Cf73ADC7320F`](https://explorer.testnet.arc.io/address/0x9960c81d15C7A3d5485C7a118f18Cf73ADC7320F) |
+| Demo AgentToken (`DEMO`) | [`0xfB55528c953984218D8345ed62899bd53EFC141F`](https://explorer.testnet.arc.io/address/0xfB55528c953984218D8345ed62899bd53EFC141F) |
+| Demo AgentBondingCurve | [`0x7a99BF1116cB67a9532f9be48cD5646BE6d8F110`](https://explorer.testnet.arc.io/address/0x7a99BF1116cB67a9532f9be48cD5646BE6d8F110) |
+
+- **Deploy tx:** [`0x0bf463f506bcdcdd934ff673ae238c6e582196862a18e999c0e575b83c9f17f0`](https://explorer.testnet.arc.io/tx/0x0bf463f506bcdcdd934ff673ae238c6e582196862a18e999c0e575b83c9f17f0)
+- **Launch (demo agent) tx:** [`0xf3f7c80051365401510b470255d34a89ca22edfb9faa9290c8082d803dbaa8fa`](https://explorer.testnet.arc.io/tx/0xf3f7c80051365401510b470255d34a89ca22edfb9faa9290c8082d803dbaa8fa)
+- owner = `0x3df362854B3981b1367aC2DFa41533386628c977` · treasury = `0x59FbA0e7…d5C0` · identity = ERC-8004 `0x8004A818…BD9e`
+
+**Verified on-chain:** `factory.owner()` = A · `token.owner()` = A · `token.curve()` = the curve · curve holds `1e24` tokens (full supply) · `price()` = `5000` (6-dec USDC per whole token = **0.005 USDC**) · `graduated()` = false.
+
+> Curve params: `x0 = 5,000 USDC`, `y0 = 1,000,000` tokens, fee **1%** (50/50 protocol/agent), sniper **5%** for 30s, graduation `1,000,000 USDC`, maxWallet/maxTx `100,000` tokens.
+> **Tests:** `test/Launchpad.t.sol` — 8/8 (buy/sell slippage, fee split, graduation, anti-sniper, max wallet/tx, access control). Full suite: **25/25**.
+
+
 
