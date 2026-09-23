@@ -34,7 +34,7 @@ settlement contract.
 Happy to complete any KYB/onboarding step required for StableFX access.
 
 Best regards,
-Vicente Gonzalez — BasePump · hello@basepump.dev · Telegram @Cryptofun2026
+Vicente Gonzalez — BasePump · hello@basepump.dev · X @VICENTEGon651262 · Telegram @Cryptofun2026
 
 ---
 

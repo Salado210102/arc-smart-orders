@@ -11,7 +11,7 @@
 | Field | Value |
 |---|---|
 | Project | **Arc Smart Orders + Agent Launchpad** |
-| Applicant | BasePump (independent builder) · Vicente Gonzalez · hello@basepump.dev · Telegram @Cryptofun2026 |
+| Applicant | BasePump (independent builder) · Vicente Gonzalez · hello@basepump.dev · X @VICENTEGon651262 · Telegram @Cryptofun2026 |
 | Repo (MIT) | https://github.com/Salado210102/arc-smart-orders |
 | Live UI | https://launchpad-neon-chi.vercel.app |
 | Network | Arc **mainnet 5042** (live) — built **only** on Arc + Circle stack |
