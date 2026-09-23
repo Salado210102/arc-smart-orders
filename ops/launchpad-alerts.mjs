@@ -71,6 +71,24 @@ function saveState(s) {
   }
 }
 
+// Separate state file for fills (avoids clobbering the agent-watcher state).
+const FILL_STATE_FILE = STATE_FILE.replace(/\.json$/i, "") + "-fills.json";
+function loadFillState() {
+  try {
+    return existsSync(FILL_STATE_FILE) ? JSON.parse(readFileSync(FILL_STATE_FILE, "utf8")) : {};
+  } catch {
+    return {};
+  }
+}
+function saveFillState(s) {
+  try {
+    mkdirSync(dirname(FILL_STATE_FILE), { recursive: true });
+    writeFileSync(FILL_STATE_FILE, JSON.stringify(s));
+  } catch {
+    /* ignore */
+  }
+}
+
 async function notify(text) {
   const targets = [];
   if (TG_TOKEN && TG_CHAT) {
@@ -188,12 +206,12 @@ async function tick() {
 
 // ---- smart-order fills (OrderExecutor.OrderExecuted) ----
 async function fillTick() {
-  const state = loadState();
+  const state = loadFillState();
   try {
     const latest = await client.getBlockNumber();
     if (!state.lastFillBlock) {
       state.lastFillBlock = process.env.START_BLOCK ? Number(process.env.START_BLOCK) - 1 : Number(latest);
-      saveState(state);
+      saveFillState(state);
       console.log(`[alerts] fills primed at block ${state.lastFillBlock}`);
       return;
     }
@@ -221,7 +239,7 @@ async function fillTick() {
       if (sent.length) console.log("[alerts] →", sent.join(", "));
     }
     state.lastFillBlock = Number(latest);
-    saveState(state);
+    saveFillState(state);
   } catch (e) {
     console.error("[alerts] fills:", e.message);
   } finally {
