@@ -51,3 +51,50 @@ https://arc.basepump.dev · https://github.com/Salado210102/arc-smart-orders
 - Safe (Arc mainnet): `0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93`
   (<https://explorer.arc.io/address/0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93>).
 - The **cross-chain** and **Phase-2 credit** modules are out of this audit scope (draft, no funds).
+
+---
+
+## Channels (if you can't write in Discord)
+
+You don't need Discord. Use any of these:
+
+1. **Reply to the Arc Microgrants email thread** you already have (fastest — same program, individuals
+   accepted). Add a short paragraph asking whether the grant can be **earmarked for an audit**.
+2. **Arc House** → <https://community.arc.io> — post the short version below (or reply to your approved
+   post). This is where your launch post already got approved.
+3. **X** → public reply/DM to **@arc** (and/or Circle) linking the proposal.
+4. **Email** → if you know a grants/ecosystem contact, use it. Note: the only Circle address we have is
+   `sales@circle.com`, which is **StableFX sales** — not grants.
+
+### Arc House — short post (paste)
+
+**Title:**
+```
+Looking for audit support — Arc Smart Orders + Agent Launchpad (live on mainnet)
+```
+
+**Body:**
+```
+Hi all — I'm Vicente, an independent builder. I shipped Arc Smart Orders + Agent Launchpad on Arc
+mainnet: non-custodial smart orders (USDC ⇄ EURC) + an AI-agent launchpad using Circle's ERC-8004/8183.
+DApp: https://arc.basepump.dev
+
+The fund-bearing core is live and I'd like it independently audited (9 contracts, ~1.4k SLOC:
+OrderExecutor, AgentBondingCurve, AgentStakingVault, …). I've prepared a full audit package and a short
+proposal, and I'm looking for ecosystem audit support, introductions, or a pointer to the right program.
+Open to a competitive/community audit too.
+
+• Repo (MIT, frozen pre-audit-v2): https://github.com/Salado210102/arc-smart-orders
+• Audit package / scope: docs/AUDIT_PACKAGE.md · docs/AUDIT_SCOPE.md
+• Proposal: docs/ARC_CIRCLE_AUDIT_PROPOSAL.md
+
+Thanks!
+```
+
+### Arc Microgrants — paragraph to add (reply to the email)
+```
+Quick follow-up: the protocol is live on Arc mainnet and the fund-bearing core is ready to be audited
+(9 contracts / ~1,411 SLOC). If the grant can be applied toward an independent security audit — or you
+can point me to the right audit program — I'd really appreciate it. Audit package + proposal attached/linked.
+```
+
