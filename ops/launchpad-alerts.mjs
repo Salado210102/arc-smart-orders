@@ -49,7 +49,7 @@ const clientTestnet = RPC_TESTNET ? createPublicClient({ transport: http(RPC_TES
 const AGENT_REGISTERED = parseAbiItem(
   "event AgentRegistered(uint256 indexed agentId, address indexed token, address indexed curve, address creator, string metadataURI)",
 );
-const ERC20 = parseAbiItem("function balanceOf(address) view returns (uint256)");
+const ERC20 = [parseAbiItem("function balanceOf(address) view returns (uint256)")];
 
 function loadState() {
   try {
