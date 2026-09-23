@@ -4,6 +4,10 @@
 
 **Non-custodial limit & TWAP orders for stablecoin FX on Arc (USDC ⇄ EURC).**
 
+> ⚠️ **Reference implementation — not audited.** On Arc mainnet today: **launching agents + bonding-curve
+> trading are live**; smart-order fills, graduation and ERC-8004 identity are **pending external
+> infrastructure** (a swap venue + the registries). See [Status & transparency](#status--transparency).
+
 Users sign an order **off-chain** (Permit2 + EIP-712). A **keeper** executes it on-chain through a
 verified executor contract that **enforces exactly what the user signed**. Funds never leave the
 user's wallet until the fill, and the keeper can never redirect the output or fill below the signed
@@ -146,16 +150,21 @@ Domain: `name="ArcSmartOrders", version="1", verifyingContract=executor` — mus
 
 ---
 
-## Agent Launchpad (live on Arc mainnet)
+## Agent Launchpad
 
-A complete launchpad for AI agents, built on the same non-custodial primitives:
+A complete launchpad for AI agents, built on the same non-custodial primitives.
 
-- **Identity** — ERC-8004 `register` on launch (`AgentFactory`).
+> **Mainnet status:** **launching an agent + trading on its USDC bonding curve are live** on Arc mainnet
+> today. **ERC-8004 identity, DEX graduation and LP locking are pending** (the registries and a public DEX
+> venue are not live on Arc mainnet yet) — they are proven on testnet and marked as such below.
+
+- **Identity** — ERC-8004 `register` on launch (`AgentFactory`) *(skipped on mainnet until the registry ships)*.
 - **Token + USDC bonding curve** — `AgentToken` (fixed supply, anti-sniper limits), `AgentBondingCurve`
   (virtual reserves `k = x·y`, 1% fee split 50/50 protocol/agent, sniper fee, graduation),
   `AgentFactory` (orchestrator).
 - **Registry + graduation** — `AgentRegistry` (agentId ⟷ token ⟷ curve ⟷ creator), `GraduationModule`
-  (pulls liquidity, seeds the DEX), `LiquidityLocker` (LP locked 365d → anti-rug).
+  (pulls liquidity, seeds the DEX), `LiquidityLocker` (LP locked 365d → anti-rug) *(graduation is **gated**
+  on mainnet — no module is wired until a real DEX exists)*.
 - **Revenue + staking** — `RevenueSplitter` (agent USDC revenue → 70% stakers / 30% treasury),
   `AgentStakingVault` (ERC-4626-style, deposit the agent token, earn USDC yield).
 - **UI** — Create · Trade (curve buy/sell) · **Staking & Yield** (stake/unstake/claim) with IPFS
@@ -423,9 +432,10 @@ lives in `keeper/src/agentic.ts`.
 ## Roadmap
 
 1. **Wire the real swap venue.** The swap leg is a pluggable `swapTarget` (owner-whitelisted). On
-   testnet we use `MockStableRouter`. For production, authorize the real venue (Circle **App Kit
-   Swap** router / **StableFX** `FxEscrow`) via `setAllowedTarget`.
-   → *Main open question: identify the public on-chain router/venue address.*
+   testnet we use `MockStableRouter`. **Update (2026-09):** StableFX is **permissioned** (institutions
+   only — declined for independent builders) and **App Kit Swap is not an on-chain router** (it is
+   API-orchestrated), so it cannot be plugged in atomically. We are evaluating a **public AMM on Arc** when
+   one exists, or a keeper-side execution. Until then, order fills stay in **dry-run**.
 2. **Off-chain readiness.** Replace the manual `ready` flag with a real FX price source (App Kit
    quote / StableFX / oracle) compared against the signed `minOut` / `minRate`.
 3. **Agentic track (ERC-8004 identity + ERC-8183 jobs).** Let AI agents register and run these
@@ -434,13 +444,17 @@ lives in `keeper/src/agentic.ts`.
 5. **Phase 2 — agentic credit.** Audit the `AgentCreditPool`, run an **invite-only pilot**, wire the
    **ERC-8183 auto-repay** through the keeper, and publish the **Python SDK** to PyPI.
 
-## Status
+## Status & transparency
 
-**Pre-audit freeze:** `pre-audit-v2` (previous: [`pre-audit-v1`](https://github.com/Salado210102/arc-smart-orders/tree/pre-audit-v1)).
-**Live on Arc mainnet (5042)** — Safe-owned deploy (see [`DEPLOYMENTS.md`](DEPLOYMENTS.md)): OrderExecutor,
-AgentFactory, AgentRegistry, GraduationModule, LiquidityLocker. Graduation is **gated** (no module wired) and
-ERC-8004 is **skipped** until the registries ship on mainnet; the swap venue (StableFX) is pending. **Not yet
-audited** — see [`docs/AUDIT_PACKAGE.md`](docs/AUDIT_PACKAGE.md).
+| | |
+|---|---|
+| **Live on Arc mainnet (5042)** | `OrderExecutor`, `AgentFactory`, `AgentRegistry`, `GraduationModule`, `LiquidityLocker` — all **Safe-owned** (see [`DEPLOYMENTS.md`](DEPLOYMENTS.md)) |
+| **Works today** | launching an agent, trading on its USDC bonding curve (non-custodial) |
+| **Pending (external, not bugs)** | smart-order **fills** + **graduation** (need a swap venue); **ERC-8004** identity (registry not on mainnet); the order engine runs in **dry-run** |
+| **Not deployed / draft** | Phase 2 `AgentCreditPool` (credit) — **unaudited**, not deployed |
+| **Not audited** | the whole codebase — see [`docs/AUDIT_PACKAGE.md`](docs/AUDIT_PACKAGE.md) |
+
+Pre-audit freeze: tag `pre-audit-v2` (previous [`pre-audit-v1`](https://github.com/Salado210102/arc-smart-orders/tree/pre-audit-v1)).
 
 ## License
 
