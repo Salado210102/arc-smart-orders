@@ -5,6 +5,7 @@
 //   node ops/keeper-metrics-bot.mjs send        # compute + send once to Telegram
 //   node ops/keeper-metrics-bot.mjs watch       # compute + send every METRICS_MS
 //   node ops/keeper-metrics-bot.mjs serve       # reply to /metrics in Telegram (long-poll) — needs a bot token
+//   node ops/keeper-metrics-bot.mjs daemon      # 24/7: periodic push + /metrics replies (the PM2 mode)
 //   node ops/keeper-metrics-bot.mjs test        # send a one-off test message
 //
 // Metrics:
@@ -296,7 +297,11 @@ async function serve() {
 
 const cmd = process.argv[2] ?? "print";
 
-if (cmd === "serve") {
+if (cmd === "daemon") {
+  // 24/7 mode: background periodic push (unless METRICS_MS=0) + on-demand /metrics listener.
+  if (METRICS_MS > 0) void watch();
+  await serve();
+} else if (cmd === "serve") {
   await serve();
 } else if (cmd === "watch") {
   await watch();

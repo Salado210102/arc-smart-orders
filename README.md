@@ -298,7 +298,7 @@ keeper/                             TypeScript (viem)
   src/setup-order.ts                  E2E: approve Permit2 + sign a LIMIT order
   src/crosschain-builder.ts           sign a CrossChainIntent + encode executeCrossChain (draft)
 apps/launchpad/                     Vite + React + Tailwind launchpad UI (Vercel)
-ops/                                ops tooling (Safe execTransaction signer, alerts + metrics bots)
+ops/                                ops tooling (Safe execTransaction signer, alerts + metrics bots, keeper funding)
 examples/python/sign_limit_order.py Python EIP-712 signing recipe (verified to match the TS SDK)
 docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · CROSS_CHAIN_ORDERS · GEX_AGENT_SPEC · SDK_INTEGRATION · SAFE_TREASURY · SAFE_MAINNET · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
 ```
