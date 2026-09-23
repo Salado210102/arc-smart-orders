@@ -61,3 +61,28 @@
 **Verified on-chain:** `ownerOf(896807)` = B · B USDC 3 → **3.0878** (escrow released) · A USDC **11.8279**.
 The link between the job and the fill is the **deliverable hash = keccak256(fillTxHash)** (non-hooked path, off-chain link).
 
+---
+
+# OrderExecutor v2 (input-side fee) — E2E — 2026-09-22
+
+- **OrderExecutor v2**: [`0x5E9dCd592B37fda481Fc203756DA4D990cE438bA`](https://explorer.testnet.arc.io/address/0x5E9dCd592B37fda481Fc203756DA4D990cE438bA)
+  - owner = A, keeper = B, **feeRecipient (treasury) = `0x59FbA0e7e3AAdfb766553D1c02f0b4ccC4D8d5C0`**, swapTarget = MockStableRouter
+- **feeBps = 30 (0.30%)**, cap 1000 bps.
+
+## Fee flow (job 186650, agent 896809)
+Fill tx: [`0xb3bb5918340f2dad259f6a4b8aee122cd97ad7363e82b4f4225aa943b075da8c`](https://explorer.testnet.arc.io/tx/0xb3bb5918340f2dad259f6a4b8aee122cd97ad7363e82b4f4225aa943b075da8c) (status success)
+
+| Movement (ERC-20 USDC/EURC, 6 dec) | From → To | Amount |
+|---|---|---|
+| Permit2 pull (gross) | A → executor | `1.000000` USDC |
+| **Platform fee (0.30%)** | **executor → treasury T** | **`0.003000` USDC** |
+| Swap input (**net**) | executor → router | `0.997000` USDC |
+| Output | router → A | `0.917240` EURC |
+
+`0.997 × 0.92 = 0.91724` ✓ · **treasury USDC = 0.003000** ✓
+
+Other txs (v2 run): setKeeper `0x93b7ffea…2ebc` · setBudget `0x5e54d3c0…4728` · fund `0x33ccad2e…6a01` · submit `0xc1afd3f5…22b7` · complete `0x4fe16b20…df03` · reputation `0x96f3ba07…a27e`.
+
+`feeBps` and `feeRecipient` are read live from the contract; `feeBps = 30`, `feeRecipient = 0x59FbA0e7…d5C0`.
+
+

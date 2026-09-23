@@ -13,7 +13,7 @@ import {
 } from "./agentic.ts";
 
 const RPC = "https://rpc.testnet.arc.io";
-const EXECUTOR = "0x9cb011A46A1127202Bc92F48f70Bf7010F1f9B6C" as const;
+const EXECUTOR = (process.env.EXECUTOR ?? "0x5E9dCd592B37fda481Fc203756DA4D990cE438bA") as `0x${string}`;
 const ROUTER = "0xcDeA0D5BcD78dB86D7A5f4E976976400a5b4dffc" as const;
 const EXPLORER = "https://explorer.testnet.arc.io/tx/";
 
@@ -57,6 +57,10 @@ const executorAbi = [
 const routerAbi = [
   { type: "function", name: "swap", stateMutability: "nonpayable", inputs: [{ name: "tokenIn", type: "address" }, { name: "amountIn", type: "uint256" }, { name: "tokenOut", type: "address" }, { name: "recipient", type: "address" }, { name: "minOut", type: "uint256" }], outputs: [{ type: "uint256" }] },
 ] as const;
+const feeAbi = [
+  { type: "function", name: "feeBps", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "feeRecipient", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+] as const;
 
 const txmap: Record<string, string> = {};
 const log = (step: string, hash: string) => {
@@ -69,12 +73,18 @@ async function main() {
   console.log(`B keeper : ${B.address}`);
   console.log(`C validator: ${C.address}\n`);
 
-  // 0) Fund B and C from A (gas + roles)
-  console.log("── Step 0: Fund B and C from A (3 USDC each) ──");
+  // 0) Ensure B and C are funded (only top up if low, to save A's USDC)
+  console.log("── Step 0: Ensure B and C are funded ──");
+  const balAbi = [{ type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ type: "uint256" }] }] as const;
   for (const [label, to] of [["B", B.address], ["C", C.address]] as const) {
-    const h = await wcA.writeContract({ account: A, address: USDC, abi: erc20Abi, functionName: "transfer", args: [to, parseUnits("3", 6)], maxFeePerGas: await gas() });
-    await pc.waitForTransactionReceipt({ hash: h });
-    log(`fund ${label}`, h);
+    const bal = (await pc.readContract({ address: USDC, abi: balAbi, functionName: "balanceOf", args: [to] })) as bigint;
+    if (bal < parseUnits("1", 6)) {
+      const h = await wcA.writeContract({ account: A, address: USDC, abi: erc20Abi, functionName: "transfer", args: [to, parseUnits("2", 6)], maxFeePerGas: await gas() });
+      await pc.waitForTransactionReceipt({ hash: h });
+      log(`fund ${label}`, h);
+    } else {
+      console.log(`  ${label} already funded (${Number(bal) / 1e6} USDC)`);
+    }
   }
 
   // 1) A (owner) makes B the OrderExecutor keeper
@@ -97,7 +107,7 @@ async function main() {
   const amountIn = parseUnits("1", 6);
   const minOut = parseUnits("0.90", 6);
   const deadline = BigInt(now + 3600);
-  const nonce = 2n;
+  const nonce = BigInt(Date.now()); // unordered Permit2 nonce — unique per run
   const permitSignature = await signLimitOrder(wcA, {
     tokenIn: USDC, tokenOut: EURC.testnet as `0x${string}`, amountIn, minOut, spender: EXECUTOR, nonce, deadline, chainId: ARC_TESTNET_CHAIN_ID,
   });
@@ -122,11 +132,18 @@ async function main() {
     log("fund escrow", rc.transactionHash);
   }
 
-  // 7) B executes the fill via OrderExecutor (keeper)
-  console.log("── Step 7: B fills the order (OrderExecutor.executeOrder) ──");
+  // 7) B executes the fill via OrderExecutor (keeper) — WITH platform fee (input-side)
+  console.log("── Step 7: B fills the order (OrderExecutor.executeOrder + fee) ──");
+  const feeBps = (await pc.readContract({ address: EXECUTOR, abi: feeAbi, functionName: "feeBps" })) as bigint;
+  const feeRecipient = (await pc.readContract({ address: EXECUTOR, abi: feeAbi, functionName: "feeRecipient" })) as `0x${string}`;
+  const fee = (amountIn * feeBps) / 10_000n;
+  const swapAmount = amountIn - fee;
+  console.log(`  feeBps=${feeBps} (${Number(feeBps) / 100}%) · fee=${fee} wei (${Number(fee) / 1e6} USDC) · swapAmount=${swapAmount} (${Number(swapAmount) / 1e6} USDC)`);
+  console.log(`  treasury (feeRecipient) = ${feeRecipient}`);
   let fillHash: `0x${string}`;
   {
-    const swapData = encodeFunctionData({ abi: routerAbi, functionName: "swap", args: [USDC, amountIn, EURC.testnet as `0x${string}`, A.address, minOut] });
+    // The keeper builds the swap for the NET amount (gross - fee).
+    const swapData = encodeFunctionData({ abi: routerAbi, functionName: "swap", args: [USDC, swapAmount, EURC.testnet as `0x${string}`, A.address, minOut] });
     const data = encodeFunctionData({
       abi: executorAbi, functionName: "executeOrder",
       args: [
@@ -138,6 +155,9 @@ async function main() {
     const rc = await pc.waitForTransactionReceipt({ hash: fillHash });
     if (rc.status !== "success") throw new Error("fill reverted");
     log("fill", fillHash);
+    const balAbi = [{ type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ type: "uint256" }] }] as const;
+    const tBal = (await pc.readContract({ address: USDC, abi: balAbi, functionName: "balanceOf", args: [feeRecipient] })) as bigint;
+    console.log(`  ➜ treasury USDC = ${tBal} (${Number(tBal) / 1e6} USDC) · fee received = ${Number(tBal) / 1e6} USDC`);
   }
 
   // 8) B submits the deliverable = keccak256(fillTxHash)
