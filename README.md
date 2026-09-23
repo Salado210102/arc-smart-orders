@@ -18,6 +18,23 @@ adapted to Arc's stablecoin-native model.
 
 ---
 
+## Modules
+
+Three layers, one repo:
+
+| Layer | What | Where | State |
+|---|---|---|---|
+| **1 · Core protocol** | Smart orders (Permit2 witness + EIP-712 **intent engine**) + **Agent Launchpad** | `contracts/src/OrderExecutor.sol`, `contracts/src/launchpad/*` | ✅ **live on Arc mainnet** |
+| **2 · Monetization & agentic credit** | **`AgentCreditPool`** (peer-to-contract USDC micro-loans), **`RevenueSplitter`** + **`AgentStakingVault`** (ERC-4626 yield accumulator) | `contracts/src/credit/*`, `contracts/src/launchpad/*` | 🧪 Phase 2 (draft, not deployed) |
+| **3 · Agent SDK** | **`arc-agent-treasury`** — check balance / borrow / repay from an AI agent | `sdk-python/` | 🧪 Phase 2 |
+
+- **Smart Orders** → [`contracts/src/OrderExecutor.sol`](contracts/src/OrderExecutor.sol) · [SDK](sdk/src/index.ts) · [Keeper](keeper/src/index.ts)
+- **Agent Launchpad** → [`docs/AGENT_LAUNCHPAD.md`](docs/AGENT_LAUNCHPAD.md)
+- **Agent Credit Pool** → [`contracts/src/credit/AgentCreditPool.sol`](contracts/src/credit/AgentCreditPool.sol) · [`docs/AGENT_CREDIT_POOL.md`](docs/AGENT_CREDIT_POOL.md)
+- **Python SDK** → [`sdk-python/`](sdk-python/)
+
+---
+
 ## Why Arc fits this
 
 - **USDC is the gas token** → a keeper pays ~\$0.001/tx in USDC, no volatile gas exposure.
@@ -149,6 +166,46 @@ Addresses & tx hashes: [`DEPLOYMENTS.md`](DEPLOYMENTS.md). Architecture: [`docs/
 fee** which is sent to the agent's `RevenueSplitter`; calling `distributeBalance()` pushes **70% to the
 staking vault** and 30% to the treasury. Verified by `test/RevenueWiring.t.sol`.
 
+## Phase 2 — Agentic credit & monetization
+
+### `AgentCreditPool` — peer-to-contract USDC micro-credit
+- **Invite-only** (whitelisted LPs + agents). LPs deposit USDC to earn yield; approved agents take
+  **short micro-loans ($5–$50)** to pay for API/gas.
+- **Risk, layered:** whitelist → **per-agent & per-epoch caps** → **max utilization** (LPs can always
+  withdraw) → **first-loss reserve** → **hybrid bond** (min USDC bond on-chain + ERC-8004 reputation
+  off-chain, slashed on default) → owner **pause**.
+- **Fees:** flat per-loan interest; **15% performance fee → Safe treasury**, a slice → reserve, the rest
+  → LPs.
+- **Auto-repay:** the keeper settles the loan from the **ERC-8183 job escrow** (`repayFrom`) as soon as
+  the deliverable is validated.
+
+### `RevenueSplitter` + `AgentStakingVault` (ERC-4626 yield accumulator)
+- `RevenueSplitter` splits an agent's USDC revenue **70% → stakers / 30% → treasury**.
+- `AgentStakingVault` is an **ERC-4626-style** vault; the stakers' share streams in as yield.
+
+### Unified economic flow
+Credit is returned to the pool **before** any dividend is distributed:
+
+```
+   AI agent needs gas/API
+          │  borrow ($5–$50)
+          ▼
+   AgentCreditPool ──────────────► AI agent
+        ▲                             │  does a job (ERC-8183 escrow)
+        │  repay (auto, via keeper)   ▼
+        └───────────────────────  Escrow pays on delivery
+                                      │
+                                      ▼
+                               RevenueSplitter
+                                 ├─ 70% ─► AgentStakingVault (stakers earn USDC)
+                                 └─ 30% ─► Safe treasury
+```
+
+When an ERC-8183 job completes, the escrow pays out; the **keeper immediately repays the outstanding
+loan** to the pool (`repayFrom`), and only **then** does the remaining revenue flow through the
+`RevenueSplitter` (70% stakers / 30% treasury). LPs are made whole first → no double-spend of the agent's
+income.
+
 ## Repo layout
 
 ```
@@ -156,6 +213,7 @@ contracts/                          Foundry — solc 0.8.26, via-ir, optimizer 2
   src/OrderExecutor.sol               executor (Permit2 witness + DcaIntent + input-side fee + whitelist)
   src/agentic/IERC8004.sol            interfaces for the deployed ERC-8004 registries
   src/agentic/IAgenticCommerce.sol    interfaces for ERC-8183 + IACPHook
+  src/credit/AgentCreditPool.sol      peer-to-contract USDC micro-credit (LP shares, bond, caps, first-loss reserve)
   src/launchpad/AgentToken.sol        ERC-20 (fixed supply, anti-sniper limits)
   src/launchpad/AgentBondingCurve.sol USDC bonding curve (virtual reserves, fees, graduation)
   src/launchpad/AgentFactory.sol      launch orchestrator (token + curve + ERC-8004 identity)
@@ -173,13 +231,17 @@ contracts/                          Foundry — solc 0.8.26, via-ir, optimizer 2
   test/RevenueWiring.t.sol            1 test   (order fee -> splitter -> vault)
   test/Permit2WitnessFork.t.sol       fork test vs the real Permit2
   test/DeployMainnetFork.t.sol        mainnet-fork dry-run of the deploy script
+  test/AgentCreditPool.t.sol          18 tests (credit pool: shares, whitelist, bond, caps, repay split, default, pause)
   script/Deploy.s.sol                 deploy OrderExecutor (+ optional mock router)
   script/DeployLaunchpad.s.sol        deploy the launchpad (P1/P2)
   script/DeployStaking.s.sol          deploy RevenueSplitter + vault (P3)
   script/DeployMainnet.s.sol          deterministic MAINNET deploy (env-validated + Safe)
+  script/DeployCreditPool.s.sol       deploy AgentCreditPool (env-validated, Safe-owned)
   script/CreateSafe.s.sol             create the 2/2 Safe on Arc
 sdk/                                TypeScript (viem)
   src/index.ts                        EIP-712 domains/types, signLimitOrder/signTwapOrder, Permit2 approval
+sdk-python/                         Python SDK — arc-agent-treasury (PyPI-ready)
+  arc_agent_treasury/__init__.py      ArcAgentTreasury: usdc_balance / needs_credit / request_credit / repay
 keeper/                             TypeScript (viem)
   src/{server,worker,db,agentic,events}.ts  persistent keeper: HTTP API + WebSocket + SQLite worker
   src/agentic.ts                      ERC-8004 identity/reputation + ERC-8183 job lifecycle
@@ -187,17 +249,35 @@ keeper/                             TypeScript (viem)
 apps/launchpad/                     Vite + React + Tailwind launchpad UI (Vercel)
 ops/                                ops tooling (Safe execTransaction signer, reminder bot)
 examples/python/sign_limit_order.py Python EIP-712 signing recipe (verified to match the TS SDK)
-docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · SAFE_TREASURY · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL
+docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · SAFE_TREASURY · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
 ```
 
 ---
 
-## Testing
+## Quick start
 
+### Python SDK (`arc-agent-treasury`)
+```bash
+pip install -e ./sdk-python            # or: pip install arc-agent-treasury (once published)
+```
+```python
+from arc_agent_treasury import ArcAgentTreasury
+
+tr = ArcAgentTreasury(
+    rpc_url="https://rpc.mainnet.arc.io",
+    pool_address="0x…AgentCreditPool",
+    agent_address="0x…myAgent",
+    private_key=os.environ["AGENT_PK"],
+)
+tx = tr.ensure_credit(min_balance=1_000_000, amount=10_000_000)  # borrow only if < 1 USDC
+```
+
+### Contracts — Foundry
 ```bash
 cd contracts
 forge install foundry-rs/forge-std     # once
-forge test -vv                         # 34/34 unit+integration (fork test skipped unless env is set)
+forge test -vv                         # core: 34/34 unit+integration (fork test skipped unless env is set)
+forge test --match-contract AgentCreditPoolTest -vvv   # Phase 2: 18 credit-pool tests
 ```
 
 Covers: atomic pull+swap, DCA parts, `minOut`/`minRate` reverts, whitelist, keeper/owner access,
@@ -339,6 +419,8 @@ lives in `keeper/src/agentic.ts`.
 3. **Agentic track (ERC-8004 identity + ERC-8183 jobs).** Let AI agents register and run these
    orders / settle jobs in USDC — Arc's headline use case.
 4. **API + UI** for creating/cancelling orders.
+5. **Phase 2 — agentic credit.** Audit the `AgentCreditPool`, run an **invite-only pilot**, wire the
+   **ERC-8183 auto-repay** through the keeper, and publish the **Python SDK** to PyPI.
 
 ## Status
 
