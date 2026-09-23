@@ -270,6 +270,26 @@ router EURC `5.0 → 4.082760`. The Permit2 **witness (`tokenOut=EURC`, `minOut`
 
 Keeper ran from the VPS (`/tmp/k`, port 8789, testnet RPC, keeper=B). Deploy key A was used on the VPS only.
 
+## Testnet keeper — managed by PM2 (`arc-keeper-testnet`)
+
+The ephemeral keeper was migrated to a **managed PM2 service**, isolated by port:
+
+| | |
+|---|---|
+| **Process** | `arc-keeper-testnet` (PM2, autorestart + `pm2 save`) |
+| **cwd / env** | `/var/www/arc-keeper/keeper-testnet/` (`.env`, chmod 600) |
+| **Port** | `8789` (mainnet keeper stays on `8788`) |
+| **Chain / RPC** | `5042002` · `https://rpc.testnet.arc.io` |
+| **EXECUTOR / ROUTER** | `0xB19F1193BcC50c2aC0fdD9f1a28F95f7493f6Ee3` / `0x228bea1763e9D52dF82714Cde250B12f1f175489` |
+| **Mode** | `DRY=0` (real testnet fills) · keeper = B |
+
+```bash
+pm2 list                              # arc-keeper (mainnet) + arc-keeper-testnet
+pm2 logs arc-keeper-testnet
+curl -s http://127.0.0.1:8789/health  # {"ok":true,"chainId":5042002,...}
+```
+Logs: `/var/www/arc-keeper/logs/arc-keeper-testnet.{out,err}.log`.
+
 
 
 
