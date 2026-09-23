@@ -1,5 +1,7 @@
 # Arc Smart Orders
 
+[![CI](https://github.com/Salado210102/arc-smart-orders/actions/workflows/ci.yml/badge.svg)](https://github.com/Salado210102/arc-smart-orders/actions/workflows/ci.yml)
+
 **Non-custodial limit & TWAP orders for stablecoin FX on Arc (USDC ⇄ EURC).**
 
 Users sign an order **off-chain** (Permit2 + EIP-712). A **keeper** executes it on-chain through a
@@ -284,9 +286,11 @@ tx = tr.ensure_credit(min_balance=1_000_000, amount=10_000_000)  # borrow only i
 ```bash
 cd contracts
 forge install foundry-rs/forge-std     # once
-forge test -vv                         # core: 34/34 unit+integration (fork test skipped unless env is set)
-forge test --match-contract AgentCreditPoolTest -vvv   # Phase 2: 18 credit-pool tests
+forge test -vv                         # core: 34/34 (+1 fork skipped unless env set)
+forge test --match-contract AgentCreditPoolTest -vvv   # Phase 2: 21 credit-pool tests
+forge test --match-contract RevenueRouterTest -vvv     # Phase 2: 3 repay-before-split tests
 ```
+> CI runs all of this on every push — see the **CI badge** at the top (`.github/workflows/ci.yml`).
 
 Covers: atomic pull+swap, DCA parts, `minOut`/`minRate` reverts, whitelist, keeper/owner access,
 **canonical Permit2 witness typehash**, `DcaIntent` rejections (wrong `tokenOut`, low `minOut`, foreign
