@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Activity, Droplet, Plus, Wallet } from "lucide-react";
+import { Activity, BarChart3, Droplet, Plus, Wallet } from "lucide-react";
 import { cn, short } from "../lib/utils";
 
-export type Tab = "agents" | "create" | "trade" | "stake";
+export type Tab = "agents" | "dashboard" | "create" | "trade" | "stake";
 
 const TABS: { key: Tab; label: string; icon: typeof Activity }[] = [
   { key: "agents", label: "Agents", icon: Activity },
+  { key: "dashboard", label: "Dashboard", icon: BarChart3 },
   { key: "create", label: "Create", icon: Plus },
   { key: "trade", label: "Trade", icon: Droplet },
   { key: "stake", label: "Staking & Yield", icon: Wallet },

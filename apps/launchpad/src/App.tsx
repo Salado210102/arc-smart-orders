@@ -4,6 +4,7 @@ import { formatUnits, parseUnits } from "viem";
 import { EXPLORER, connect, publicClient, walletClient } from "./arc";
 import { ADDR, erc20Abi, factoryAbi, registryAbi } from "./contracts";
 import { AgentCard, type Agent } from "./components/AgentCard";
+import { Dashboard } from "./components/Dashboard";
 import { Navbar, type Tab } from "./components/Navbar";
 import { StakingPanel } from "./components/StakingPanel";
 import { SwapBox } from "./components/SwapBox";
@@ -181,6 +182,13 @@ export default function App() {
                 ))}
               </div>
             )}
+          </>
+        )}
+
+        {tab === "dashboard" && (
+          <>
+            <SectionHeading title="Dashboard" subtitle="On-chain protocol metrics" />
+            <Dashboard />
           </>
         )}
 

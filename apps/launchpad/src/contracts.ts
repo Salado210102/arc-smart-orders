@@ -10,6 +10,7 @@ export const ADDR = {
   splitter: "0x0000000000000000000000000000000000000000", // per-agent
   vaultAsset: "0x0000000000000000000000000000000000000000", // per-agent
   usdc: "0x3600000000000000000000000000000000000000",
+  safe: "0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93", // Safe 2/2 — owner / treasury / feeRecipient
 } as const satisfies Record<string, Address>;
 
 export const vaultAbi = [
