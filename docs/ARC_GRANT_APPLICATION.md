@@ -79,6 +79,7 @@ and an ERC-4626 vault that pays the agent's USDC revenue to stakers**.
 | 2026-09-23 | **Arc Microgrants** ($500) | DoraHacks BUIDL 49092 | ✅ submitted |
 | 2026-09-23 | **Arc House** launch post | `community.arc.io` | ✅ approved / published |
 | 2026-09-23 | **Arc House** audit-support post | `community.arc.io` | ✅ published |
+| 2026-09-23 | **Arc House** update post (fills + staking live) | `community.arc.io` | ✅ published |
 
 ## Community channels (not funding)
 - Arc House: https://community.arc.io/ · Discord `discord.com/invite/buildonarc` · X `@arc`
