@@ -60,11 +60,21 @@ Full guide: [`SAFE_TREASURY.md`](SAFE_TREASURY.md). Summary:
 - [ ] Confirm all the §0 addresses on chain with `cast code …` (non-empty).
 - [ ] **DEX venue chosen** (§2.3) — a real AMM/router on Arc that supports `addLiquidity` and mints LP.
 
-### 2.3 DEX venue (must be decided before deploy)
-The `GraduationModule` needs an `IDEX` with `addLiquidity(tokenA, tokenB, amountA, amountB, to)` and
-`lpToken()`. Until an Arc AMM is available this is the testnet `MockDEX`; **do not go to mainnet with
-a mock**. Candidates to evaluate: Circle **App Kit Swap** router, **StableFX** `FxEscrow`, or a
-Uniswap-v4-style pool if deployed on Arc.
+### 2.3 DEX venue (decided — verified on-chain 2026-09-23)
+- **StableFX `FxEscrow` = `0xe2E5F173576B513d994073CCbDaCBE027d43DFe6`** (Arc mainnet) — a real venue,
+  but it is a **permissioned RFQ escrow** (settlement), **not** an AMM. Use it as the order engine's
+  `swapTarget`; request access via **`sales@circle.com`** (institutional/API key). See
+  [`CIRCLE_STABLEFX_EMAIL.md`](CIRCLE_STABLEFX_EMAIL.md).
+- **No public AMM/router** on Arc mainnet yet.
+- `GraduationModule` still needs an `IDEX` with `addLiquidity(tokenA,tokenB,amountA,amountB,to)` +
+  `lpToken()`. Options: **(a)** gate graduation until an Arc AMM exists, or **(b)** deploy a minimal AMM
+  as a documented soft-launch venue. **Do not ship a mock as the production venue.**
+
+### 2.4 ERC-8004 / ERC-8183 on mainnet (not deployed yet)
+The registries are **not on Arc mainnet** (verified: `0x8004A8…` / `0x0747…` have no code there). The
+`AgentFactory` supports **`identity == 0` (skip ERC-8004)**, so mainnet can go live now and wire the
+registry later via the Safe (`factory.setIdentity(<registry>)`). `ERC8183_ESCROW` is **keeper-side only**
+(not a constructor arg). Both are **optional** in the deploy script (omit or `0x0`).
 
 ## 3. Deploy (deterministic, sequential)
 
@@ -77,10 +87,12 @@ cd contracts
 export CONFIRM_MAINNET=1                     # safety gate (script reverts without it)
 export RPC=https://rpc.mainnet.arc.io
 export USDC_MAINNET=0x3600000000000000000000000000000000000000
-export DEX_ROUTER=<real AMM / graduation venue>
-export ERC8004_REGISTRY=<ERC-8004 IdentityRegistry on Arc mainnet>
-export ERC8183_ESCROW=<ERC-8183 AgenticCommerce on Arc mainnet>
+export DEX_ROUTER=0xe2E5F173576B513d994073CCbDaCBE027d43DFe6   # StableFX FxEscrow (order-engine swapTarget)
 export ORDERS_KEEPER=<KEEPER_EOA>
+# ERC-8004/8183 are NOT on Arc mainnet yet -> omit (or set 0x0): launches skip ERC-8004,
+# then wire it later via the Safe: factory.setIdentity(<registry>)
+#   export ERC8004_REGISTRY=0x0
+#   export ERC8183_ESCROW=0x0
 # defaults: owner/treasury/feeRecipient = Safe 0x0FBFAF…7e93 · fee 30 bps · graduation cap $10k · lock 365d
 forge script script/DeployMainnet.s.sol \
   --rpc-url $RPC --private-key $PK --broadcast --slow --verify

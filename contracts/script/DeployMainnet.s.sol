@@ -20,9 +20,10 @@ import {LiquidityLocker} from "../src/launchpad/LiquidityLocker.sol";
 ///   CONFIRM_MAINNET=1
 ///   USDC_MAINNET          USDC (ERC-20) address
 ///   DEX_ROUTER            real AMM / graduation venue on Arc
-///   ERC8004_REGISTRY      ERC-8004 IdentityRegistry
-///   ERC8183_ESCROW        ERC-8183 AgenticCommerce (validated; consumed by the keeper/agents)
 ///   ORDERS_KEEPER         keeper EOA
+/// Optional env (0x0/unset = skip):
+///   ERC8004_REGISTRY      ERC-8004 IdentityRegistry — if 0, launches SKIP ERC-8004 (set later via Safe)
+///   ERC8183_ESCROW        ERC-8183 AgenticCommerce (keeper-side) — validated only if provided
 /// Optional env:
 ///   LAUNCHPAD_OWNER       default: the Arc Safe 2/2 (0x0FBFAF…7e93)
 ///   LAUNCHPAD_TREASURY    default: owner
@@ -44,8 +45,9 @@ contract DeployMainnet is Script {
         //  ---- dynamic, validated addresses ----
         address usdc = _contractEnv("USDC_MAINNET");
         address dex = _contractEnv("DEX_ROUTER");
-        address identity = _contractEnv("ERC8004_REGISTRY");
-        address erc8183 = _contractEnv("ERC8183_ESCROW");
+        //  Optional: 0x0 (or unset) = skip. If provided, must be a deployed contract.
+        address identity = _optionalContractEnv("ERC8004_REGISTRY");
+        address erc8183 = _optionalContractEnv("ERC8183_ESCROW");
 
         //  ---- roles (owner/treasury/feeRecipient MUST be contracts = the Safe) ----
         address owner = vm.envOr("LAUNCHPAD_OWNER", ARC_SAFE);
@@ -106,6 +108,15 @@ contract DeployMainnet is Script {
         console2.log("ORDS feeBps     :", feeBps);
         console2.log("soft-launch cap :", softCapUsdc, "USDC graduation/agent");
 
+        //  ---- optional-infra warnings ----
+        if (identity == address(0)) {
+            console2.log("");
+            console2.log("WARN: ERC8004_REGISTRY=0 -> launches SKIP ERC-8004; call setIdentity(Safe) once live");
+        }
+        if (erc8183 == address(0)) {
+            console2.log("WARN: ERC8183_ESCROW=0 -> ERC-8183 jobs disabled (keeper-side); set before agentic jobs");
+        }
+
         //  ---- Safe follow-up: registry.setFactory is onlyOwner (the deployer cannot call it) ----
         console2.log("");
         console2.log("!! The Safe MUST execute registry.setFactory(factory):");
@@ -131,5 +142,13 @@ contract DeployMainnet is Script {
         a = vm.envOr(key, address(0));
         require(a != address(0), string.concat(key, ": missing or zero"));
         require(a.code.length > 0, string.concat(key, ": no contract code at address"));
+    }
+
+    /// @dev Reads an optional address env var. 0x0/unset = skip. If set, it must have code.
+    function _optionalContractEnv(string memory key) internal view returns (address a) {
+        a = vm.envOr(key, address(0));
+        if (a != address(0)) {
+            require(a.code.length > 0, string.concat(key, ": no contract code at address"));
+        }
     }
 }
