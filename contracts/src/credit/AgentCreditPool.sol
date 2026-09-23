@@ -12,14 +12,14 @@ pragma solidity 0.8.26;
 ///      - Caps: per-agent, per-epoch, and a max utilization so LPs can always withdraw.
 ///      - Pause: blocks deposit/loan; withdraw/repay always work.
 ///      - Auto-repay: `keeper` (or anyone) can settle a loan via `repayFrom` once ERC-8183 pays out.
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
 contract AgentCreditPool {
     // --------------------------------------------------------------------- deps
-    interface IERC20 {
-        function transfer(address to, uint256 amount) external returns (bool);
-        function transferFrom(address from, address to, uint256 amount) external returns (bool);
-        function balanceOf(address account) external view returns (uint256);
-    }
-
     IERC20 public immutable usdc; // Arc ERC-20 (6 dec): 0x3600...0000
 
     // --------------------------------------------------------------------- roles
