@@ -60,14 +60,25 @@ and an ERC-4626 vault that pays the agent's USDC revenue to stakers**.
 | **Agentic Economy Prize** | **$50,000** (Circle-funded bonus) | Registered in *Build with Gemini XPRIZE* + use **Circle Agent Stack** + GCP hosting + a real USDC tx + public repo | teams | **Sep 25 2026** | [event](https://community.arc.io/public/events/the-agentic-economy-prize-aignfyumkq) |
 | **UFSF** (audit subsidy) | up to **100%** of audit cost | **Registered legal entity** + KYB; not deployed on a non-Uniswap DEX | ❌ no (needs entity) | monthly cohorts (closes 7th) | [`areta.fillout.com/ufsf-projects`](https://areta.fillout.com/ufsf-projects) |
 | **Uniswap Foundation Grants** | funding based on scope | Deploy to Unichain and/or Uniswap v4; docs; impact | (rolling) | rolling | [form](https://share.hsforms.com/1fxQjPQTgTYmPwlYxxKlSGQsdca9) |
-| **Circle Grant Program** | path-to-production funding | via Microgrants referral / further-along project | — | — | (referred from Microgrants) |
+| **Circle Grant Program** (Questbook) | **$5k–$100k USDC**, milestone-based (can fund an audit) | Live on Arc; Arc-central flow; Circle products (USDC/EURC) | ✅ yes (form asks "incorporated?" → non-incorporated allowed) | rolling / cohorts | [apply](https://circle.questbook.app/) · [info](https://www.circle.com/grant) |
 
 ### Read-out
-- **Best fit right now = Arc Microgrants** (accepts individuals) → but the project must be **deployed on
-  Arc mainnet**, which is **currently blocked** by the missing ERC-8004/8183 registries + a real DEX venue.
-  → **Unblocking mainnet is the gating task.**
+- **Submitted:** **Arc Microgrants** (DoraHacks) **and** **Circle Grants Program — Cohort 2** (Questbook) — see §Submissions log.
+- **Mainnet launchpad is LIVE** (create agent + bonding-curve trading, Safe-owned). Remaining mainnet gaps:
+  a real **FX venue** (smart-order fills, keeper on `DRY=1`), **graduation** (needs an AMM), and the
+  **ERC-8004/8183** registries (not deployed on mainnet yet).
+- **Audit:** not done; requested via the Arc House post and inside the Circle Grant application (milestone 1).
 - **UFSF** stays blocked until a legal entity exists.
 - **No public email exists** for any of these; do not chase one.
+
+## Submissions log
+
+| Date | Program | Channel | Status |
+|---|---|---|---|
+| 2026-09-23 | **Circle Grants Program — Cohort 2** | Questbook (`circle.questbook.app`) | ✅ **submitted** (repo + deck + video + Drive) |
+| 2026-09-23 | **Arc Microgrants** ($500) | DoraHacks BUIDL 49092 | ✅ submitted |
+| 2026-09-23 | **Arc House** launch post | `community.arc.io` | ✅ approved / published |
+| 2026-09-23 | **Arc House** audit-support post | `community.arc.io` | ✅ published |
 
 ## Community channels (not funding)
 - Arc House: https://community.arc.io/ · Discord `discord.com/invite/buildonarc` · X `@arc`
