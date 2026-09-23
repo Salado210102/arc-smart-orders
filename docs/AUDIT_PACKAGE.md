@@ -1,7 +1,7 @@
 # Audit Package — Arc Smart Orders + Agent Launchpad
 
 > Everything a reviewer needs to reproduce the build, run the tests, and verify the deployment.
-> **Frozen at git tag `pre-audit-v1`** (`git rev-parse pre-audit-v1`).
+> **Frozen at git tag `pre-audit-v2`** (`git rev-parse pre-audit-v2`).
 
 | | |
 |---|---|
@@ -109,7 +109,7 @@ Full history + tx hashes: [`../DEPLOYMENTS.md`](../DEPLOYMENTS.md).
 
 ```bash
 git clone https://github.com/Salado210102/arc-smart-orders && cd arc-smart-orders/contracts
-git checkout pre-audit-v1
+git checkout pre-audit-v2
 forge build --sizes
 forge test -vvv
 # start here: docs/AUDIT_SCOPE.md (threat model §3–4), then src/*.sol
@@ -117,7 +117,7 @@ forge test -vvv
 
 ## 8. Pre-submission checklist
 
-- [x] Frozen commit + tag `pre-audit-v1`
+- [x] Frozen commit + tag `pre-audit-v2`
 - [x] Deterministic compiler config committed
 - [x] `forge build --sizes` — all < 24,576 B
 - [x] `forge test` — 34/34

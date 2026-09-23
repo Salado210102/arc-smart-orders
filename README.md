@@ -13,7 +13,8 @@ adapted to Arc's stablecoin-native model.
 - Executor contract: [`contracts/src/OrderExecutor.sol`](contracts/src/OrderExecutor.sol)
 - SDK (signing): [`sdk/src/index.ts`](sdk/src/index.ts)
 - Keeper: [`keeper/src/index.ts`](keeper/src/index.ts)
-- 📄 **Launch writeup:** [`docs/LAUNCH.md`](docs/LAUNCH.md) · **Revenue model:** [`docs/REVENUE.md`](docs/REVENUE.md) · **Agent Launchpad plan:** [`docs/AGENT_LAUNCHPAD.md`](docs/AGENT_LAUNCHPAD.md) · **Mainnet treasury (Safe):** [`docs/SAFE_TREASURY.md`](docs/SAFE_TREASURY.md) · **Python signing recipe:** [`examples/python/sign_limit_order.py`](examples/python/sign_limit_order.py) (verified to match the TS SDK) · **Agentic E2E (tx tree):** [`DEPLOYMENTS.md`](DEPLOYMENTS.md)
+- 📦 **Audit package (start here):** [`docs/AUDIT_PACKAGE.md`](docs/AUDIT_PACKAGE.md) — scope, sizes, test evidence, fork rehearsal, checklist
+- 📄 **Launch writeup:** [`docs/LAUNCH.md`](docs/LAUNCH.md) · **Revenue model:** [`docs/REVENUE.md`](docs/REVENUE.md) · **Agent Launchpad:** [`docs/AGENT_LAUNCHPAD.md`](docs/AGENT_LAUNCHPAD.md) · **Mainnet treasury (Safe):** [`docs/SAFE_TREASURY.md`](docs/SAFE_TREASURY.md) · **Mainnet runbook:** [`docs/MAINNET_RUNBOOK.md`](docs/MAINNET_RUNBOOK.md) · **Audit scope:** [`docs/AUDIT_SCOPE.md`](docs/AUDIT_SCOPE.md) · **Python signing recipe:** [`examples/python/sign_limit_order.py`](examples/python/sign_limit_order.py) · **Deployments (tx tree):** [`DEPLOYMENTS.md`](DEPLOYMENTS.md)
 
 ---
 
@@ -140,7 +141,7 @@ A complete launchpad for AI agents, built on the same non-custodial primitives:
   `AgentStakingVault` (ERC-4626-style, deposit the agent token, earn USDC yield).
 - **UI** — Create · Trade (curve buy/sell) · **Staking & Yield** (stake/unstake/claim) with IPFS
   (Pinata) metadata, at **https://launchpad-neon-chi.vercel.app**.
-- **Tests** — **34/34** Foundry (orders 17 · launchpad 8 · graduation 3 · staking 5 · revenue wiring 1).
+- **Tests** — **34/34** Foundry (orders 17 · launchpad 8 · graduation 3 · staking 5 · revenue-wiring 1) **+ 1 mainnet-fork dry-run** (`test/DeployMainnetFork.t.sol`, [audit package](docs/AUDIT_PACKAGE.md) §4).
 
 Addresses & tx hashes: [`DEPLOYMENTS.md`](DEPLOYMENTS.md). Architecture: [`docs/AGENT_LAUNCHPAD.md`](docs/AGENT_LAUNCHPAD.md).
 
@@ -151,23 +152,42 @@ staking vault** and 30% to the treasury. Verified by `test/RevenueWiring.t.sol`.
 ## Repo layout
 
 ```
-contracts/                        Foundry
-  src/OrderExecutor.sol               the executor (witness + intent + whitelist)
-  src/mocks/MockStableRouter.sol      fixed-rate USDC->EURC router for testnet/local
+contracts/                          Foundry — solc 0.8.26, via-ir, optimizer 200, bytecode_hash=none
+  src/OrderExecutor.sol               executor (Permit2 witness + DcaIntent + input-side fee + whitelist)
   src/agentic/IERC8004.sol            interfaces for the deployed ERC-8004 registries
   src/agentic/IAgenticCommerce.sol    interfaces for ERC-8183 + IACPHook
   src/launchpad/AgentToken.sol        ERC-20 (fixed supply, anti-sniper limits)
   src/launchpad/AgentBondingCurve.sol USDC bonding curve (virtual reserves, fees, graduation)
   src/launchpad/AgentFactory.sol      launch orchestrator (token + curve + ERC-8004 identity)
-  test/OrderExecutor.t.sol            11 tests
-  script/Deploy.s.sol                 deploy to Arc (+ optional mock router)
-sdk/                              TypeScript (viem)
+  src/launchpad/AgentRegistry.sol     on-chain agent index
+  src/launchpad/GraduationModule.sol  seeds DEX liquidity + locks LP
+  src/launchpad/LiquidityLocker.sol   LP lock (anti-rug, 365d)
+  src/launchpad/RevenueSplitter.sol   agent USDC revenue -> 70% stakers / 30% treasury
+  src/launchpad/AgentStakingVault.sol ERC-4626-style USDC-yield vault
+  src/launchpad/mocks/MockDEX.sol     test AMM + LP token
+  src/mocks/MockStableRouter.sol      fixed-rate USDC->EURC router for testnet/local
+  test/OrderExecutor.t.sol            17 tests (witness, DCA, fee, access, whitelist)
+  test/Launchpad.t.sol                8 tests  (curve, fee split, anti-sniper, limits)
+  test/LaunchpadGraduation.t.sol      3 tests  (graduation + LP lock)
+  test/Staking.t.sol                  5 tests  (revenue split -> staking yield)
+  test/RevenueWiring.t.sol            1 test   (order fee -> splitter -> vault)
+  test/Permit2WitnessFork.t.sol       fork test vs the real Permit2
+  test/DeployMainnetFork.t.sol        mainnet-fork dry-run of the deploy script
+  script/Deploy.s.sol                 deploy OrderExecutor (+ optional mock router)
+  script/DeployLaunchpad.s.sol        deploy the launchpad (P1/P2)
+  script/DeployStaking.s.sol          deploy RevenueSplitter + vault (P3)
+  script/DeployMainnet.s.sol          deterministic MAINNET deploy (env-validated + Safe)
+  script/CreateSafe.s.sol             create the 2/2 Safe on Arc
+sdk/                                TypeScript (viem)
   src/index.ts                        EIP-712 domains/types, signLimitOrder/signTwapOrder, Permit2 approval
-keeper/                           TypeScript (viem)
-  src/index.ts                        executes ready orders, 20-gwei floor, USDC gas
+keeper/                             TypeScript (viem)
+  src/{server,worker,db,agentic,events}.ts  persistent keeper: HTTP API + WebSocket + SQLite worker
   src/agentic.ts                      ERC-8004 identity/reputation + ERC-8183 job lifecycle
   src/setup-order.ts                  E2E: approve Permit2 + sign a LIMIT order
-.env.example
+apps/launchpad/                     Vite + React + Tailwind launchpad UI (Vercel)
+ops/                                ops tooling (Safe execTransaction signer, reminder bot)
+examples/python/sign_limit_order.py Python EIP-712 signing recipe (verified to match the TS SDK)
+docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · SAFE_TREASURY · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL
 ```
 
 ---
@@ -177,12 +197,20 @@ keeper/                           TypeScript (viem)
 ```bash
 cd contracts
 forge install foundry-rs/forge-std     # once
-forge test -vv                         # 11 tests
+forge test -vv                         # 34/34 unit+integration (fork test skipped unless env is set)
 ```
 
 Covers: atomic pull+swap, DCA parts, `minOut`/`minRate` reverts, whitelist, keeper/owner access,
-**canonical Permit2 witness typehash**, and DcaIntent rejections (wrong `tokenOut`, low `minOut`,
-foreign signature, expired).
+**canonical Permit2 witness typehash**, `DcaIntent` rejections (wrong `tokenOut`, low `minOut`, foreign
+signature, expired), the bonding-curve invariants (fee split, anti-sniper, max wallet/tx, graduation +
+LP lock), the revenue split → staking yield, and the order fee → splitter → vault wiring.
+
+**Mainnet-fork rehearsal** (see [`docs/AUDIT_PACKAGE.md`](docs/AUDIT_PACKAGE.md) §4):
+```bash
+CONFIRM_MAINNET=1 USDC_MAINNET=0x3600…0000 DEX_ROUTER=0x…D3 ERC8004_REGISTRY=0x8004A818…BD9e \
+ERC8183_ESCROW=0x0747…4583 ORDERS_KEEPER=0x327f…50bC LAUNCHPAD_OWNER=0x0FBFAF…7e93 \
+forge test --match-test test_FullDeployOnFork -vv
+```
 
 Typecheck the TS:
 ```bash
@@ -314,7 +342,10 @@ lives in `keeper/src/agentic.ts`.
 
 ## Status
 
-Reference implementation — **not audited**. Testnet first.
+**Pre-audit freeze:** `pre-audit-v2` (previous: [`pre-audit-v1`](https://github.com/Salado210102/arc-smart-orders/tree/pre-audit-v1)).
+Deployed & tested on **Arc testnet** (see [`DEPLOYMENTS.md`](DEPLOYMENTS.md)); the mainnet deployment is
+scripted and rehearsed on an **Arc-mainnet fork**, and is gated on the ERC-8004/ERC-8183 registries and a
+real DEX venue being live on mainnet. **Not yet audited** — see [`docs/AUDIT_PACKAGE.md`](docs/AUDIT_PACKAGE.md).
 
 ## License
 
