@@ -4,7 +4,7 @@
 **Applicant:** BasePump (independent builder) · hello@basepump.dev · @Cryptofun2026
 **Repo (MIT):** https://github.com/Salado210102/arc-smart-orders
 **Live UI:** https://launchpad-neon-chi.vercel.app
-**Network:** Arc testnet (5042002) — mainnet target 5042
+**Network:** Arc mainnet (5042, live) + testnet (5042002)
 **Request:** audit subsidy (UFSF covers up to 100% of audit cost) · **scope: 9 contracts / 1,411 SLOC**
 
 ---

@@ -14,7 +14,7 @@
 | Applicant | BasePump (independent builder) · Vicente Gonzalez · hello@basepump.dev · @Cryptofun2026 |
 | Repo (MIT) | https://github.com/Salado210102/arc-smart-orders |
 | Live UI | https://launchpad-neon-chi.vercel.app |
-| Network | Arc **testnet 5042002** (mainnet 5042 target) — built **only** on Arc + Circle stack |
+| Network | Arc **mainnet 5042** (live) — built **only** on Arc + Circle stack |
 | Treasury | Safe **2/2** `0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93` (owner + fee recipient) |
 
 ## One-liner
@@ -37,8 +37,8 @@ and an ERC-4626 vault that pays the agent's USDC revenue to stakers**.
 ## Maturity (all on Arc)
 
 - **34/34 Foundry tests** incl. a mainnet-fork test of the Permit2 witness.
-- **Deployed + verified on Arc testnet** with a full agentic E2E (ERC-8004 agent → ERC-8183 job → fill →
-  escrow release → reputation), live UI, and a persistent keeper (HTTP API + WebSocket + SQLite).
+- **Deployed + verified on Arc** (testnet agentic E2E: ERC-8004 agent → ERC-8183 job → fill → escrow release →
+  reputation, **plus live mainnet** Safe-owned deploy), live UI, and a persistent keeper (HTTP API + WebSocket + SQLite).
 - **Safe-owned mainnet deploy rehearsed**: the exact `DeployMainnet` script ran on testnet with the
   **Safe 2/2** as owner/treasury, and the Safe executed the owner-only `registry.setFactory` tx.
 - Open-source (MIT): contracts, SDK (TS + verified Python recipe), keeper, UI.

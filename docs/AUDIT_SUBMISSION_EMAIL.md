@@ -3,7 +3,7 @@
 > ⚠️ **Correction applied:** the Safe address in the original draft
 > (`0x0FBFAF72ef2fFA3C1EE5DCA53e9Eeb7fFef07e93`) **has no contract code** — it is wrong.
 > The real, on-chain-verified 2/2 Safe is **`0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93`**
-> (Arc testnet: `getThreshold()=2`, `getOwners()=[0x3df3…c977, 0xE34A…1279]`).
+> (Arc mainnet: `getThreshold()=2`, `getOwners()=[0x3df3…c977, 0xE34A…1279]`).
 > **Use the address below.** Do not send the draft as-is.
 
 ---
@@ -48,7 +48,7 @@ Vicente — Lead Quantitative Engineer
 
 ## Notes / alternatives
 
-- The **Safe above lives on Arc testnet** (deterministic → same address on mainnet once funded). The
-  auditor can verify it on `https://explorer.testnet.arc.io/address/0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93`.
+- The **Safe above lives on Arc mainnet**. Verify it on
+  `https://explorer.arc.io/address/0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93`.
 - If the contact is **Circle** (not UFSF), drop the final "regarding the UFSF audit process" line and say
   "regarding an audit / ecosystem support".

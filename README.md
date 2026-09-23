@@ -127,7 +127,7 @@ Domain: `name="ArcSmartOrders", version="1", verifyingContract=executor` — mus
 
 ---
 
-## Agent Launchpad (live on Arc testnet)
+## Agent Launchpad (live on Arc mainnet)
 
 A complete launchpad for AI agents, built on the same non-custodial primitives:
 
@@ -343,9 +343,10 @@ lives in `keeper/src/agentic.ts`.
 ## Status
 
 **Pre-audit freeze:** `pre-audit-v2` (previous: [`pre-audit-v1`](https://github.com/Salado210102/arc-smart-orders/tree/pre-audit-v1)).
-Deployed & tested on **Arc testnet** (see [`DEPLOYMENTS.md`](DEPLOYMENTS.md)); the mainnet deployment is
-scripted and rehearsed on an **Arc-mainnet fork**, and is gated on the ERC-8004/ERC-8183 registries and a
-real DEX venue being live on mainnet. **Not yet audited** — see [`docs/AUDIT_PACKAGE.md`](docs/AUDIT_PACKAGE.md).
+**Live on Arc mainnet (5042)** — Safe-owned deploy (see [`DEPLOYMENTS.md`](DEPLOYMENTS.md)): OrderExecutor,
+AgentFactory, AgentRegistry, GraduationModule, LiquidityLocker. Graduation is **gated** (no module wired) and
+ERC-8004 is **skipped** until the registries ship on mainnet; the swap venue (StableFX) is pending. **Not yet
+audited** — see [`docs/AUDIT_PACKAGE.md`](docs/AUDIT_PACKAGE.md).
 
 ## License
 
