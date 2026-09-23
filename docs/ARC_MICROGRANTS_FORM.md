@@ -1,4 +1,8 @@
-# Arc Microgrants — submission (READY — copy/paste)
+# Arc Microgrants — submission (SUBMITTED 2026-09-23)
+
+> 📨 **Submitted 2026-09-23** via **DoraHacks** — BUIDL: https://dorahacks.io/buidl/49092 ·
+> Hackathon: https://dorahacks.io/hackathon/arc-microgrants/detail · status: **pending review**
+> (deadline Oct 14 2026; decisions by Oct 21).
 
 > **Program:** Arc Microgrants · $500 USDC (20 of a $10k pool) · non-dilutive · route into the Circle Grant
 > Program · [event page](https://community.arc.io/public/events/arc-microgrants-f8tijfjhyq)
