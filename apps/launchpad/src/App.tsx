@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Info, Plus, Rocket, Sparkles } from "lucide-react";
 import { formatUnits, parseUnits } from "viem";
-import { EXPLORER, connect, publicClient, walletClient } from "./arc";
+import { EXPLORER, connectProvider, listWallets, publicClient, walletClient, type WalletInfo } from "./arc";
 import { ADDR, erc20Abi, factoryAbi, registryAbi } from "./contracts";
 import { AgentCard, type Agent } from "./components/AgentCard";
 import { Dashboard } from "./components/Dashboard";
 import { Navbar, type Tab } from "./components/Navbar";
 import { StakingPanel } from "./components/StakingPanel";
 import { SwapBox } from "./components/SwapBox";
+import { WalletPicker } from "./components/WalletPicker";
 import { Button } from "./components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Input } from "./components/ui/input";
@@ -20,6 +21,7 @@ export default function App() {
   const [selected, setSelected] = useState<Agent | null>(null);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [wallets, setWallets] = useState<WalletInfo[] | null>(null);
 
   const [name, setName] = useState("My Agent");
   const [symbol, setSymbol] = useState("AGT");
@@ -65,7 +67,22 @@ export default function App() {
 
   async function doConnect() {
     try {
-      setAccount(await connect());
+      const ws = await listWallets();
+      if (ws.length === 0) throw new Error("No EVM wallet detected (install MetaMask).");
+      if (ws.length === 1) {
+        setAccount(await connectProvider(ws[0].provider));
+        return;
+      }
+      setWallets(ws);
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function pickWallet(w: WalletInfo) {
+    setWallets(null);
+    try {
+      setAccount(await connectProvider(w.provider));
     } catch (e) {
       setMsg((e as Error).message);
     }
@@ -265,6 +282,8 @@ export default function App() {
       <footer className="border-t border-zinc-800/60 py-6 text-center text-[11px] text-zinc-600">
         Arc Agent Launchpad · <a className="hover:text-zinc-400" href="https://github.com/Salado210102/arc-smart-orders" target="_blank" rel="noreferrer">open source (MIT)</a> · non-custodial · mainnet
       </footer>
+
+      {wallets && <WalletPicker wallets={wallets} onPick={pickWallet} onClose={() => setWallets(null)} />}
     </div>
   );
 }
