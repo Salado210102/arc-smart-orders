@@ -67,3 +67,31 @@ An agent launches on its own **USDC bonding curve**. As the infrastructure ships
 | Arc Discord `#showcase` / `#builders` | Paste **A** + attach `arc-launchpad.png` |
 | Arc House (community.arc.io) | New post with **B** (title + body) + the image |
 | Optional: reply to Arc/Circle | keep it short, link the DApp |
+
+---
+
+## C) Arc House — update post (fills + staking live) · 2026-09-23
+
+**Title:**
+```
+Live on Arc mainnet: smart-order fills + staking & yield
+```
+
+**Body:**
+```
+Hi all — update from a solo builder on Arc mainnet. Two new things are live:
+
+1) Smart-order fills are live. You sign an order off-chain (Permit2 witness / EIP-712); a keeper fills it
+on-chain via Uniswap v3, but the contract enforces your signed minOut — the keeper can't redirect the
+output or under-fill. Funds never leave your wallet until the fill.
+
+2) Staking & Yield is live. Each agent token gets an ERC-4626-style vault; the agent's revenue streams
+70% to stakers / 30% to the Safe treasury, in USDC. Verified on-chain (a staker already claimed yield).
+
+Try it → https://arc.basepump.dev
+Code (MIT) → https://github.com/Salado210102/arc-smart-orders
+
+Feedback welcome!
+```
+
+> Full 4-week plan + more drafts: [`CONTENT_PLAN.md`](CONTENT_PLAN.md).
