@@ -92,10 +92,32 @@ Open to a competitive/community audit too.
 Thanks!
 ```
 
-### Arc Microgrants — paragraph to add (reply to the email)
+### Arc Microgrants — reply (paste into the existing thread)
+
+**Subject:**
 ```
-Quick follow-up: the protocol is live on Arc mainnet and the fund-bearing core is ready to be audited
-(9 contracts / ~1,411 SLOC). If the grant can be applied toward an independent security audit — or you
-can point me to the right audit program — I'd really appreciate it. Audit package + proposal attached/linked.
+Re: Arc Microgrants — audit support for my submission
+```
+
+**Body:**
+```
+Hi Arc team,
+
+Quick follow-up on my Arc Microgrants submission (Arc Smart Orders + Agent Launchpad).
+
+The protocol is live on Arc mainnet and the fund-bearing core is ready to be independently audited —
+9 contracts / ~1,411 SLOC (OrderExecutor, AgentBondingCurve, AgentStakingVault, …). Package & proposal:
+- Repo (MIT, frozen pre-audit-v2): https://github.com/Salado210102/arc-smart-orders
+- Audit package: https://github.com/Salado210102/arc-smart-orders/blob/pre-audit-v2/docs/AUDIT_PACKAGE.md
+- Audit scope: https://github.com/Salado210102/arc-smart-orders/blob/pre-audit-v2/docs/AUDIT_SCOPE.md
+- Proposal: https://github.com/Salado210102/arc-smart-orders/blob/main/docs/ARC_CIRCLE_AUDIT_PROPOSAL.md
+- Deployments: https://github.com/Salado210102/arc-smart-orders/blob/main/DEPLOYMENTS.md
+
+If the grant can be applied toward an audit — or if you can point me to the right audit program or
+partner — I'd really appreciate it. I'm happy to share line-item quotes or run a competitive audit.
+
+Thanks!
+Vicente Gonzalez
+hello@basepump.dev · https://arc.basepump.dev
 ```
 
