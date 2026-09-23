@@ -15,7 +15,18 @@ export const arc = defineChain({
   blockExplorers: { default: { name: "Arc Explorer", url: "https://explorer.arc.io" } },
 });
 
+export const arcTestnet = defineChain({
+  id: 5042002,
+  name: "Arc Testnet",
+  nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
+  rpcUrls: { default: { http: ["https://rpc.testnet.arc.io"] } },
+  blockExplorers: { default: { name: "Arc Testnet Explorer", url: "https://explorer.testnet.arc.io" } },
+});
+
+export type ArcChain = typeof arc | typeof arcTestnet;
+
 export const publicClient = createPublicClient({ chain: arc, transport: http() });
+export const publicClientTestnet = createPublicClient({ chain: arcTestnet, transport: http() });
 
 const hexId = `0x${arc.id.toString(16)}`;
 
@@ -73,9 +84,31 @@ export async function connectProvider(provider: Eip1193): Promise<`0x${string}`>
   return addr;
 }
 
-export function walletClient(): WalletClient {
+export function walletClient(chain: ArcChain = arc): WalletClient {
   const provider = evm ?? (window as unknown as { ethereum: Eip1193 }).ethereum;
-  return createWalletClient({ chain: arc, transport: custom(provider as never) });
+  return createWalletClient({ chain, transport: custom(provider as never) });
+}
+
+/** Ask the wallet to switch to (or add) an Arc chain — needed before sending a tx on testnet. */
+export async function switchChain(chain: ArcChain): Promise<void> {
+  const provider = evm ?? (window as unknown as { ethereum: Eip1193 }).ethereum;
+  const hexId = `0x${chain.id.toString(16)}`;
+  try {
+    await provider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: hexId }] });
+  } catch {
+    await provider.request({
+      method: "wallet_addEthereumChain",
+      params: [
+        {
+          chainId: hexId,
+          chainName: chain.name,
+          nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
+          rpcUrls: [chain.rpcUrls.default.http[0]],
+          blockExplorerUrls: [chain.blockExplorers!.default.url],
+        },
+      ],
+    });
+  }
 }
 
 /** Disconnect: ask the wallet to revoke this dApp's account permission (best-effort) and forget it. */

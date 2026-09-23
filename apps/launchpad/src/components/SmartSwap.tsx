@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, BadgeCheck, ExternalLink, ShieldCheck, Zap } from "lucide-react";
 import { formatUnits, parseUnits } from "viem";
-import { EXPLORER, publicClient, walletClient } from "../arc";
+import { arc, arcTestnet, publicClient, publicClientTestnet, switchChain, walletClient } from "../arc";
 import { erc20Abi } from "../contracts";
 import {
-  EURC_ADDR,
-  KEEPER_API,
+  NETWORKS,
   PERMIT2,
   USDC_ADDR,
   getOrder,
   signLimitOrder,
   submitOrder,
+  type Network,
   type OrderRow,
 } from "../lib/orders";
 import { Badge } from "./ui/badge";
@@ -33,6 +33,11 @@ export function SmartSwap({
   busy: boolean;
   setBusy: (b: boolean) => void;
 }) {
+  const [network, setNetwork] = useState<Network>("mainnet");
+  const net = NETWORKS[network];
+  const pc = network === "testnet" ? publicClientTestnet : publicClient;
+  const chain = network === "testnet" ? arcTestnet : arc;
+
   const [amount, setAmount] = useState("1");
   const [rate, setRate] = useState("0.92");
   const [slip, setSlip] = useState("1");
@@ -51,19 +56,24 @@ export function SmartSwap({
     }
     try {
       const [b, a] = await Promise.all([
-        publicClient.readContract({ address: USDC_ADDR, abi: erc20Abi, functionName: "balanceOf", args: [account] }),
-        publicClient.readContract({ address: USDC_ADDR, abi: erc20Abi, functionName: "allowance", args: [account, PERMIT2] }),
+        pc.readContract({ address: USDC_ADDR, abi: erc20Abi, functionName: "balanceOf", args: [account] }),
+        pc.readContract({ address: USDC_ADDR, abi: erc20Abi, functionName: "allowance", args: [account, PERMIT2] }),
       ]);
       setBalance(b as bigint);
       setAllowance(a as bigint);
     } catch {
       /* ignore */
     }
-  }, [account]);
+  }, [account, pc]);
 
+  // Reset transient state when the account or network changes.
   useEffect(() => {
+    setOrder(null);
+    setOrderId(null);
+    setStage("idle");
+    setErr("");
     void refresh();
-  }, [refresh]);
+  }, [refresh, network]);
 
   // Poll the keeper until the order reaches a terminal state.
   useEffect(() => {
@@ -72,7 +82,7 @@ export function SmartSwap({
     let tries = 0;
     const tick = async () => {
       if (stop) return;
-      const o = await getOrder(orderId);
+      const o = await getOrder(net, orderId);
       if (o) {
         setOrder(o);
         const s = o.status.toUpperCase();
@@ -89,6 +99,7 @@ export function SmartSwap({
     return () => {
       stop = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderId]);
 
   let amountIn = 0n;
@@ -114,17 +125,18 @@ export function SmartSwap({
     setStage("approving");
     setErr("");
     try {
-      const w = walletClient() as unknown as { writeContract: (a: unknown) => Promise<`0x${string}`> };
+      await switchChain(chain);
+      const w = walletClient(chain) as unknown as { writeContract: (a: unknown) => Promise<`0x${string}`> };
       const hash = await w.writeContract({
         account,
-        chain: null,
+        chain,
         address: USDC_ADDR,
         abi: erc20Abi,
         functionName: "approve",
         args: [PERMIT2, 2n ** 256n - 1n],
       });
-      await publicClient.waitForTransactionReceipt({ hash });
-      setMsg(`Approved Permit2 ✓ ${EXPLORER}/tx/${hash}`);
+      await pc.waitForTransactionReceipt({ hash });
+      setMsg(`Approved Permit2 ✓ ${net.explorer}/tx/${hash}`);
       await refresh();
       setStage("idle");
     } catch (e) {
@@ -147,20 +159,20 @@ export function SmartSwap({
     try {
       const nonce = BigInt(Date.now());
       const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
-      const w = walletClient();
-      const signature = await signLimitOrder(w, account, {
+      const w = walletClient(chain);
+      const signature = await signLimitOrder(w, account, net, {
         tokenIn: USDC_ADDR,
-        tokenOut: EURC_ADDR,
+        tokenOut: net.eurc,
         amountIn,
         minOut,
         nonce,
         deadline,
       });
       setStage("submitted");
-      const res = await submitOrder({
+      const res = await submitOrder(net, {
         maker: account,
         tokenIn: USDC_ADDR,
-        tokenOut: EURC_ADDR,
+        tokenOut: net.eurc,
         amountIn: amountIn.toString(),
         minOut: minOut.toString(),
         nonce: nonce.toString(),
@@ -189,10 +201,26 @@ export function SmartSwap({
           <span className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-violet-400" /> Try Smart Swap
           </span>
-          <Badge variant="muted">{stageBadge(stage)}</Badge>
+          <Badge variant={network === "testnet" ? "default" : "muted"}>{net.mode}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
+        {/* Network selector */}
+        <div className="grid grid-cols-2 gap-1 rounded-xl border border-zinc-800 bg-zinc-900/40 p-1">
+          {(Object.keys(NETWORKS) as Network[]).map((k) => (
+            <button
+              key={k}
+              onClick={() => setNetwork(k)}
+              className={
+                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors " +
+                (network === k ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:text-zinc-200")
+              }
+            >
+              {NETWORKS[k].label}
+            </button>
+          ))}
+        </div>
+
         {/* Pair */}
         <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
           <select
@@ -282,7 +310,7 @@ export function SmartSwap({
             {stage === "filled" && order.fill_tx && (
               <a
                 className="mt-2 inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300"
-                href={`${EXPLORER}/tx/${order.fill_tx}`}
+                href={`${net.explorer}/tx/${order.fill_tx}`}
                 target="_blank"
                 rel="noreferrer"
               >
@@ -294,11 +322,12 @@ export function SmartSwap({
         )}
 
         <p className="text-center text-[11px] text-zinc-600">
-          Non-custodial · you only sign (no gas) · keeper: {KEEPER_API.replace(/^https?:\/\//, "")}
+          Non-custodial · you only sign (no gas) · keeper: {net.keeperApi.replace(/^https?:\/\//, "")}
         </p>
         <p className="text-center text-[10px] text-zinc-700">
-          Beta preview — on Arc mainnet the keeper runs dry-run until the FX venue is wired; the order stays PENDING
-          then expires (no funds move).
+          {network === "testnet"
+            ? "Testnet — live on-chain fills against the whitelisted mock router. Needs testnet USDC + a one-time Permit2 approval."
+            : "Mainnet beta preview — the keeper runs dry-run until the FX venue is wired; the order stays PENDING then expires (no funds move)."}
         </p>
       </CardContent>
     </Card>

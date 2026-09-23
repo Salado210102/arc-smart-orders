@@ -188,7 +188,8 @@ A complete launchpad for AI agents, built on the same non-custodial primitives.
   on mainnet — no module is wired until a real DEX exists)*.
 - **Revenue + staking** — `RevenueSplitter` (agent USDC revenue → 70% stakers / 30% treasury),
   `AgentStakingVault` (ERC-4626-style, deposit the agent token, earn USDC yield).
-- **UI** — Create · Trade (curve buy/sell) · **Staking & Yield** (stake/unstake/claim) with IPFS
+- **UI** — Create · Trade (curve buy/sell) · **Smart Swap** (sign 0-gas limit orders; **Testnet = live
+  fills**, Mainnet = Beta dry-run) · **Staking & Yield** (stake/unstake/claim) with IPFS
   (Pinata) metadata, at **https://arc.basepump.dev**.
 - **Tests** — **34/34** Foundry (orders 17 · launchpad 8 · graduation 3 · staking 5 · revenue-wiring 1) **+ 1 mainnet-fork dry-run** (`test/DeployMainnetFork.t.sol`, [audit package](docs/AUDIT_PACKAGE.md) §4).
 
@@ -305,7 +306,7 @@ apps/launchpad/                     Vite + React + Tailwind launchpad UI (Vercel
 ops/                                ops tooling (Safe execTransaction signer, alerts + metrics bots, keeper funding)
 examples/python/sign_limit_order.py Python EIP-712 signing recipe (verified to match the TS SDK)
 scripts/backtest_gex_signals.py     GEX (Call/Put Wall, Zero Gamma) signal backtest -> EIP-712 intents
-docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · CROSS_CHAIN_ORDERS · GEX_AGENT_SPEC · SDK_INTEGRATION · SAFE_TREASURY · SAFE_MAINNET · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
+docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · CROSS_CHAIN_ORDERS · GEX_AGENT_SPEC · PYTHON_SDK · SDK_INTEGRATION · SAFE_TREASURY · SAFE_MAINNET · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
 ```
 
 ---
@@ -342,14 +343,20 @@ client.ensure_permit2_approval()                                          # one-
 resp = client.submit_limit_order(amount_in=to_units("1"), min_out=to_units("0.90"))  # 0 gas
 final = client.wait_for_fill(resp["order"]["id"])                         # -> FILLED + fill_tx
 ```
-- `sdk/python/` · example [`sdk/python/examples/submit_limit_order.py`](sdk/python/examples/submit_limit_order.py) · [README](sdk/python/README.md)
-- Tests: `python sdk/python/tests/test_signing.py`
+- `sdk/python/` · example [`sdk/python/examples/submit_limit_order.py`](sdk/python/examples/submit_limit_order.py) · [README](sdk/python/README.md) · full guide [`docs/PYTHON_SDK.md`](docs/PYTHON_SDK.md)
+- Tests: `python sdk/python/tests/test_signing.py` (recovers the owner from the signature → fails on any type mismatch)
 
 ### GEX signal backtest
 ```bash
 python scripts/backtest_gex_signals.py --steps 600 --seed 7 --out /tmp/gex.json
 # simulates GEX (Call/Put Wall, Zero Gamma) signals -> EIP-712 LIMIT intents with minOut + expected return
 ```
+
+### Smart Swap widget (dashboard)
+The **Smart Swap** tab at <https://arc.basepump.dev> signs a 0-gas limit order and follows it to `FILLED`.
+A **network selector** switches between:
+- **Arc Testnet (Live fills)** → keeper `…/arc-keeper-testnet` (`0xB19F…6Ee3`), fills on-chain (needs testnet USDC + one-time Permit2 approval).
+- **Arc Mainnet (Beta)** → keeper `…/arc-keeper`, dry-run until the FX venue is wired (order stays `PENDING`).
 
 ### Contracts — Foundry
 ```bash

@@ -1,17 +1,43 @@
 // Smart-order helpers for the launchpad UI: EIP-712 Permit2 signing + keeper API client.
 //
-// The keeper API base is configurable at build time via VITE_KEEPER_API (default: local keeper).
+// Two networks:
+//   - mainnet (5042)   : keeper runs DRY-RUN (no FX venue) -> orders stay PENDING (Beta).
+//   - testnet (5042002): keeper fills live on-chain against MockStableRouter (Live fills).
+// Keeper API base is configurable at build time via VITE_KEEPER_API / VITE_KEEPER_TESTNET_API.
 import type { Address, Hex, WalletClient } from "viem";
 import { ADDR } from "../contracts";
 
-export const ARC_CHAIN_ID = 5042;
 export const PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3" as const;
-export const EXECUTOR = "0x9b3a990d1a31Ff5E01ddB8702e10F2529811FDb7" as const; // mainnet OrderExecutor v2
-export const USDC_ADDR = ADDR.usdc as Address;
-export const EURC_ADDR = "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1" as Address; // Arc mainnet EURC (6 dec)
+export const USDC_ADDR = ADDR.usdc as Address; // same on mainnet + testnet
 
 const _env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {};
-export const KEEPER_API = (_env.VITE_KEEPER_API ?? "http://127.0.0.1:8788").replace(/\/$/, "");
+
+export type Network = "mainnet" | "testnet";
+
+export const NETWORKS = {
+  mainnet: {
+    key: "mainnet" as const,
+    chainId: 5042,
+    label: "Arc Mainnet",
+    executor: "0x9b3a990d1a31Ff5E01ddB8702e10F2529811FDb7" as Address,
+    eurc: "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1" as Address,
+    keeperApi: (_env.VITE_KEEPER_API ?? "http://127.0.0.1:8788").replace(/\/$/, ""),
+    explorer: "https://explorer.arc.io",
+    mode: "Beta (dry-run)" as const,
+  },
+  testnet: {
+    key: "testnet" as const,
+    chainId: 5042002,
+    label: "Arc Testnet",
+    executor: "0xB19F1193BcC50c2aC0fdD9f1a28F95f7493f6Ee3" as Address,
+    eurc: "0x89B50855Aa3bE2F677cD6303Cec089B5F319D72a" as Address,
+    keeperApi: (_env.VITE_KEEPER_TESTNET_API ?? "http://127.0.0.1:8789").replace(/\/$/, ""),
+    explorer: "https://explorer.testnet.arc.io",
+    mode: "Live fills" as const,
+  },
+} as const;
+
+export type NetConfig = (typeof NETWORKS)[Network];
 
 // Must match OrderExecutor.WITNESS_TYPE_STRING / the TS+Python SDKs.
 export const WITNESS_TYPES = {
@@ -32,7 +58,8 @@ export const WITNESS_TYPES = {
   ],
 } as const;
 
-export const permit2Domain = { name: "Permit2", chainId: ARC_CHAIN_ID, verifyingContract: PERMIT2 } as const;
+export const permit2Domain = (chainId: number) =>
+  ({ name: "Permit2", chainId, verifyingContract: PERMIT2 }) as const;
 
 export type LimitOrderParams = {
   tokenIn: Address;
@@ -44,15 +71,20 @@ export type LimitOrderParams = {
 };
 
 /** Sign a one-shot LIMIT order (Permit2 SignatureTransfer + witness). No gas, no transaction. */
-export async function signLimitOrder(w: WalletClient, account: Address, p: LimitOrderParams): Promise<Hex> {
+export async function signLimitOrder(
+  w: WalletClient,
+  account: Address,
+  net: NetConfig,
+  p: LimitOrderParams,
+): Promise<Hex> {
   return w.signTypedData({
     account,
-    domain: permit2Domain,
+    domain: permit2Domain(net.chainId),
     types: WITNESS_TYPES,
     primaryType: "PermitWitnessTransferFrom",
     message: {
       permitted: { token: p.tokenIn, amount: p.amountIn },
-      spender: EXECUTOR,
+      spender: net.executor,
       nonce: p.nonce,
       deadline: p.deadline,
       witness: { tokenOut: p.tokenOut, minOut: p.minOut },
@@ -77,18 +109,21 @@ export type OrderRow = {
 export type SubmitResult = { ok: boolean; order?: OrderRow; error?: string; detail?: string };
 
 /** POST a signed order to the keeper. */
-export async function submitOrder(payload: {
-  maker: string;
-  tokenIn: string;
-  tokenOut: string;
-  amountIn: string;
-  minOut: string;
-  nonce: string;
-  deadline: number;
-  signature: string;
-}): Promise<SubmitResult> {
+export async function submitOrder(
+  net: NetConfig,
+  payload: {
+    maker: string;
+    tokenIn: string;
+    tokenOut: string;
+    amountIn: string;
+    minOut: string;
+    nonce: string;
+    deadline: number;
+    signature: string;
+  },
+): Promise<SubmitResult> {
   try {
-    const r = await fetch(`${KEEPER_API}/v1/orders`, {
+    const r = await fetch(`${net.keeperApi}/v1/orders`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
@@ -101,9 +136,9 @@ export async function submitOrder(payload: {
 }
 
 /** GET the current order state (poll until FILLED/FAILED/EXPIRED). */
-export async function getOrder(id: string): Promise<OrderRow | null> {
+export async function getOrder(net: NetConfig, id: string): Promise<OrderRow | null> {
   try {
-    const r = await fetch(`${KEEPER_API}/v1/orders/${id}`);
+    const r = await fetch(`${net.keeperApi}/v1/orders/${id}`);
     if (!r.ok) return null;
     return (await r.json()) as OrderRow;
   } catch {
