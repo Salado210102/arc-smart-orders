@@ -13,3 +13,6 @@ keeper/orders.json
 keeper/data/
 keeper/logs/
 
+
+dist/
+

@@ -15,6 +15,7 @@ contract AgentToken {
 
     address public owner;
     address public curve; // bonding curve (exempt from limits)
+    mapping(address => bool) public exempt; // addresses exempt from the limits (curve, module, owner)
     uint256 public maxWallet; // base units; 0 = no limit
     uint256 public maxTx; // base units; 0 = no limit
     bool public limitsActive = true;
@@ -46,6 +47,7 @@ contract AgentToken {
         maxTx = maxTx_;
         totalSupply = supply_;
         balanceOf[msg.sender] = supply_; // minted to the deployer (the curve)
+        exempt[owner_] = true;
         emit Transfer(address(0), msg.sender, supply_);
     }
 
@@ -53,7 +55,12 @@ contract AgentToken {
     function setCurve(address curve_) external onlyOwner {
         if (curve_ == address(0)) revert ZeroAddress();
         curve = curve_;
+        exempt[curve_] = true;
         emit CurveSet(curve_);
+    }
+
+    function setExempt(address account, bool isExempt) external onlyOwner {
+        exempt[account] = isExempt;
     }
 
     function setLimits(uint256 maxWallet_, uint256 maxTx_, bool active_) external onlyOwner {
@@ -91,15 +98,20 @@ contract AgentToken {
     function _transfer(address from, address to, uint256 amount) private {
         if (to == address(0)) revert ZeroAddress();
         if (balanceOf[from] < amount) revert InsufficientBalance();
-        //  Anti-sniper limits only while the curve is active; exempt curve & owner.
-        if (limitsActive) {
-            if (to != curve && to != owner && maxWallet > 0 && balanceOf[to] + amount > maxWallet) {
-                revert MaxWalletExceeded();
-            }
-            if (from != curve && from != owner && maxTx > 0 && amount > maxTx) revert MaxTxExceeded();
+        //  Anti-sniper limits only while the curve is active and not yet graduated.
+        if (limitsActive && !_curveGraduated()) {
+            if (!exempt[to] && maxWallet > 0 && balanceOf[to] + amount > maxWallet) revert MaxWalletExceeded();
+            if (!exempt[from] && maxTx > 0 && amount > maxTx) revert MaxTxExceeded();
         }
         balanceOf[from] -= amount;
         balanceOf[to] += amount;
         emit Transfer(from, to, amount);
+    }
+
+    /// @dev True once the bonding curve has graduated (limits are lifted -> DEX trading).
+    function _curveGraduated() private view returns (bool) {
+        if (curve == address(0)) return false;
+        (bool ok, bytes memory ret) = curve.staticcall(abi.encodeWithSignature("graduated()"));
+        return ok && ret.length >= 32 && abi.decode(ret, (bool));
     }
 }

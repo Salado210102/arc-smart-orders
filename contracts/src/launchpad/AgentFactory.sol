@@ -3,17 +3,19 @@ pragma solidity 0.8.26;
 
 import {AgentToken} from "./AgentToken.sol";
 import {AgentBondingCurve} from "./AgentBondingCurve.sol";
+import {AgentRegistry} from "./AgentRegistry.sol";
 
 /// @notice Orchestrates an Agent launch: deploys the ERC-20 + USDC bonding curve, wires them,
-///         registers the agent identity (ERC-8004) and hands ownership to the Safe.
-/// @dev identity == address(0) skips ERC-8004 registration (e.g. local tests).
+///         registers the ERC-8004 identity, indexes it in AgentRegistry and hands ownership to the Safe.
+/// @dev identity == address(0) skips ERC-8004; registry == address(0) skips indexing.
 contract AgentFactory {
     address public immutable usdc;
     address public identity; // ERC-8004 IdentityRegistry (0 = skip)
     address public treasury; // protocol/Safe fee receiver
     address public owner; // Safe
+    address public registry; // AgentRegistry (0 = skip)
+    address public graduationModule; // wired into each curve
 
-    //  protocol defaults
     uint16 public feeBps = 100; // 1%
     uint16 public treasuryShareBps = 5000; // 50% of the fee to the protocol treasury
     uint16 public sniperFeeBps = 500; // 5% during the sniper window
@@ -23,6 +25,7 @@ contract AgentFactory {
         address indexed token,
         address indexed curve,
         address indexed creator,
+        uint256 agentId,
         uint256 supply,
         uint256 graduationUsdc,
         string metadataURI
@@ -30,23 +33,35 @@ contract AgentFactory {
     event FeeDefaultsUpdated(uint16 feeBps, uint16 treasuryShareBps, uint16 sniperFeeBps, uint64 sniperWindow);
     event IdentityUpdated(address identity);
     event TreasuryUpdated(address treasury);
+    event RegistryUpdated(address registry);
+    event GraduationModuleUpdated(address graduationModule);
 
     error NotOwner();
     error ZeroAddress();
     error BadParams();
     error IdentityFailed();
+    error SupplyTransferFailed();
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
         _;
     }
 
-    constructor(address usdc_, address identity_, address treasury_, address owner_) {
+    constructor(
+        address usdc_,
+        address identity_,
+        address treasury_,
+        address owner_,
+        address registry_,
+        address graduationModule_
+    ) {
         if (usdc_ == address(0) || treasury_ == address(0) || owner_ == address(0)) revert ZeroAddress();
         usdc = usdc_;
         identity = identity_;
         treasury = treasury_;
         owner = owner_;
+        registry = registry_;
+        graduationModule = graduationModule_;
     }
 
     function launch(
@@ -62,16 +77,14 @@ contract AgentFactory {
         if (supply_ == 0 || x0_ == 0 || graduationUsdc_ == 0) revert BadParams();
         if (maxWallet_ != 0 && maxWallet_ < maxTx_) revert BadParams();
 
-        //  Token: owner = this factory until the curve is wired, then -> Safe.
         AgentToken token = new AgentToken(name_, symbol_, supply_, address(this), maxWallet_, maxTx_);
-
         AgentBondingCurve curve = new AgentBondingCurve(
             usdc,
             address(token),
             x0_,
             supply_,
             graduationUsdc_,
-            owner,
+            address(this), // curve owner = factory (temporarily)
             treasury,
             msg.sender, // agent treasury = creator
             feeBps,
@@ -81,25 +94,37 @@ contract AgentFactory {
         );
 
         token.setCurve(address(curve));
-        //  Move the whole supply into the curve (the factory minted it).
-        require(token.transfer(address(curve), supply_), "supply_transfer_failed");
-        token.transferOwnership(owner); // hand control to the Safe
+        if (!token.transfer(address(curve), supply_)) revert SupplyTransferFailed();
+        if (graduationModule != address(0)) {
+            curve.setGraduationModule(graduationModule);
+            token.setExempt(graduationModule, true); // module receives the remaining supply
+        }
 
+        curve.transferOwnership(owner);
+        token.transferOwnership(owner);
+
+        //  ERC-8004 identity (capture the id if the registry returns it).
+        uint256 agentId = 0;
         if (identity != address(0)) {
-            (bool ok, ) = identity.call(abi.encodeWithSignature("register(string)", metadataURI_));
+            (bool ok, bytes memory ret) = identity.call(abi.encodeWithSignature("register(string)", metadataURI_));
             if (!ok) revert IdentityFailed();
+            if (ret.length >= 32) agentId = abi.decode(ret, (uint256));
+        }
+
+        if (registry != address(0)) {
+            AgentRegistry(registry).register(agentId, address(token), address(curve), msg.sender, metadataURI_);
         }
 
         tokenAddr = address(token);
         curveAddr = address(curve);
-        emit AgentCreated(tokenAddr, curveAddr, msg.sender, supply_, graduationUsdc_, metadataURI_);
+        emit AgentCreated(tokenAddr, curveAddr, msg.sender, agentId, supply_, graduationUsdc_, metadataURI_);
     }
 
     //  ---- admin ----
 
     /// @dev Accept ERC-721 identity NFTs (ERC-8004 registers via safeMint to this factory).
     function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
-        return 0x150b7a02; // IERC721Receiver.onERC721Received.selector
+        return 0x150b7a02;
     }
 
     function setFeeDefaults(uint16 feeBps_, uint16 treasuryShareBps_, uint16 sniperFeeBps_, uint64 sniperWindow_)
@@ -123,5 +148,15 @@ contract AgentFactory {
         if (treasury_ == address(0)) revert ZeroAddress();
         treasury = treasury_;
         emit TreasuryUpdated(treasury_);
+    }
+
+    function setRegistry(address registry_) external onlyOwner {
+        registry = registry_;
+        emit RegistryUpdated(registry_);
+    }
+
+    function setGraduationModule(address graduationModule_) external onlyOwner {
+        graduationModule = graduationModule_;
+        emit GraduationModuleUpdated(graduationModule_);
     }
 }

@@ -32,6 +32,7 @@ contract AgentBondingCurve {
 
     uint256 public graduationUsdc; // raised-USDC threshold
     bool public graduated;
+    address public graduationModule; // receives liquidity on graduation
 
     address public owner;
     address public treasury; // protocol/Safe
@@ -44,6 +45,9 @@ contract AgentBondingCurve {
     event FeeUpdated(uint16 feeBps, uint16 treasuryShareBps, uint16 sniperFeeBps);
     event AgentTreasuryUpdated(address agentTreasury);
     event GraduationUsdcUpdated(uint256 graduationUsdc);
+    event GraduationModuleUpdated(address module);
+    event LiquidityPulled(address to, uint256 usdc, uint256 tokens);
+    event OwnershipTransferred(address indexed previous, address indexed current);
 
     error NotOwner();
     error TradingDisabled();
@@ -198,5 +202,28 @@ contract AgentBondingCurve {
     function setGraduationUsdc(uint256 graduationUsdc_) external onlyOwner {
         graduationUsdc = graduationUsdc_;
         emit GraduationUsdcUpdated(graduationUsdc_);
+    }
+
+    function setGraduationModule(address module) external onlyOwner {
+        graduationModule = module;
+        emit GraduationModuleUpdated(module);
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "zero");
+        emit OwnershipTransferred(owner, newOwner);
+        owner = newOwner;
+    }
+
+    /// @notice Called by the GraduationModule after `graduated`: sends the raised USDC + remaining
+    ///         tokens to the module so it can seed DEX liquidity.
+    function pullForGraduation(address to) external {
+        require(msg.sender == graduationModule, "only_module");
+        if (!graduated) revert TradingDisabled();
+        uint256 u = usdc.balanceOf(address(this));
+        uint256 t = token.balanceOf(address(this));
+        if (u > 0 && !usdc.transfer(to, u)) revert TransferFailed();
+        if (t > 0 && !token.transfer(to, t)) revert TransferFailed();
+        emit LiquidityPulled(to, u, t);
     }
 }

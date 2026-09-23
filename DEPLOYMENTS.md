@@ -104,5 +104,25 @@ Other txs (v2 run): setKeeper `0x93b7ffea…2ebc` · setBudget `0x5e54d3c0…472
 > Curve params: `x0 = 5,000 USDC`, `y0 = 1,000,000` tokens, fee **1%** (50/50 protocol/agent), sniper **5%** for 30s, graduation `1,000,000 USDC`, maxWallet/maxTx `100,000` tokens.
 > **Tests:** `test/Launchpad.t.sol` — 8/8 (buy/sell slippage, fee split, graduation, anti-sniper, max wallet/tx, access control). Full suite: **25/25**.
 
+---
+
+# Agent Launchpad (P2 — registry + graduation) — 2026-09-22
+
+| Contract | Address |
+|---|---|
+| **AgentRegistry** | [`0x8a29Ca54c59e8853E5D15F9B4F42E1CC1650246c`](https://explorer.testnet.arc.io/address/0x8a29Ca54c59e8853E5D15F9B4F42E1CC1650246c) |
+| **GraduationModule** | [`0x7D4c0013c770CA7b9ffA40D6a182c4d0fB0C8873`](https://explorer.testnet.arc.io/address/0x7D4c0013c770CA7b9ffA40D6a182c4d0fB0C8873) |
+| **LiquidityLocker** | [`0x9A20D5f7856F936F7eEDBa0e46a6A839fbd70C57`](https://explorer.testnet.arc.io/address/0x9A20D5f7856F936F7eEDBa0e46a6A839fbd70C57) |
+| MockDEX (LP, testnet AMM) | [`0x3f33d759B4755E6596EE922936d1ea394952748D`](https://explorer.testnet.arc.io/address/0x3f33d759B4755E6596EE922936d1ea394952748D) |
+| **AgentFactory** (v2) | [`0x756DA207Bd7f15BAe616cB0cc10775e3bd1F3372`](https://explorer.testnet.arc.io/address/0x756DA207Bd7f15BAe616cB0cc10775e3bd1F3372) |
+| Demo token | `0x5D6862CfE0b619BCE781c5fa88661e6CE28f889C` |
+| Demo curve | `0xD5A04798D5caD6Df5aE1277DF178fbCa92396Ae2` |
+
+Deploy txs: Locker `0x6eff9520…` · Registry `0x0eed1a11…` · MockDEX `0xbdb87563…` · Module `0xfca29b6b…` · Factory `0x01fb02a8…` · setFactory `0x0a8c5d72…` · launch `0xd01050eb…`.
+
+**Verified on-chain:** `registry.count() == 1` · `registry.factory() == AgentFactory` · `curve.graduationModule() == GraduationModule` · `locker.lockCount() == 0` (not graduated yet).
+**Full-cycle test:** `test/LaunchpadGraduation.t.sol` — buy past the threshold → `graduate()` → **LP locked in LiquidityLocker** for the creator (unlock `+365d`); withdraw reverts until unlock. **Full suite: 28/28.**
+
+
 
 

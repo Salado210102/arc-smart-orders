@@ -27,7 +27,7 @@ contract LaunchpadTest is Test {
     function setUp() public {
         usdc = new MockUSDC();
         identity = new MockIdentityRegistry();
-        factory = new AgentFactory(address(usdc), address(identity), TREASURY, OWNER);
+        factory = new AgentFactory(address(usdc), address(identity), TREASURY, OWNER, address(0), address(0));
 
         vm.prank(CREATOR);
         (address t, address c) = factory.launch(

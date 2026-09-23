@@ -1,0 +1,71 @@
+import type { Address } from "viem";
+
+//  Arc testnet (P2 deployment — see DEPLOYMENTS.md)
+export const ADDR = {
+  factory: "0x756DA207Bd7f15BAe616cB0cc10775e3bd1F3372",
+  registry: "0x8a29Ca54c59e8853E5D15F9B4F42E1CC1650246c",
+  module: "0x7D4c0013c770CA7b9ffA40D6a182c4d0fB0C8873",
+  locker: "0x9A20D5f7856F936F7eEDBa0e46a6A839fbd70C57",
+  usdc: "0x3600000000000000000000000000000000000000",
+} as const satisfies Record<string, Address>;
+
+export const factoryAbi = [
+  {
+    type: "function",
+    name: "launch",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "name_", type: "string" },
+      { name: "symbol_", type: "string" },
+      { name: "supply_", type: "uint256" },
+      { name: "x0_", type: "uint256" },
+      { name: "graduationUsdc_", type: "uint256" },
+      { name: "maxWallet_", type: "uint256" },
+      { name: "maxTx_", type: "uint256" },
+      { name: "metadataURI_", type: "string" },
+    ],
+    outputs: [
+      { name: "tokenAddr", type: "address" },
+      { name: "curveAddr", type: "address" },
+    ],
+  },
+] as const;
+
+export const registryAbi = [
+  { type: "function", name: "count", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  {
+    type: "function",
+    name: "all",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [
+      {
+        type: "tuple[]",
+        components: [
+          { name: "agentId", type: "uint256" },
+          { name: "token", type: "address" },
+          { name: "curve", type: "address" },
+          { name: "creator", type: "address" },
+          { name: "metadataURI", type: "string" },
+          { name: "createdAt", type: "uint64" },
+        ],
+      },
+    ],
+  },
+] as const;
+
+export const curveAbi = [
+  { type: "function", name: "buy", stateMutability: "nonpayable", inputs: [{ name: "usdcIn", type: "uint256" }, { name: "minTokensOut", type: "uint256" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "sell", stateMutability: "nonpayable", inputs: [{ name: "tokensIn", type: "uint256" }, { name: "minUsdcOut", type: "uint256" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "buyQuote", stateMutability: "view", inputs: [{ name: "usdcIn", type: "uint256" }], outputs: [{ name: "tokensOut", type: "uint256" }, { name: "fee", type: "uint256" }] },
+  { type: "function", name: "sellQuote", stateMutability: "view", inputs: [{ name: "tokensIn", type: "uint256" }], outputs: [{ name: "usdcOut", type: "uint256" }, { name: "fee", type: "uint256" }, { name: "gross", type: "uint256" }] },
+  { type: "function", name: "price", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "graduated", stateMutability: "view", inputs: [], outputs: [{ type: "bool" }] },
+  { type: "function", name: "raisedUsdc", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+] as const;
+
+export const erc20Abi = [
+  { type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ name: "s", type: "address" }, { name: "a", type: "uint256" }], outputs: [{ type: "bool" }] },
+  { type: "function", name: "allowance", stateMutability: "view", inputs: [{ name: "o", type: "address" }, { name: "s", type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ type: "uint256" }] },
+] as const;
