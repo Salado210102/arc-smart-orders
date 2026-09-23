@@ -11,7 +11,7 @@
 //   KEEPER_ADDRESS, KEEPER_MIN_USDC            (mainnet low-gas alert; base units, 6 dec)
 //   ARC_RPC_TESTNET, KEEPER_ADDRESS_TESTNET, KEEPER_MIN_USDC_TESTNET  (testnet low-gas alert)
 //   BALANCE_CHECK_MS                           (default 3600000 = 1h)
-import { createPublicClient, http, parseAbiItem } from "viem";
+import { createPublicClient, http, parseAbiItem, formatUnits } from "viem";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -34,6 +34,7 @@ const TG_CHAT = process.env.TELEGRAM_CHAT_ID;
 const DISCORD = process.env.DISCORD_WEBHOOK_URL;
 const EXPLORER = "https://explorer.arc.io";
 const USDC = "0x3600000000000000000000000000000000000000";
+const EXECUTOR = process.env.EXECUTOR ?? "0x9b3a990d1a31Ff5E01ddB8702e10F2529811FDb7"; // mainnet OrderExecutor
 
 // ---- low-gas monitor ----
 const CHECK_MS = Number(process.env.BALANCE_CHECK_MS ?? 3600000);
@@ -48,6 +49,9 @@ const clientTestnet = RPC_TESTNET ? createPublicClient({ transport: http(RPC_TES
 
 const AGENT_REGISTERED = parseAbiItem(
   "event AgentRegistered(uint256 indexed agentId, address indexed token, address indexed curve, address creator, string metadataURI)",
+);
+const ORDER_EXECUTED = parseAbiItem(
+  "event OrderExecuted(address indexed orderOwner, address indexed tokenIn, address indexed tokenOut, address swapTarget, uint256 amountIn, uint256 amountOut)",
 );
 const ERC20 = [parseAbiItem("function balanceOf(address) view returns (uint256)")];
 
@@ -182,6 +186,49 @@ async function tick() {
   }
 }
 
+// ---- smart-order fills (OrderExecutor.OrderExecuted) ----
+async function fillTick() {
+  const state = loadState();
+  try {
+    const latest = await client.getBlockNumber();
+    if (!state.lastFillBlock) {
+      state.lastFillBlock = process.env.START_BLOCK ? Number(process.env.START_BLOCK) - 1 : Number(latest);
+      saveState(state);
+      console.log(`[alerts] fills primed at block ${state.lastFillBlock}`);
+      return;
+    }
+    if (BigInt(state.lastFillBlock) >= latest) return;
+
+    const logs = await client.getLogs({
+      address: EXECUTOR,
+      event: ORDER_EXECUTED,
+      fromBlock: BigInt(state.lastFillBlock) + 1n,
+      toBlock: latest,
+    });
+
+    for (const log of logs) {
+      const { orderOwner, tokenIn, tokenOut, amountIn, amountOut } = log.args;
+      const amtIn = Number(formatUnits(amountIn ?? 0n, 6)).toLocaleString("en-US", { maximumFractionDigits: 6 });
+      const amtOut = Number(formatUnits(amountOut ?? 0n, 6)).toLocaleString("en-US", { maximumFractionDigits: 6 });
+      const msg =
+        `✅ <b>Smart order filled on Arc mainnet</b>\n` +
+        `• owner: <code>${orderOwner}</code>\n` +
+        `• in  <b>${amtIn}</b> (${tokenIn})\n` +
+        `• out <b>${amtOut}</b> (${tokenOut})\n` +
+        `<a href="${EXPLORER}/tx/${log.transactionHash}">view tx →</a>`;
+      console.log(`[alert] fill ${log.transactionHash}`);
+      const sent = await notify(msg);
+      if (sent.length) console.log("[alerts] →", sent.join(", "));
+    }
+    state.lastFillBlock = Number(latest);
+    saveState(state);
+  } catch (e) {
+    console.error("[alerts] fills:", e.message);
+  } finally {
+    setTimeout(fillTick, POLL_MS);
+  }
+}
+
 const targets = [TG_TOKEN && TG_CHAT ? "telegram" : null, DISCORD ? "discord" : null].filter(Boolean);
 console.log(`[alerts] registry ${REGISTRY} on ${RPC} · targets: ${targets.join(", ") || "NONE (configure " + ENV_FILE + ")"}`);
 console.log(
@@ -189,3 +236,4 @@ console.log(
 );
 void tick();
 if (KEEPER || KEEPER_TESTNET) void balanceTick();
+void fillTick();
