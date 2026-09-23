@@ -65,7 +65,7 @@ contract CrossChainOrderExecutor {
         uint256 deadline;
     }
 
-    uint256 private _locked;
+    bool private _locked;
 
     event CrossChainFilled(
         address indexed owner, uint256 sourceChainId, address tokenIn, address tokenOut, uint256 amountIn, uint256 netAmountIn, uint256 fee, uint256 amountOut
