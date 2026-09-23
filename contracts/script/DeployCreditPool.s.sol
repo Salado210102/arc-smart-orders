@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {Script, console2} from "forge-std/Script.sol";
 import {AgentCreditPool} from "../src/credit/AgentCreditPool.sol";
+import {RevenueRouter} from "../src/credit/RevenueRouter.sol";
 
 /// @notice Deterministic deploy of the AgentCreditPool (invite-only USDC micro-credit on Arc).
 /// @dev Safety gates:
@@ -18,6 +19,7 @@ import {AgentCreditPool} from "../src/credit/AgentCreditPool.sol";
 /// Optional env:
 ///   RISK_MANAGER   default: SAFE_ADDRESS
 ///   KEEPER         default: SAFE_ADDRESS (auto-repay via ERC-8183)
+///   SPLITTER_ADDRESS  if set (a deployed RevenueSplitter), also deploys the RevenueRouter
 ///
 /// Run:
 ///   forge script script/DeployCreditPool.s.sol --rpc-url <arc> --private-key $PK --broadcast
@@ -29,12 +31,18 @@ contract DeployCreditPool is Script {
         address safe = _contractEnv("SAFE_ADDRESS"); // owner + treasury
         address riskManager = vm.envOr("RISK_MANAGER", safe);
         address keeper = vm.envOr("KEEPER", safe);
+        address splitter = vm.envOr("SPLITTER_ADDRESS", address(0));
 
         require(riskManager != address(0), "RISK_MANAGER = 0");
         require(keeper != address(0), "KEEPER = 0");
+        if (splitter != address(0)) require(splitter.code.length > 0, "SPLITTER_ADDRESS: no contract code");
 
         vm.startBroadcast();
         AgentCreditPool pool = new AgentCreditPool(usdc, safe, safe, riskManager);
+        RevenueRouter router;
+        if (splitter != address(0)) {
+            router = new RevenueRouter(usdc, address(pool), splitter, safe);
+        }
         vm.stopBroadcast();
 
         // ---- post-deploy invariants ----
@@ -43,9 +51,14 @@ contract DeployCreditPool is Script {
         require(pool.treasury() == safe, "treasury != Safe");
         require(pool.riskManager() == riskManager, "riskManager mismatch");
         require(pool.paused() == false, "paused on deploy");
+        if (splitter != address(0)) {
+            require(address(router.pool()) == address(pool), "router.pool mismatch");
+            require(router.owner() == safe, "router owner != Safe");
+        }
 
         console2.log("=== AgentCreditPool deployment ===");
         console2.log("pool            :", address(pool));
+        console2.log("RevenueRouter   :", address(router));
         console2.log("usdc            :", usdc);
         console2.log("owner/treasury  :", safe);
         console2.log("riskManager     :", riskManager);

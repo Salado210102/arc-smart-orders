@@ -75,6 +75,7 @@ contract AgentCreditPool {
     }
     Loan[] public loans;
     mapping(address => uint256) public agentOutstanding;
+    mapping(address => uint256[]) internal agentLoans; // loan ids per agent (for repayOnBehalf)
 
     uint256 private _locked;
 
@@ -165,6 +166,15 @@ contract AgentCreditPool {
         return epochOutstanding;
     }
 
+    /// @notice Total (principal + interest) this agent would need to repay to clear its active loans.
+    function debtOf(address agent) public view returns (uint256 total) {
+        uint256[] storage ids = agentLoans[agent];
+        for (uint256 i = 0; i < ids.length; i++) {
+            Loan storage l = loans[ids[i]];
+            if (l.active) total += l.principal + (l.principal * interestBps) / 10_000;
+        }
+    }
+
     // ===================================================================== LP side
     function deposit(uint256 amount) external nonReentrant returns (uint256 mintedShares) {
         if (paused) revert Paused();
@@ -232,6 +242,7 @@ contract AgentCreditPool {
 
         loanId = loans.length;
         loans.push(Loan({ borrower: msg.sender, principal: amount, dueAt: uint64(block.timestamp) + termSeconds, active: true, defaulted: false }));
+        agentLoans[msg.sender].push(loanId);
 
         outstanding += amount;
         idle -= amount;
@@ -250,6 +261,21 @@ contract AgentCreditPool {
     /// @notice Repay pulling USDC from msg.sender — for the keeper / ERC-8183 escrow auto-repay.
     function repayFrom(uint256 loanId) external nonReentrant {
         _settle(loanId, msg.sender);
+    }
+
+    /// @notice Repay an agent's active loans from msg.sender's funds (used by the RevenueRouter / keeper
+    ///         to GUARANTEE debt is settled BEFORE revenue is split). Settles whole loans in order while
+    ///         `maxAmount` allows; returns the amount actually used.
+    function repayOnBehalf(address agent, uint256 maxAmount) external nonReentrant returns (uint256 used) {
+        uint256[] storage ids = agentLoans[agent];
+        for (uint256 i = 0; i < ids.length && used < maxAmount; i++) {
+            Loan storage l = loans[ids[i]];
+            if (!l.active) continue;
+            uint256 owed = l.principal + (l.principal * interestBps) / 10_000;
+            if (used + owed > maxAmount) continue; // cannot fully settle this loan with the funds available
+            _settle(ids[i], msg.sender);
+            used += owed;
+        }
     }
 
     function _settle(uint256 loanId, address payer) internal {
@@ -313,6 +339,17 @@ contract AgentCreditPool {
     function setPaused(bool p) external onlyRisk {
         paused = p;
         emit PausedSet(p);
+    }
+
+    /// @notice Emergency stop. Blocks deposit/loan; withdraw/repay always work.
+    function pause() external onlyRisk {
+        paused = true;
+        emit PausedSet(true);
+    }
+
+    function unpause() external onlyRisk {
+        paused = false;
+        emit PausedSet(false);
     }
 
     function setLP(address who, bool ok) external onlyRisk {

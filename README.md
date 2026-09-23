@@ -183,6 +183,11 @@ staking vault** and 30% to the treasury. Verified by `test/RevenueWiring.t.sol`.
 - `RevenueSplitter` splits an agent's USDC revenue **70% → stakers / 30% → treasury**.
 - `AgentStakingVault` is an **ERC-4626-style** vault; the stakers' share streams in as yield.
 
+### `RevenueRouter` — repay-before-split guarantee
+`RevenueRouter.route(agent, revenue)` calls `pool.repayOnBehalf(agent, …)` **before** forwarding the
+remainder to the `RevenueSplitter`, in the **same transaction** — so the pool is settled first and
+dividends are computed only on **net** revenue. (`contracts/src/credit/RevenueRouter.sol`)
+
 ### Unified economic flow
 Credit is returned to the pool **before** any dividend is distributed:
 
@@ -192,11 +197,12 @@ Credit is returned to the pool **before** any dividend is distributed:
           ▼
    AgentCreditPool ──────────────► AI agent
         ▲                             │  does a job (ERC-8183 escrow)
-        │  repay (auto, via keeper)   ▼
-        └───────────────────────  Escrow pays on delivery
-                                      │
-                                      ▼
-                               RevenueSplitter
+        │  repayOnBehalf (auto)       ▼
+        └───────────────  RevenueRouter.route(agent, revenue)
+              │              (1) repay debt to the pool FIRST
+              │              (2) forward the remainder
+              │                     ▼
+              └────────────  RevenueSplitter
                                  ├─ 70% ─► AgentStakingVault (stakers earn USDC)
                                  └─ 30% ─► Safe treasury
 ```
@@ -214,6 +220,7 @@ contracts/                          Foundry — solc 0.8.26, via-ir, optimizer 2
   src/agentic/IERC8004.sol            interfaces for the deployed ERC-8004 registries
   src/agentic/IAgenticCommerce.sol    interfaces for ERC-8183 + IACPHook
   src/credit/AgentCreditPool.sol      peer-to-contract USDC micro-credit (LP shares, bond, caps, first-loss reserve)
+  src/credit/RevenueRouter.sol        repay-before-split router (settles pool debt, then forwards to the splitter)
   src/launchpad/AgentToken.sol        ERC-20 (fixed supply, anti-sniper limits)
   src/launchpad/AgentBondingCurve.sol USDC bonding curve (virtual reserves, fees, graduation)
   src/launchpad/AgentFactory.sol      launch orchestrator (token + curve + ERC-8004 identity)
@@ -231,7 +238,8 @@ contracts/                          Foundry — solc 0.8.26, via-ir, optimizer 2
   test/RevenueWiring.t.sol            1 test   (order fee -> splitter -> vault)
   test/Permit2WitnessFork.t.sol       fork test vs the real Permit2
   test/DeployMainnetFork.t.sol        mainnet-fork dry-run of the deploy script
-  test/AgentCreditPool.t.sol          18 tests (credit pool: shares, whitelist, bond, caps, repay split, default, pause)
+  test/AgentCreditPool.t.sol          21 tests (credit pool: shares, whitelist, bond, caps, repay split, default, pause)
+  test/RevenueRouter.t.sol            integration: repay debt before splitting revenue
   script/Deploy.s.sol                 deploy OrderExecutor (+ optional mock router)
   script/DeployLaunchpad.s.sol        deploy the launchpad (P1/P2)
   script/DeployStaking.s.sol          deploy RevenueSplitter + vault (P3)
@@ -241,7 +249,7 @@ contracts/                          Foundry — solc 0.8.26, via-ir, optimizer 2
 sdk/                                TypeScript (viem)
   src/index.ts                        EIP-712 domains/types, signLimitOrder/signTwapOrder, Permit2 approval
 sdk-python/                         Python SDK — arc-agent-treasury (PyPI-ready)
-  arc_agent_treasury/__init__.py      ArcAgentTreasury: usdc_balance / needs_credit / request_credit / repay
+  arc_agent_treasury/{__init__,client}.py  AgentTreasuryClient: usdc_balance / ensure_credit / request_credit / repay
 keeper/                             TypeScript (viem)
   src/{server,worker,db,agentic,events}.ts  persistent keeper: HTTP API + WebSocket + SQLite worker
   src/agentic.ts                      ERC-8004 identity/reputation + ERC-8183 job lifecycle
@@ -249,7 +257,7 @@ keeper/                             TypeScript (viem)
 apps/launchpad/                     Vite + React + Tailwind launchpad UI (Vercel)
 ops/                                ops tooling (Safe execTransaction signer, reminder bot)
 examples/python/sign_limit_order.py Python EIP-712 signing recipe (verified to match the TS SDK)
-docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · SAFE_TREASURY · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
+docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · SDK_INTEGRATION · SAFE_TREASURY · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
 ```
 
 ---

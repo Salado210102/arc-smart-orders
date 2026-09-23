@@ -302,4 +302,41 @@ contract AgentCreditPoolTest is Test {
         vm.expectRevert(AgentCreditPool.HasActiveLoans.selector);
         pool.withdrawBond(5 * USDC_1);
     }
+
+    // ---------------------------------------------------------------- pause alias + repayOnBehalf
+    function test_pauseAliasBlocksThenUnpauseRestores() public {
+        _lpDeposit(500 * USDC_1);
+        _bond(10 * USDC_1);
+        vm.prank(risk);
+        pool.pause();
+        assertTrue(pool.paused());
+        vm.prank(agent);
+        vm.expectRevert(AgentCreditPool.Paused.selector);
+        pool.requestLoan(5 * USDC_1, 1 days);
+        vm.prank(risk);
+        pool.unpause();
+        assertFalse(pool.paused());
+        _borrow(5 * USDC_1, 1 days);
+    }
+
+    function test_repayOnBehalfClearsAgentDebt() public {
+        _lpDeposit(500 * USDC_1);
+        _bond(10 * USDC_1);
+        _borrow(10 * USDC_1, 1 days);
+        uint256 debt = pool.debtOf(agent);
+        assertGt(debt, 10 * USDC_1); // principal + interest
+
+        vm.prank(keeper);
+        uint256 used = pool.repayOnBehalf(agent, debt);
+        assertEq(used, debt);
+        assertEq(pool.debtOf(agent), 0);
+        assertEq(pool.outstanding(), 0);
+    }
+
+    function test_debtOfIncludesInterest() public {
+        _lpDeposit(500 * USDC_1);
+        _bond(10 * USDC_1);
+        uint256 id = _borrow(10 * USDC_1, 1 days);
+        assertEq(pool.debtOf(agent), pool.pendingInterest(id) + 10 * USDC_1);
+    }
 }
