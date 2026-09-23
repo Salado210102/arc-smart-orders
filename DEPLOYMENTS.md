@@ -123,6 +123,21 @@ Deploy txs: Locker `0x6eff9520…` · Registry `0x0eed1a11…` · MockDEX `0xbdb
 **Verified on-chain:** `registry.count() == 1` · `registry.factory() == AgentFactory` · `curve.graduationModule() == GraduationModule` · `locker.lockCount() == 0` (not graduated yet).
 **Full-cycle test:** `test/LaunchpadGraduation.t.sol` — buy past the threshold → `graduate()` → **LP locked in LiquidityLocker** for the creator (unlock `+365d`); withdraw reverts until unlock. **Full suite: 28/28.**
 
+---
+
+# Agent Launchpad (P3 — revenue split + staking) — 2026-09-22
+
+| Contract | Address |
+|---|---|
+| **AgentStakingVault** (ERC-4626-style, asset = demo AgentToken) | [`0x8c58fee840EE397d59362B39A6Eb59F4EdcC1bD7`](https://explorer.testnet.arc.io/address/0x8c58fee840EE397d59362B39A6Eb59F4EdcC1bD7) |
+| **RevenueSplitter** (70% stakers / 30% treasury) | [`0xFbfDa3712332347AF32ACeA10e981F36fb5734ED`](https://explorer.testnet.arc.io/address/0xFbfDa3712332347AF32ACeA10e981F36fb5734ED) |
+
+Deploy txs: Vault `0x952803a5…` · Splitter `0x32b4d2bb…`. asset = demo token `0x5D6862Cf…889C`, owner = A, treasury = `0x59FbA0e7…d5C0`.
+
+**Flow:** agent revenue (USDC) → `RevenueSplitter.distribute(amount)` → 70% to the vault (`notifyReward` → accrued pro-rata to stakers) + 30% to treasury. Stakers `deposit` the AgentToken and `claim()` USDC; `withdraw` returns the principal exactly.
+**Tests:** `test/Staking.t.sol` — 5/5 (deposit, yield via splitter, proportional without precision loss, pool-before-stakers, second-yield accrual). **Full suite: 33/33.**
+
+
 
 
 

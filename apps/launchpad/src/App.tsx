@@ -47,6 +47,34 @@ export default function App() {
   const [name, setName] = useState("My Agent");
   const [symbol, setSymbol] = useState("AGT");
   const [meta, setMeta] = useState("ipfs://bafkreibdi6623n3xpf7ymk62ckb4bo75o3qemwkpfvp5i25j66itxvsoei");
+  const [pinataJwt, setPinataJwt] = useState(() => localStorage.getItem("pinataJwt") ?? "");
+
+  //  Pin the agent metadata to IPFS via Pinata (JWT is user-provided, never bundled).
+  async function pinMeta() {
+    if (!pinataJwt) return setMsg("Paste a Pinata JWT first (stored locally in your browser).");
+    setBusy(true);
+    setMsg("Pinning metadata to IPFS…");
+    try {
+      const body = {
+        pinataContent: { name, symbol, description: `${name} — AI agent launched on Arc`, capabilities: [], version: "1.0.0" },
+        pinataMetadata: { name: `${symbol}-metadata.json` },
+      };
+      const r = await fetch("https://api.pinata.cloud/pinning/pinJSONToIPFS", {
+        method: "POST",
+        headers: { "content-type": "application/json", Authorization: `Bearer ${pinataJwt}` },
+        body: JSON.stringify(body),
+      });
+      const j = (await r.json()) as { IpfsHash?: string; error?: { details?: string } };
+      if (!r.ok || !j.IpfsHash) throw new Error(j?.error?.details ?? "pin_failed");
+      localStorage.setItem("pinataJwt", pinataJwt);
+      setMeta(`ipfs://${j.IpfsHash}`);
+      setMsg(`Pinned ✓ ipfs://${j.IpfsHash}`);
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function create() {
     if (!account) return;
     setBusy(true);
@@ -191,8 +219,17 @@ export default function App() {
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
           <input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="Symbol" />
           <input value={meta} onChange={(e) => setMeta(e.target.value)} placeholder="Metadata URI (IPFS)" />
+          <input
+            type="password"
+            value={pinataJwt}
+            onChange={(e) => setPinataJwt(e.target.value)}
+            placeholder="Pinata JWT (optional — to pin metadata to IPFS)"
+          />
           <p className="muted">Defaults: supply 1,000,000 · x0 5,000 USDC · graduation 1,000,000 USDC · fee 1% · lock 365d</p>
-          <button disabled={!account || busy} onClick={create}>Create agent (ERC-8004 + curve)</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="sec" disabled={busy} onClick={pinMeta}>Pin metadata to IPFS</button>
+            <button disabled={!account || busy} onClick={create}>Create agent (ERC-8004 + curve)</button>
+          </div>
         </div>
       )}
 
