@@ -4,6 +4,7 @@ import { createPublicClient, createWalletClient, http, defineChain, encodeFuncti
 import { privateKeyToAccount } from "viem/accounts";
 import { listPending, markFilled, markFailed, expireOld, type OrderRow } from "./db.ts";
 import { submitDeliverable } from "./agentic.ts";
+import { emitEvent } from "./events.ts";
 import { ARC_TESTNET_CHAIN_ID } from "../../sdk/src/index.ts";
 
 const RPC = process.env.ARC_TESTNET_RPC ?? "https://rpc.testnet.arc.io";
@@ -90,15 +91,19 @@ async function processOrder(o: OrderRow) {
     const rc = await pc.waitForTransactionReceipt({ hash, confirmations: 1 });
     if (rc.status !== "success") throw new Error("exec_reverted");
     markFilled(o.id, hash);
+    emitEvent({ type: "order.filled", id: o.id, tx: hash, maker: o.maker });
     console.log(`[orders] ${o.id} FILLED -> ${hash}`);
     if (o.job_id) {
       const d = keccak256(toHex(hash));
       await submitDeliverable(pc, wc, BigInt(o.job_id), d);
+      emitEvent({ type: "order.deliverable", id: o.id, jobId: o.job_id, tx: hash });
       console.log(`[orders] ${o.id}: deliverable enviado al job ${o.job_id}`);
     }
   } catch (e) {
-    markFailed(o.id, (e as { shortMessage?: string; message?: string }).shortMessage ?? (e as Error).message ?? "exec_failed");
-    console.error(`[orders] ${o.id} FAILED:`, (e as { shortMessage?: string; message?: string }).shortMessage ?? (e as Error).message);
+    const msg = (e as { shortMessage?: string; message?: string }).shortMessage ?? (e as Error).message ?? "exec_failed";
+    markFailed(o.id, msg);
+    emitEvent({ type: "order.failed", id: o.id, error: msg });
+    console.error(`[orders] ${o.id} FAILED:`, msg);
   }
 }
 

@@ -1,10 +1,12 @@
 // Order API + off-chain validation (Fastify). Persists signed orders for the worker.
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
+import websocket from "@fastify/websocket";
 import { createPublicClient, http, defineChain, verifyTypedData } from "viem";
 import { PERMIT2, USDC, EURC, ARC_TESTNET_CHAIN_ID } from "../../sdk/src/index.ts";
 import { WITNESS_TYPES } from "../../sdk/src/index.ts";
 import { insertOrder, getOrder, listByMaker, listPending } from "./db.ts";
+import { bus, emitEvent } from "./events.ts";
 
 const RPC = process.env.ARC_TESTNET_RPC ?? "https://rpc.testnet.arc.io";
 const CHAIN_ID = Number(process.env.CHAIN_ID ?? ARC_TESTNET_CHAIN_ID);
@@ -29,8 +31,27 @@ const isAddr = (a: unknown): a is string => typeof a === "string" && /^0x[0-9a-f
 const isHexSig = (s: unknown): s is string => typeof s === "string" && /^0x[0-9a-fA-F]{130}$/.test(s);
 const isDigits = (s: unknown): s is string => typeof s === "string" && /^\d+$/.test(s) && s !== "0";
 
-export function buildServer() {
+export async function buildServer() {
   const app = Fastify({ logger: true });
+  await app.register(websocket);
+
+  //  Live feed: broadcasts order lifecycle events (created/filled/failed).
+  app.get("/ws", { websocket: true }, (socket) => {
+    try {
+      socket.send(JSON.stringify({ type: "hello", ts: Date.now() }));
+    } catch {
+      /* ignore */
+    }
+    const on = (e: unknown) => {
+      try {
+        socket.send(JSON.stringify(e));
+      } catch {
+        /* ignore */
+      }
+    };
+    bus.on("event", on);
+    socket.on("close", () => bus.off("event", on));
+  });
 
   app.get("/health", async () => ({ ok: true, chainId: CHAIN_ID, executor: EXECUTOR }));
 
@@ -105,6 +126,7 @@ export function buildServer() {
         signature,
         job_id: b.jobId ? String(b.jobId) : null,
       });
+      emitEvent({ type: "order.created", id: order.id, maker });
       return { ok: true, order };
     } catch (e) {
       req.log.error(e);
@@ -116,7 +138,7 @@ export function buildServer() {
 }
 
 export async function startServer() {
-  const app = buildServer();
+  const app = await buildServer();
   await app.listen({ port: PORT, host: "0.0.0.0" });
   return app;
 }
