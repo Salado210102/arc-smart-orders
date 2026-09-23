@@ -1,0 +1,4 @@
+# Arc liquidation monitor (bots/liquidation_monitor.py)
+web3>=6.20
+aiohttp>=3.9
+eth-account>=0.11
