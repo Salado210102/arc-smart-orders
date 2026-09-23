@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {IPriceOracle} from "./IPriceOracle.sol";
+
 /// @title AgentCreditPool — invite-only USDC micro-credit for AI agents on Arc
 /// @notice LPs (whitelisted) deposit USDC to earn yield; approved agents take short micro-loans
 ///         ($5–$50) to pay for API/gas, ideally auto-repaid from an ERC-8183 job escrow.
@@ -65,6 +67,15 @@ contract AgentCreditPool {
     uint256 public minBond = 10e6; // 10 USDC required to borrow
     mapping(address => uint256) public bond;
 
+    // --------------------------------------------------------------------- cirBTC collateral
+    address public cirbtc; // cirBTC (ERC-20, 8 dec) — mainnet 0x171A…bAA0
+    address public priceOracle; // IPriceOracle (USD per BTC, 1e18)
+    uint16 public maxLtvBps = 7000; // 70% LTV
+    uint16 public liquidationThresholdBps = 8000; // 80%
+    uint16 public liquidationPenaltyBps = 500; // 5% of debt -> treasury
+    mapping(address => uint256) public collateral; // cirBTC (8 dec)
+    mapping(address => uint256) public collateralDebt; // USDC principal (6 dec)
+
     // --------------------------------------------------------------------- loans
     struct Loan {
         address borrower;
@@ -95,6 +106,13 @@ contract AgentCreditPool {
     event PausedSet(bool paused);
     event RolesUpdated(address riskManager, address keeper);
     event OwnershipTransferred(address indexed from, address indexed to);
+    event CollateralConfigUpdated(address cirbtc, address oracle);
+    event RiskParamsUpdated(uint16 maxLtvBps, uint16 liquidationThresholdBps, uint16 liquidationPenaltyBps);
+    event CollateralDeposited(address indexed agent, uint256 amount);
+    event CollateralWithdrawn(address indexed agent, uint256 amount);
+    event CollateralBorrowed(address indexed agent, uint256 usdc, uint256 debt);
+    event CollateralRepaid(address indexed agent, uint256 usdc, uint256 interest);
+    event Liquidated(address indexed agent, uint256 debtRepaid, uint256 collateralSeized, uint256 penalty);
 
     // --------------------------------------------------------------------- errors
     error NotOwner();
@@ -114,6 +132,9 @@ contract AgentCreditPool {
     error NotDue();
     error TransferFailed();
     error Reentrancy();
+    error CollateralNotConfigured();
+    error LtvTooHigh();
+    error NotLiquidatable();
 
     // --------------------------------------------------------------------- modifiers
     modifier onlyOwner() {
@@ -407,6 +428,130 @@ contract AgentCreditPool {
         if (to == address(0)) revert BadParams();
         emit OwnershipTransferred(owner, to);
         owner = to;
+    }
+
+    // ===================================================================== cirBTC collateral
+    function setCollateralConfig(address cirbtc_, address priceOracle_) external onlyOwner {
+        cirbtc = cirbtc_;
+        priceOracle = priceOracle_;
+        emit CollateralConfigUpdated(cirbtc_, priceOracle_);
+    }
+
+    function setRiskParams(uint16 maxLtvBps_, uint16 liquidationThresholdBps_, uint16 liquidationPenaltyBps_)
+        external
+        onlyOwner
+    {
+        if (maxLtvBps_ == 0 || maxLtvBps_ > 9000) revert BadParams();
+        if (liquidationThresholdBps_ <= maxLtvBps_ || liquidationThresholdBps_ > 9800) revert BadParams();
+        if (liquidationPenaltyBps_ > 2000) revert BadParams();
+        maxLtvBps = maxLtvBps_;
+        liquidationThresholdBps = liquidationThresholdBps_;
+        liquidationPenaltyBps = liquidationPenaltyBps_;
+        emit RiskParamsUpdated(maxLtvBps_, liquidationThresholdBps_, liquidationPenaltyBps_);
+    }
+
+    /// @notice USDC (6 dec) value of an agent's cirBTC collateral at the oracle price.
+    function collateralValueUsdc(address agent) public view returns (uint256) {
+        if (cirbtc == address(0) || priceOracle == address(0)) return 0;
+        uint256 p = IPriceOracle(priceOracle).priceUsdPerBtc(); // 1e18 per BTC
+        return (collateral[agent] * p) / 1e20; // 8-dec * 1e18 / 1e20 = 6-dec USDC
+    }
+
+    function collateralDebtOwed(address agent) public view returns (uint256) {
+        uint256 d = collateralDebt[agent];
+        return d + (d * interestBps) / 10_000;
+    }
+
+    /// @notice LTV in bps (owed / collateral value).
+    function collateralLtvBps(address agent) public view returns (uint256) {
+        uint256 v = collateralValueUsdc(agent);
+        uint256 owed = collateralDebtOwed(agent);
+        if (v == 0) return owed == 0 ? 0 : type(uint256).max;
+        return (owed * 10_000) / v;
+    }
+
+    function maxBorrowAgainstCollateral(address agent) public view returns (uint256) {
+        uint256 cap = (collateralValueUsdc(agent) * maxLtvBps) / 10_000;
+        uint256 owed = collateralDebtOwed(agent);
+        return cap > owed ? cap - owed : 0;
+    }
+
+    function depositCollateral(uint256 amount) external nonReentrant {
+        if (cirbtc == address(0)) revert CollateralNotConfigured();
+        if (amount == 0) revert ZeroAmount();
+        collateral[msg.sender] += amount;
+        if (!IERC20(cirbtc).transferFrom(msg.sender, address(this), amount)) revert TransferFailed();
+        emit CollateralDeposited(msg.sender, amount);
+    }
+
+    function withdrawCollateral(uint256 amount) external nonReentrant {
+        if (amount == 0 || amount > collateral[msg.sender]) revert BadParams();
+        collateral[msg.sender] -= amount;
+        uint256 v = collateralValueUsdc(msg.sender);
+        uint256 owed = collateralDebtOwed(msg.sender);
+        if (owed > 0 && owed * 10_000 > v * maxLtvBps) revert LtvTooHigh();
+        if (!IERC20(cirbtc).transfer(msg.sender, amount)) revert TransferFailed();
+        emit CollateralWithdrawn(msg.sender, amount);
+    }
+
+    /// @notice Borrow USDC against cirBTC collateral, within the max LTV.
+    function borrowAgainstCollateral(uint256 usdcAmount) external nonReentrant {
+        if (cirbtc == address(0) || priceOracle == address(0)) revert CollateralNotConfigured();
+        if (paused) revert Paused();
+        if (usdcAmount == 0) revert ZeroAmount();
+        if (usdcAmount > idle) revert InsufficientLiquidity();
+
+        uint256 newDebt = collateralDebt[msg.sender] + usdcAmount;
+        uint256 owed = newDebt + (newDebt * interestBps) / 10_000;
+        uint256 v = collateralValueUsdc(msg.sender);
+        if (v == 0 || owed * 10_000 > v * maxLtvBps) revert LtvTooHigh();
+
+        collateralDebt[msg.sender] = newDebt;
+        idle -= usdcAmount;
+
+        if (!usdc.transfer(msg.sender, usdcAmount)) revert TransferFailed();
+        emit CollateralBorrowed(msg.sender, usdcAmount, newDebt);
+    }
+
+    /// @notice Repay the full collateralized debt (principal + interest). Interest is split like micro-loans.
+    function repayCollateral() external nonReentrant {
+        uint256 owed = collateralDebtOwed(msg.sender);
+        if (owed == 0) revert NoActiveLoan();
+
+        uint256 principal = collateralDebt[msg.sender];
+        uint256 interest = owed - principal;
+        uint256 perf = (interest * performanceFeeBps) / 10_000;
+        uint256 toReserve = (interest * reserveShareBps) / 10_000;
+        uint256 toLPs = interest - perf - toReserve;
+
+        collateralDebt[msg.sender] = 0;
+        idle += principal + toLPs;
+        reserve += toReserve;
+
+        if (!usdc.transferFrom(msg.sender, address(this), owed)) revert TransferFailed();
+        if (perf > 0 && !usdc.transfer(treasury, perf)) revert TransferFailed();
+
+        emit CollateralRepaid(msg.sender, owed, interest);
+    }
+
+    /// @notice Liquidate an under-collateralized agent: seize cirBTC to the treasury, make LPs whole.
+    function liquidate(address agent) external nonReentrant {
+        uint256 owed = collateralDebtOwed(agent);
+        if (owed == 0) revert NoActiveLoan();
+        uint256 v = collateralValueUsdc(agent);
+        if (v == 0 || owed * 10_000 <= v * liquidationThresholdBps) revert NotLiquidatable();
+
+        uint256 penalty = (owed * liquidationPenaltyBps) / 10_000;
+        uint256 p = IPriceOracle(priceOracle).priceUsdPerBtc(); // 1e18
+        uint256 seizeAmt = ((owed + penalty) * 1e20) / p; // cirBTC (8 dec)
+        if (seizeAmt > collateral[agent]) seizeAmt = collateral[agent];
+
+        collateral[agent] -= seizeAmt;
+        collateralDebt[agent] = 0;
+        idle += owed; // LPs made whole (fully backed at the liquidation threshold)
+
+        if (!IERC20(cirbtc).transfer(treasury, seizeAmt)) revert TransferFailed();
+        emit Liquidated(agent, owed, seizeAmt, penalty);
     }
 
     // ===================================================================== internal
