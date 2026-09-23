@@ -215,7 +215,7 @@ Chain **5042** · RPC `https://rpc.mainnet.arc.io` · Explorer `https://explorer
 | **AgentRegistry** | `0x8aE509565397C62a585c74aA44f7E3bFEab3Bb01` | [`0x725cda6b…1a47`](https://explorer.arc.io/tx/0x725cda6b6afd8a96043d92eec65db044a741e8e0379fc815bd506aa835e61a47) |
 | **GraduationModule** | `0x1B8CA122DFd1100C0873A517b4875611Ed9De792` | [`0xab9e7cfb…6a9d`](https://explorer.arc.io/tx/0xab9e7cfb025e2672fa01a6e01efd9a7b6d086e19855849ec9d3f9a9a35ab6a9d) |
 | **AgentFactory** | `0x4A80a4748A1d2AB37300780FcBC2FD28d2Ed393B` | [`0x0ead7a51…daae`](https://explorer.arc.io/tx/0x0ead7a51afc204a8d91f95acf8cf09ff9b5c0dd8109c092523d936051414daae) |
-| **OrderExecutor** | `0x9b3A990D1a31ff5E01DdB8702E10F2529811Fdb7` | [`0xfebd8ce7…2d86`](https://explorer.arc.io/tx/0xfebd8ce7409551c5c2d41bb7f8ed40e1ecca464d0acd607fcd74764d91f12d86) |
+| **OrderExecutor** | `0x9b3a990d1a31Ff5E01ddB8702e10F2529811FDb7` | [`0xfebd8ce7…2d86`](https://explorer.arc.io/tx/0xfebd8ce7409551c5c2d41bb7f8ed40e1ecca464d0acd607fcd74764d91f12d86) |
 | **Safe `setFactory(factory)`** | — | [`0x9ab16edb…bb14`](https://explorer.arc.io/tx/0x9ab16edba51a11f818ad8cf9f9cc07d2c5f86e20c95bef2201bbe24805bcbb14) |
 
 **Config (verified on-chain):**

@@ -31,7 +31,7 @@
 
 | Contract | Address |
 |---|---|
-| OrderExecutor | `0x9b3A990D1a31ff5E01DdB8702E10F2529811Fdb7` |
+| OrderExecutor | `0x9b3a990d1a31Ff5E01ddB8702e10F2529811FDb7` |
 | AgentFactory | `0x4A80a4748A1d2AB37300780FcBC2FD28d2Ed393B` |
 | AgentRegistry | `0x8aE509565397C62a585c74aA44f7E3bFEab3Bb01` |
 | GraduationModule | `0x1B8CA122DFd1100C0873A517b4875611Ed9De792` |

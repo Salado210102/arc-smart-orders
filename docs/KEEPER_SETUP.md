@@ -44,7 +44,7 @@ Fill `keeper/.env`:
 ARC_RPC=https://rpc.mainnet.arc.io
 CHAIN_ID=5042
 KEEPER_PK=0x...          # the keeper hot wallet (B, 0x327f…50bC) — must be funded with USDC on Arc mainnet
-EXECUTOR=0x9b3A990D1a31ff5E01DdB8702E10F2529811Fdb7
+EXECUTOR=0x9b3a990d1a31Ff5E01ddB8702e10F2529811FDb7
 ROUTER=0x0000000000000000000000000000000000000000   # venue pending -> DRY=1
 MIN_FEE_GWEI=20
 LOOP_MS=8000
