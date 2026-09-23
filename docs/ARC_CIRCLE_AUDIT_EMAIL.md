@@ -85,8 +85,9 @@ proposal, and I'm looking for ecosystem audit support, introductions, or a point
 Open to a competitive/community audit too.
 
 • Repo (MIT, frozen pre-audit-v2): https://github.com/Salado210102/arc-smart-orders
-• Audit package / scope: docs/AUDIT_PACKAGE.md · docs/AUDIT_SCOPE.md
-• Proposal: docs/ARC_CIRCLE_AUDIT_PROPOSAL.md
+• Audit package: https://github.com/Salado210102/arc-smart-orders/blob/pre-audit-v2/docs/AUDIT_PACKAGE.md
+• Scope: https://github.com/Salado210102/arc-smart-orders/blob/pre-audit-v2/docs/AUDIT_SCOPE.md
+• Proposal: https://github.com/Salado210102/arc-smart-orders/blob/main/docs/ARC_CIRCLE_AUDIT_PROPOSAL.md
 
 Thanks!
 ```
