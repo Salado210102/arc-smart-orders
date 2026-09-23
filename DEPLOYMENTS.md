@@ -290,6 +290,24 @@ curl -s http://127.0.0.1:8789/health  # {"ok":true,"chainId":5042002,...}
 ```
 Logs: `/var/www/arc-keeper/logs/arc-keeper-testnet.{out,err}.log`.
 
+---
+
+# Agent Launchpad — first MAINNET agent via the DApp (E2E) — 2026-09-23
+
+Full DApp flow on **Arc mainnet (5042)**: connect wallet → create agent → buy on the bonding curve →
+the `arc-alerts` Telegram bot fires automatically.
+
+| | |
+|---|---|
+| **AgentToken** | `0xD81d4A4e6e91977cEf71b81259BF0a627e3E60De` |
+| **AgentBondingCurve** | `0xf2da5A5F12E6a2f53C1Ee848988660044e94fd6F` |
+| **Creator** | `0xA228372c79944e46c2972462f7849c66467e641b` (DApp user wallet) |
+| **Buy** | 0.2 USDC → ≈ **39.6 tokens** (net raised `0.198 USDC`, `price = 5000`) |
+| **Alert** | Telegram "🚀 New agent launched on Arc" delivered by `arc-alerts` (24/7) |
+
+> `agentId = 0` because ERC-8004 is skipped on Arc mainnet (registry not deployed there yet), as designed.
+> This is the first agent created through the production DApp on mainnet.
+
 
 
 
