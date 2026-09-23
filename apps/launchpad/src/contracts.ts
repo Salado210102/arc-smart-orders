@@ -76,6 +76,7 @@ export const curveAbi = [
   { type: "function", name: "price", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   { type: "function", name: "graduated", stateMutability: "view", inputs: [], outputs: [{ type: "bool" }] },
   { type: "function", name: "raisedUsdc", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "graduationUsdc", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
 ] as const;
 
 export const erc20Abi = [

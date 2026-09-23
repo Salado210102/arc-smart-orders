@@ -1,25 +1,31 @@
-import { useEffect, useState } from "react";
-import { parseUnits, formatUnits } from "viem";
-import { publicClient, connect, walletClient, EXPLORER } from "./arc.ts";
-import { ADDR, factoryAbi, registryAbi, curveAbi, erc20Abi, vaultAbi } from "./contracts.ts";
-
-type Agent = {
-  agentId: bigint;
-  token: `0x${string}`;
-  curve: `0x${string}`;
-  creator: `0x${string}`;
-  metadataURI: string;
-  createdAt: bigint;
-};
+import { useCallback, useEffect, useState } from "react";
+import { Plus, Rocket, Sparkles } from "lucide-react";
+import { formatUnits, parseUnits } from "viem";
+import { EXPLORER, connect, publicClient, walletClient } from "./arc";
+import { ADDR, erc20Abi, factoryAbi, registryAbi } from "./contracts";
+import { AgentCard, type Agent } from "./components/AgentCard";
+import { Navbar, type Tab } from "./components/Navbar";
+import { StakingPanel } from "./components/StakingPanel";
+import { SwapBox } from "./components/SwapBox";
+import { Button } from "./components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
+import { Input } from "./components/ui/input";
 
 export default function App() {
   const [account, setAccount] = useState<`0x${string}` | null>(null);
-  const [tab, setTab] = useState<"agents" | "create" | "trade" | "stake">("agents");
+  const [usdc, setUsdc] = useState("0");
+  const [tab, setTab] = useState<Tab>("agents");
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [selected, setSelected] = useState<Agent | null>(null);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function refresh() {
+  const [name, setName] = useState("My Agent");
+  const [symbol, setSymbol] = useState("AGT");
+  const [meta, setMeta] = useState("ipfs://bafkreibdi6623n3xpf7ymk62ckb4bo75o3qemwkpfvp5i25j66itxvsoei");
+  const [pinataJwt, setPinataJwt] = useState(() => localStorage.getItem("pinataJwt") ?? "");
+
+  const refreshAgents = useCallback(async () => {
     try {
       const list = (await publicClient.readContract({
         address: ADDR.registry,
@@ -30,10 +36,31 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-  }
-  useEffect(() => {
-    void refresh();
   }, []);
+
+  useEffect(() => {
+    void refreshAgents();
+  }, [refreshAgents]);
+
+  useEffect(() => {
+    (async () => {
+      if (!account) {
+        setUsdc("0");
+        return;
+      }
+      try {
+        const b = (await publicClient.readContract({
+          address: ADDR.usdc,
+          abi: erc20Abi,
+          functionName: "balanceOf",
+          args: [account],
+        })) as bigint;
+        setUsdc(formatUnits(b, 6));
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [account, msg]);
 
   async function doConnect() {
     try {
@@ -43,13 +70,6 @@ export default function App() {
     }
   }
 
-  // ---- create ----
-  const [name, setName] = useState("My Agent");
-  const [symbol, setSymbol] = useState("AGT");
-  const [meta, setMeta] = useState("ipfs://bafkreibdi6623n3xpf7ymk62ckb4bo75o3qemwkpfvp5i25j66itxvsoei");
-  const [pinataJwt, setPinataJwt] = useState(() => localStorage.getItem("pinataJwt") ?? "");
-
-  //  Pin the agent metadata to IPFS via Pinata (JWT is user-provided, never bundled).
   async function pinMeta() {
     if (!pinataJwt) return setMsg("Paste a Pinata JWT first (stored locally in your browser).");
     setBusy(true);
@@ -75,10 +95,11 @@ export default function App() {
       setBusy(false);
     }
   }
+
   async function create() {
     if (!account) return;
     setBusy(true);
-    setMsg("Launching…");
+    setMsg("Launching agent…");
     try {
       const w = walletClient() as any;
       const hash = await w.writeContract({
@@ -99,8 +120,9 @@ export default function App() {
         ],
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      setMsg(`Launched ✓ ${EXPLORER}/tx/${hash}`);
-      await refresh();
+      setMsg(`Agent launched ✓ ${EXPLORER}/tx/${hash}`);
+      await refreshAgents();
+      setTab("agents");
     } catch (e) {
       setMsg((e as { shortMessage?: string }).shortMessage ?? (e as Error).message);
     } finally {
@@ -108,247 +130,116 @@ export default function App() {
     }
   }
 
-  // ---- trade ----
-  const [sel, setSel] = useState<Agent | null>(null);
-  const [amount, setAmount] = useState("10");
-  const [quote, setQuote] = useState("");
-  useEffect(() => {
-    (async () => {
-      if (!sel || !amount) return setQuote("");
-      try {
-        const [out, fee] = (await publicClient.readContract({
-          address: sel.curve,
-          abi: curveAbi,
-          functionName: "buyQuote",
-          args: [parseUnits(amount, 6)],
-        })) as readonly [bigint, bigint];
-        setQuote(`→ ~${Number(formatUnits(out, 18)).toLocaleString()} tokens · fee ${formatUnits(fee, 6)} USDC`);
-      } catch {
-        setQuote("");
-      }
-    })();
-  }, [sel, amount]);
-
-  async function buy() {
-    if (!account || !sel) return;
-    setBusy(true);
-    setMsg("Approving + buying…");
-    try {
-      const w = walletClient() as any;
-      const usdcIn = parseUnits(amount, 6);
-      const [out] = (await publicClient.readContract({
-        address: sel.curve,
-        abi: curveAbi,
-        functionName: "buyQuote",
-        args: [usdcIn],
-      })) as readonly [bigint, bigint];
-      const minOut = (out * 99n) / 100n;
-      const a = await w.writeContract({ account, chain: null, address: ADDR.usdc, abi: erc20Abi, functionName: "approve", args: [sel.curve, usdcIn] });
-      await publicClient.waitForTransactionReceipt({ hash: a });
-      const h = await w.writeContract({ account, chain: null, address: sel.curve, abi: curveAbi, functionName: "buy", args: [usdcIn, minOut] });
-      await publicClient.waitForTransactionReceipt({ hash: h });
-      setMsg(`Bought ✓ ${EXPLORER}/tx/${h}`);
-    } catch (e) {
-      setMsg((e as { shortMessage?: string }).shortMessage ?? (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function sell() {
-    if (!account || !sel) return;
-    setBusy(true);
-    setMsg("Approving + selling…");
-    try {
-      const w = walletClient() as any;
-      const tokensIn = parseUnits(amount, 18);
-      const [usdcOut] = (await publicClient.readContract({
-        address: sel.curve,
-        abi: curveAbi,
-        functionName: "sellQuote",
-        args: [tokensIn],
-      })) as readonly [bigint, bigint, bigint];
-      const minOut = (usdcOut * 99n) / 100n;
-      const a = await w.writeContract({ account, chain: null, address: sel.token, abi: erc20Abi, functionName: "approve", args: [sel.curve, tokensIn] });
-      await publicClient.waitForTransactionReceipt({ hash: a });
-      const h = await w.writeContract({ account, chain: null, address: sel.curve, abi: curveAbi, functionName: "sell", args: [tokensIn, minOut] });
-      await publicClient.waitForTransactionReceipt({ hash: h });
-      setMsg(`Sold ✓ ${EXPLORER}/tx/${h}`);
-    } catch (e) {
-      setMsg((e as { shortMessage?: string }).shortMessage ?? (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // ---- staking ----
-  const [stakeAmt, setStakeAmt] = useState("100");
-  const [staked, setStaked] = useState("");
-  const [pending, setPending] = useState("");
-  const [tvAssets, setTvAssets] = useState("");
-  async function refreshStake() {
-    if (!account) return;
-    try {
-      const [b, p, t] = await Promise.all([
-        publicClient.readContract({ address: ADDR.vault, abi: vaultAbi, functionName: "balanceOf", args: [account] }),
-        publicClient.readContract({ address: ADDR.vault, abi: vaultAbi, functionName: "pendingRewards", args: [account] }),
-        publicClient.readContract({ address: ADDR.vault, abi: vaultAbi, functionName: "totalAssets" }),
-      ]);
-      setStaked(formatUnits(b as bigint, 18));
-      setPending(formatUnits(p as bigint, 6));
-      setTvAssets(formatUnits(t as bigint, 18));
-    } catch (e) {
-      console.error(e);
-    }
-  }
-  useEffect(() => {
-    void refreshStake();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, msg]);
-
-  async function stake() {
-    if (!account) return;
-    setBusy(true);
-    setMsg("Approving + staking…");
-    try {
-      const w = walletClient() as any;
-      const amt = parseUnits(stakeAmt, 18);
-      const a = await w.writeContract({ account, chain: null, address: ADDR.vaultAsset, abi: erc20Abi, functionName: "approve", args: [ADDR.vault, amt] });
-      await publicClient.waitForTransactionReceipt({ hash: a });
-      const h = await w.writeContract({ account, chain: null, address: ADDR.vault, abi: vaultAbi, functionName: "deposit", args: [amt, account] });
-      await publicClient.waitForTransactionReceipt({ hash: h });
-      setMsg(`Staked ✓ ${EXPLORER}/tx/${h}`);
-    } catch (e) {
-      setMsg((e as { shortMessage?: string }).shortMessage ?? (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function unstake() {
-    if (!account) return;
-    setBusy(true);
-    setMsg("Unstaking…");
-    try {
-      const w = walletClient() as any;
-      const amt = parseUnits(stakeAmt, 18);
-      const h = await w.writeContract({ account, chain: null, address: ADDR.vault, abi: vaultAbi, functionName: "withdraw", args: [amt, account, account] });
-      await publicClient.waitForTransactionReceipt({ hash: h });
-      setMsg(`Unstaked ✓ ${EXPLORER}/tx/${h}`);
-    } catch (e) {
-      setMsg((e as { shortMessage?: string }).shortMessage ?? (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function claimStake() {
-    if (!account) return;
-    setBusy(true);
-    setMsg("Claiming USDC…");
-    try {
-      const w = walletClient() as any;
-      const h = await w.writeContract({ account, chain: null, address: ADDR.vault, abi: vaultAbi, functionName: "claim" });
-      await publicClient.waitForTransactionReceipt({ hash: h });
-      setMsg(`Claimed ✓ ${EXPLORER}/tx/${h}`);
-    } catch (e) {
-      setMsg((e as { shortMessage?: string }).shortMessage ?? (e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+  function trade(a: Agent) {
+    setSelected(a);
+    setTab("trade");
   }
 
   return (
-    <div className="wrap">
-      <h1>🤖 Agent Launchpad — Arc</h1>
-      <div className="tabs" style={{ marginBottom: 14 }}>
-        {account ? (
-          <span className="muted">{account} · <a href={`${EXPLORER}/address/${account}`} target="_blank" rel="noreferrer">explorer</a></span>
-        ) : (
-          <button onClick={doConnect}>Connect wallet</button>
+    <div className="min-h-screen">
+      <Navbar account={account} usdc={usdc} tab={tab} setTab={setTab} onConnect={doConnect} />
+
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        {msg && (
+          <div className="mb-6 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3 font-mono text-xs text-zinc-300 break-all">
+            {msg}
+          </div>
         )}
+
+        {tab === "agents" && (
+          <>
+            <SectionHeading
+              title="Agents"
+              subtitle={`${agents.length} agent${agents.length === 1 ? "" : "s"} registered on Arc`}
+              action={
+                <Button variant="secondary" size="sm" onClick={() => setTab("create")}>
+                  <Plus className="h-3.5 w-3.5" /> New agent
+                </Button>
+              }
+            />
+            {agents.length === 0 ? (
+              <Card className="p-10 text-center">
+                <Rocket className="mx-auto h-6 w-6 text-violet-400" />
+                <p className="mt-3 text-sm text-zinc-400">No agents yet — launch the first one.</p>
+                <Button className="mt-4" size="sm" onClick={() => setTab("create")}>
+                  Create agent
+                </Button>
+              </Card>
+            ) : (
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {agents.map((a) => (
+                  <AgentCard key={a.token} agent={a} onTrade={trade} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === "create" && (
+          <div className="mx-auto max-w-xl">
+            <SectionHeading title="Launch an AI Agent" subtitle="ERC-8004 identity + USDC bonding curve" />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-violet-400" /> Agent details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
+                <Input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="Ticker (e.g. AGT)" />
+                <Input value={meta} onChange={(e) => setMeta(e.target.value)} placeholder="Metadata URI (IPFS)" />
+                <Input
+                  type="password"
+                  value={pinataJwt}
+                  onChange={(e) => setPinataJwt(e.target.value)}
+                  placeholder="Pinata JWT (optional — pin metadata to IPFS)"
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <Button variant="secondary" disabled={busy} onClick={pinMeta}>
+                    Pin to IPFS
+                  </Button>
+                  <Button disabled={!account || busy} onClick={create}>
+                    Launch
+                  </Button>
+                </div>
+                <p className="text-[11px] text-zinc-600">
+                  Defaults: 1,000,000 supply · 5,000 USDC virtual · 1,000,000 USDC graduation · 1% fee · LP locked 365d.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {tab === "trade" && (
+          <>
+            <SectionHeading title="Trade" subtitle="Buy / sell on the bonding curve" />
+            <SwapBox agents={agents} selected={selected} account={account} onSelect={setSelected} setMsg={setMsg} busy={busy} setBusy={setBusy} />
+          </>
+        )}
+
+        {tab === "stake" && (
+          <>
+            <SectionHeading title="Staking & Yield" subtitle="Stake the agent token, earn USDC" />
+            <StakingPanel account={account} setMsg={setMsg} busy={busy} setBusy={setBusy} refreshKey={msg} />
+          </>
+        )}
+      </main>
+
+      <footer className="border-t border-zinc-800/60 py-6 text-center text-[11px] text-zinc-600">
+        Arc Agent Launchpad · <a className="hover:text-zinc-400" href="https://github.com/Salado210102/arc-smart-orders" target="_blank" rel="noreferrer">open source (MIT)</a> · non-custodial · testnet
+      </footer>
+    </div>
+  );
+}
+
+function SectionHeading({ title, subtitle, action }: { title: string; subtitle?: string; action?: React.ReactNode }) {
+  return (
+    <div className="mb-6 flex items-end justify-between gap-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-zinc-500">{subtitle}</p>}
       </div>
-
-      <div className="tabs">
-        <button className={tab === "agents" ? "" : "sec"} onClick={() => setTab("agents")}>Agents ({agents.length})</button>
-        <button className={tab === "create" ? "" : "sec"} onClick={() => setTab("create")}>Create</button>
-        <button className={tab === "trade" ? "" : "sec"} onClick={() => setTab("trade")}>Trade</button>
-        <button className={tab === "stake" ? "" : "sec"} onClick={() => setTab("stake")}>Staking &amp; Yield</button>
-      </div>
-
-      {msg && <p className="card" style={{ wordBreak: "break-all" }}>{msg}</p>}
-
-      {tab === "agents" && (
-        <div>
-          {agents.length === 0 && <p className="muted">No agents yet.</p>}
-          {agents.map((a) => (
-            <div className="card" key={a.token}>
-              <div><b>{a.metadataURI}</b></div>
-              <div className="muted">token <code>{a.token}</code></div>
-              <div className="muted">curve <code>{a.curve}</code> · creator <code>{a.creator}</code></div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab === "create" && (
-        <div className="card">
-          <h2>Launch an AI Agent</h2>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
-          <input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="Symbol" />
-          <input value={meta} onChange={(e) => setMeta(e.target.value)} placeholder="Metadata URI (IPFS)" />
-          <input
-            type="password"
-            value={pinataJwt}
-            onChange={(e) => setPinataJwt(e.target.value)}
-            placeholder="Pinata JWT (optional — to pin metadata to IPFS)"
-          />
-          <p className="muted">Defaults: supply 1,000,000 · x0 5,000 USDC · graduation 1,000,000 USDC · fee 1% · lock 365d</p>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="sec" disabled={busy} onClick={pinMeta}>Pin metadata to IPFS</button>
-            <button disabled={!account || busy} onClick={create}>Create agent (ERC-8004 + curve)</button>
-          </div>
-        </div>
-      )}
-
-      {tab === "trade" && (
-        <div className="card">
-          <h2>Buy / Sell on the curve</h2>
-          <select onChange={(e) => setSel(agents[Number(e.target.value)] ?? null)} defaultValue="-1">
-            <option value="-1">Select an agent…</option>
-            {agents.map((a, i) => (
-              <option key={a.token} value={i}>{a.metadataURI}</option>
-            ))}
-          </select>
-          <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount (USDC to buy / tokens to sell)" />
-          {quote && <p className="muted">{quote}</p>}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button disabled={!account || !sel || busy} onClick={buy}>Buy</button>
-            <button className="sec" disabled={!account || !sel || busy} onClick={sell}>Sell</button>
-          </div>
-          <p className="muted">Buy input is USDC (6 dec). Sell input is the agent token (18 dec). 1% slippage guard.</p>
-        </div>
-      )}
-
-      {tab === "stake" && (
-        <div className="card">
-          <h2>Staking &amp; Yield (ERC-4626)</h2>
-          <p className="muted">
-            Vault <code>{ADDR.vault}</code> · TVL {tvAssets} sAGT · your stake <b>{staked}</b> sAGT
-          </p>
-          <p className="muted">
-            Pending USDC: <b>{pending}</b>
-          </p>
-          <input value={stakeAmt} onChange={(e) => setStakeAmt(e.target.value)} placeholder="Amount (sAGT)" />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button disabled={!account || busy} onClick={stake}>Stake</button>
-            <button className="sec" disabled={!account || busy} onClick={unstake}>Unstake</button>
-            <button className="sec" disabled={!account || busy} onClick={claimStake}>Claim USDC</button>
-          </div>
-          <p className="muted">
-            Deposits the agent token (demo) and earns the agent's USDC revenue — 70% is routed to this
-            vault via <code>RevenueSplitter</code> (30% treasury).
-          </p>
-        </div>
-      )}
+      {action}
     </div>
   );
 }
