@@ -13,6 +13,7 @@ adapted to Arc's stablecoin-native model.
 - Executor contract: [`contracts/src/OrderExecutor.sol`](contracts/src/OrderExecutor.sol)
 - SDK (signing): [`sdk/src/index.ts`](sdk/src/index.ts)
 - Keeper: [`keeper/src/index.ts`](keeper/src/index.ts)
+- 📄 **Launch writeup:** [`docs/LAUNCH.md`](docs/LAUNCH.md) · **Python signing recipe:** [`examples/python/sign_limit_order.py`](examples/python/sign_limit_order.py) (verified to match the TS SDK) · **Agentic E2E (tx tree):** [`DEPLOYMENTS.md`](DEPLOYMENTS.md)
 
 ---
 
