@@ -6,7 +6,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Progress } from "./ui/progress";
-import { short } from "../lib/utils";
+import { ipfsUrls, short, tokenTicker } from "../lib/utils";
 
 export type Agent = {
   agentId: bigint;
@@ -17,17 +17,26 @@ export type Agent = {
   createdAt: bigint;
 };
 
-const gw = (uri: string) => (uri.startsWith("ipfs://") ? `https://ipfs.io/ipfs/${uri.slice(7)}` : uri);
+const gw = (uri: string) => ipfsUrls(uri)[0] ?? uri;
 
 function useMeta(uri: string) {
   const [m, setM] = useState<{ name?: string; symbol?: string; image?: string; description?: string }>({});
   useEffect(() => {
     let alive = true;
     if (!uri) return;
-    fetch(gw(uri))
-      .then((r) => r.json())
-      .then((j) => alive && setM(j))
-      .catch(() => {});
+    (async () => {
+      for (const url of ipfsUrls(uri)) {
+        try {
+          const r = await fetch(url);
+          if (!r.ok) continue;
+          const j = await r.json();
+          if (alive) setM(j);
+          return;
+        } catch {
+          /* try next gateway */
+        }
+      }
+    })();
     return () => {
       alive = false;
     };
@@ -84,8 +93,8 @@ export function AgentCard({ agent, onTrade }: { agent: Agent; onTrade: (a: Agent
   const meta = useMeta(agent.metadataURI);
   const prog = useProgress(agent.curve);
   const pct = prog.target > 0n ? Number((prog.raised * 10000n) / prog.target) / 100 : 0;
-  const ticker = meta.symbol ? `$${meta.symbol}` : `$${short(agent.token).toUpperCase()}`;
-  const name = meta.name || (agent.metadataURI ? short(agent.metadataURI) : "Agent");
+  const ticker = meta.symbol ? `$${meta.symbol}` : tokenTicker(agent.token);
+  const name = meta.name || `Agent #${agent.agentId}`;
 
   return (
     <Card className="group flex flex-col overflow-hidden transition-colors hover:border-zinc-700">

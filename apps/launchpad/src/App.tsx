@@ -22,7 +22,7 @@ export default function App() {
 
   const [name, setName] = useState("My Agent");
   const [symbol, setSymbol] = useState("AGT");
-  const [meta, setMeta] = useState("ipfs://bafkreibdi6623n3xpf7ymk62ckb4bo75o3qemwkpfvp5i25j66itxvsoei");
+  const [meta, setMeta] = useState("");
   const [pinataJwt, setPinataJwt] = useState(() => localStorage.getItem("pinataJwt") ?? "");
 
   const refreshAgents = useCallback(async () => {
@@ -136,10 +136,10 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <Navbar account={account} usdc={usdc} tab={tab} setTab={setTab} onConnect={doConnect} />
 
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         {msg && (
           <div className="mb-6 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3 font-mono text-xs text-zinc-300 break-all">
             {msg}
@@ -187,7 +187,25 @@ export default function App() {
               <CardContent className="flex flex-col gap-3">
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" />
                 <Input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="Ticker (e.g. AGT)" />
-                <Input value={meta} onChange={(e) => setMeta(e.target.value)} placeholder="Metadata URI (IPFS)" />
+                <div>
+                  <div className="mb-1 text-[11px] text-zinc-500">Metadata URI (auto-generated when pinned)</div>
+                  <div className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2">
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs text-zinc-400">
+                      {meta || "not pinned yet"}
+                    </span>
+                    {meta && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(meta);
+                          setMsg(`Copied ${meta}`);
+                        }}
+                        className="shrink-0 rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-[11px] text-zinc-400 hover:text-zinc-200"
+                      >
+                        Copy
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <Input
                   type="password"
                   value={pinataJwt}

@@ -123,8 +123,13 @@ export function StakingPanel({
           </p>
         </div>
         <CardContent className="pt-5">
-          <Button variant="success" className="w-full" disabled={!account || busy || Number(pending) <= 0} onClick={() => act("claim")}>
-            Claim USDC
+          <Button
+            variant={account && Number(pending) > 0 ? "success" : "secondary"}
+            className="w-full"
+            disabled={!account || busy || Number(pending) <= 0}
+            onClick={() => act("claim")}
+          >
+            {account && Number(pending) > 0 ? "Claim USDC" : "No yield to claim"}
           </Button>
         </CardContent>
       </Card>

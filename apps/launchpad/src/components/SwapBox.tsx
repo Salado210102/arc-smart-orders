@@ -6,7 +6,7 @@ import { ADDR, curveAbi, erc20Abi } from "../contracts";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { short } from "../lib/utils";
+import { short, tokenTicker } from "../lib/utils";
 import type { Agent } from "./AgentCard";
 
 export function SwapBox({
@@ -154,8 +154,10 @@ export function SwapBox({
         </div>
 
         <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-          <div className="mb-1 text-[11px] text-zinc-500">{dir === "buy" ? "You receive (est.)" : "You receive (est.)"}</div>
-          <div className="font-mono text-sm text-emerald-400">{quote || "—"}</div>
+          <div className="mb-1 text-[11px] text-zinc-500">You receive (est.)</div>
+          <div className="font-mono text-sm text-emerald-400">
+            {quote || `0.00 ${dir === "buy" ? (selected ? tokenTicker(selected.token) : "TOKEN") : "USDC"}`}
+          </div>
           {price && <div className="mt-1 font-mono text-[11px] text-zinc-500">spot {price} USDC / token</div>}
         </div>
 
