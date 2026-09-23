@@ -308,6 +308,27 @@ the `arc-alerts` Telegram bot fires automatically.
 > `agentId = 0` because ERC-8004 is skipped on Arc mainnet (registry not deployed there yet), as designed.
 > This is the first agent created through the production DApp on mainnet.
 
+---
+
+# 🚀 First LIVE smart-order fill on Arc mainnet — via Uniswap v3 — 2026-09-23
+
+The venue the roadmap was waiting for is now live (**Uniswap v3 + v4 on Arc**). We whitelisted the
+`SwapRouter02` and the keeper filled a real order end-to-end.
+
+| Step | Tx |
+|---|---|
+| Whitelist `SwapRouter02` (`setAllowedTarget`) via Safe 2/2 | [`0x8d500b2f…ea46`](https://explorer.arc.io/tx/0x8d500b2fbaa36cf7cbbf2fa565dee9cf6c87a277492b5d05be4466096f5aea46) |
+| Permit2 approval (A) | [`0x2b20d937…c326`](https://explorer.arc.io/tx/0x2b20d937072c511a8dd074d529d41ec59ec516e88e723e382093294ccbe2c326) |
+| **Fill: 0.5 USDC → minOut 0.42 EURC** (keeper B, `venue=uniswap-v3`, `DRY=0`) | [`0xa07e3ae0…e6ad`](https://explorer.arc.io/tx/0xa07e3ae0b9b53390a7575ba848443c3fcce6088b9dd36ffc1a145b0ad0b3e6ad) |
+
+**Verified on-chain:** A USDC −0.5 · A EURC **+0.437633** (net 0.4985 × pool price ≈ 0.878) ·
+**Safe fee +0.0015 USDC** (0.30%). Order `785297fd-a82f-46b6-a307-0e11efdb29bc` → **FILLED** via the
+public keeper API (`https://api.basepump.dev/arc-keeper`).
+
+**Venue:** Uniswap v3 `SwapRouter02 0x53BF6B0684Ec7eF91e1387Da3D1a1769bC5A6F77`; USDC/EURC pool fee 0.05%
+`0x6fd5F2fb831940DcD61A98c5B3aCB7D8C6f3bFc1`. Keeper: `SWAP_VENUE=uniswap-v3`, `DRY=0`.
+See [`docs/VENUE_INTEGRATION.md`](docs/VENUE_INTEGRATION.md).
+
 
 
 

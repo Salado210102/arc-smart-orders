@@ -4,9 +4,9 @@
 
 **Non-custodial limit & TWAP orders for stablecoin FX on Arc (USDC ⇄ EURC).**
 
-> ⚠️ **Reference implementation — not audited.** On Arc mainnet today: **launching agents + bonding-curve
-> trading are live**; smart-order fills, graduation and ERC-8004 identity are **pending external
-> infrastructure** (a swap venue + the registries). See [Status & transparency](#status--transparency).
+> ⚠️ **Reference implementation — not audited.** On Arc mainnet today: **launching agents, bonding-curve
+> trading and smart-order fills are live** (fills execute on Uniswap v3). **Graduation** and **ERC-8004
+> identity** are pending (AMM config + the registries). See [Status & transparency](#status--transparency).
 
 Users sign an order **off-chain** (Permit2 + EIP-712). A **keeper** executes it on-chain through a
 verified executor contract that **enforces exactly what the user signed**. Funds never leave the
@@ -355,8 +355,8 @@ python scripts/backtest_gex_signals.py --steps 600 --seed 7 --out /tmp/gex.json
 ### Smart Swap widget (dashboard)
 The **Smart Swap** tab at <https://arc.basepump.dev> signs a 0-gas limit order and follows it to `FILLED`.
 A **network selector** switches between:
-- **Arc Testnet (Live fills)** → keeper `…/arc-keeper-testnet` (`0xB19F…6Ee3`), fills on-chain (needs testnet USDC + one-time Permit2 approval).
-- **Arc Mainnet (Beta)** → keeper `…/arc-keeper`, dry-run until the FX venue is wired (order stays `PENDING`).
+- **Arc Testnet (Live fills)** → keeper `…/arc-keeper-testnet` (`0xB19F…6Ee3`), fills on-chain vs the mock router.
+- **Arc Mainnet (Live fills)** → keeper `…/arc-keeper`, fills on-chain via **Uniswap v3** (`SwapRouter02`, USDC/EURC pool).
 
 Build-time env (Vite): `VITE_KEEPER_API` and `VITE_KEEPER_TESTNET_API` — see [`apps/launchpad/.env.example`](apps/launchpad/.env.example).
 
@@ -521,7 +521,7 @@ Both keepers + the alerts bot run on the same VPS, isolated by port (see [`docs/
 
 | PM2 process | Role | Port | Network |
 |---|---|---|---|
-| `arc-keeper` | order keeper — **dry-run** (venue live: Uniswap v3/v4 on Arc; enable via Safe whitelist + `DRY=0`) | `8788` | Arc **5042** (mainnet) |
+| `arc-keeper` | order keeper — **live fills on mainnet via Uniswap v3** (`DRY=0`) | `8788` | Arc **5042** (mainnet) |
 | `arc-keeper-testnet` | order keeper — **live fills** | `8789` | Arc **5042002** (testnet) |
 | `arc-alerts` | Telegram alerts: new agents + **keeper low-gas** (mainnet & testnet) | — | Arc 5042 / 5042002 |
 | `pm2-logrotate` | log rotation (`max_size 10M`, `retain 7`, compressed) | — | — |
@@ -533,8 +533,8 @@ Both keepers + the alerts bot run on the same VPS, isolated by port (see [`docs/
 | | |
 |---|---|
 | **Live on Arc mainnet (5042)** | `OrderExecutor`, `AgentFactory`, `AgentRegistry`, `GraduationModule`, `LiquidityLocker` — all **Safe-owned** (see [`DEPLOYMENTS.md`](DEPLOYMENTS.md)) |
-| **Works today** | launching an agent, trading on its USDC bonding curve (non-custodial) |
-| **Pending (external, not bugs)** | smart-order **fills** + **graduation** — venue **now exists (Uniswap v3/v4 on Arc)**; pending Safe whitelist + audit. **ERC-8004** identity (registry not on mainnet yet); order engine runs in **dry-run** until enabled |
+| **Works today** | launching an agent, trading on its USDC bonding curve, and **live smart-order fills via Uniswap v3** (non-custodial) |
+| **Pending (external, not bugs)** | **graduation** config (AMM adapter) + **ERC-8004** identity (registry not on mainnet yet) |
 | **Not deployed / draft** | Phase 2 `AgentCreditPool` (credit) — **unaudited**, not deployed |
 | **Not audited** | the whole codebase — see [`docs/AUDIT_PACKAGE.md`](docs/AUDIT_PACKAGE.md) |
 

@@ -23,7 +23,7 @@ export const NETWORKS = {
     eurc: "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1" as Address,
     keeperApi: (_env.VITE_KEEPER_API ?? "http://127.0.0.1:8788").replace(/\/$/, ""),
     explorer: "https://explorer.arc.io",
-    mode: "Beta (dry-run)" as const,
+    mode: "Live fills" as const,
   },
   testnet: {
     key: "testnet" as const,

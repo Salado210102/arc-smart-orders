@@ -170,12 +170,12 @@ export default function App() {
       <Navbar account={account} usdc={usdc} tab={tab} setTab={setTab} onConnect={doConnect} onDisconnect={doDisconnect} />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
-        <div className="mb-5 flex items-start gap-2 rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-[11px] text-amber-300/90">
+        <div className="mb-5 flex items-start gap-2 rounded-lg border border-emerald-900/40 bg-emerald-950/20 px-3 py-2 text-[11px] text-emerald-300/90">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
-            <strong className="font-semibold">Smart orders: Beta preview</strong> — the order engine runs in{" "}
-            <strong className="font-semibold">dry-run</strong> (off-chain simulation) on Arc mainnet. On-chain fills
-            activate with the Arc FX venue.
+            <strong className="font-semibold">Smart orders: live</strong> — on Arc mainnet, signed orders fill
+            on-chain via <strong className="font-semibold">Uniswap v3</strong> (non-custodial). Arc Testnet uses a
+            mock FX router.
           </span>
         </div>
 

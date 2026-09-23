@@ -327,7 +327,7 @@ export function SmartSwap({
         <p className="text-center text-[10px] text-zinc-700">
           {network === "testnet"
             ? "Testnet — live on-chain fills against the whitelisted mock router. Needs testnet USDC + a one-time Permit2 approval."
-            : "Mainnet beta preview — the keeper runs dry-run until the FX venue is wired; the order stays PENDING then expires (no funds move)."}
+            : "Mainnet — live on-chain fills via Uniswap v3 (USDC/EURC pool). Needs mainnet USDC + a one-time Permit2 approval."}
         </p>
       </CardContent>
     </Card>
