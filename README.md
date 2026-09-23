@@ -452,6 +452,19 @@ lives in `keeper/src/agentic.ts`.
 5. **Phase 2 — agentic credit.** Audit the `AgentCreditPool`, run an **invite-only pilot**, wire the
    **ERC-8183 auto-repay** through the keeper, and publish the **Python SDK** to PyPI.
 
+## Infrastructure — VPS services (PM2)
+
+Both keepers + the alerts bot run on the same VPS, isolated by port (see [`docs/KEEPER_SETUP.md`](docs/KEEPER_SETUP.md), [`docs/ALERTS_BOT.md`](docs/ALERTS_BOT.md)):
+
+| PM2 process | Role | Port | Network |
+|---|---|---|---|
+| `arc-keeper` | order keeper — **dry-run** (no fills until a venue exists) | `8788` | Arc **5042** (mainnet) |
+| `arc-keeper-testnet` | order keeper — **live fills** | `8789` | Arc **5042002** (testnet) |
+| `arc-alerts` | Telegram alerts: new agents + **keeper low-gas** (mainnet & testnet) | — | Arc 5042 / 5042002 |
+| `pm2-logrotate` | log rotation (`max_size 10M`, `retain 7`, compressed) | — | — |
+
+`pm2 save` + `pm2 startup` (systemd) → all services persist across reboots.
+
 ## Status & transparency
 
 | | |
