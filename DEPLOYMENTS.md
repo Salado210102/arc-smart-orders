@@ -28,3 +28,36 @@
 - The keeper pulled the **exact** signed amount of USDC from the user via `Permit2.permitWitnessTransferFrom`,
   **enforcing the witness (`tokenOut=EURC`, `minOut`)** — the keeper cannot redirect or under-fill.
 - Atomic: pull → swap (whitelisted target) → output to the user, in one transaction.
+
+---
+
+# Agentic E2E (ERC-8004 + ERC-8183) — 2026-09-22
+
+**Roles (3 separate wallets):**
+| Role | Address |
+|---|---|
+| **A — client / agent** (signs intent, creates job, funds escrow) | `0x3df362854B3981b1367aC2DFa41533386628c977` |
+| **B — keeper / executor agent** (ERC-8004 identity, fills, submits) | `0x327fF705C1De5Ffd071bDF7E43069398507E50bC` |
+| **C — validator / evaluator** (releases escrow, gives reputation) | `0xE34AA475d6F606671DB886fE9db3baFA428a1279` |
+
+- **ERC-8004 agentId** (B): **896807**
+- **ERC-8183 jobId**: **186648** → status **Completed**
+
+## Tx tree (Arc testnet)
+| Step | Tx |
+|---|---|
+| fund B (3 USDC) | `0xece7267e37563b8977621cb268f6acc445fb1f504a337af25c9d384cc9b9dc94` |
+| fund C (3 USDC) | `0x9f9afac017ca61b63e3b2e9f51820b1e4c5b305b5fc3a8bed4576bcb0189faa7` |
+| OrderExecutor `setKeeper(B)` (owner A) | `0x6e64fa37bf15d9cba126361d351e4a66a5d55e5b273ed6dc2e790ba3f936b723` |
+| ERC-8004 `register` (B → agentId 896807) | `0xf6a2aefff5377404e81e5c7f55f3f72437c754c6d8fbbefc66388a055a36f8a5` |
+| ERC-8183 `createJob(B, C)` (A) → job 186648 | `0xda8de4bd4a55a8400a24938c3be40cf42bba7117bb0972a57ddea02060e0b4cb` |
+| ERC-8183 `setBudget(0.10 USDC)` (B) | `0xdb1e189547939ea00bb58a4e354ff1672aa13b20407b6fc84f9d1d0b7ea7301b` |
+| ERC-8183 `approve+fund` escrow (A) | `0x33ec9c39bf9eaef8ad66dce3609173837d4491992d8491e441407eb6fdfd2fe0` |
+| **OrderExecutor `executeOrder` fill** (B, keeper) | `0x4a1f3dd8b8ddcb8f73f5c2413f20e03ca086c22da08686c4860b40563efbc714` |
+| ERC-8183 `submit(keccak256(fillTx))` (B) | `0x97019d04032f2edf6ce75012a53327bd632f653be58bb3c94d01aa0fdaee67a2` |
+| ERC-8183 `complete` → escrow to B (C) | `0xafabb9745475091284065f464d096732d91f56ef31bfb85c161466350d158475` |
+| ERC-8004 `giveFeedback` (C → agent 896807) | `0x7c171ad17e929392582edfc2ce07c562f418af1a86e4f326d21083a7679a24e3` |
+
+**Verified on-chain:** `ownerOf(896807)` = B · B USDC 3 → **3.0878** (escrow released) · A USDC **11.8279**.
+The link between the job and the fill is the **deliverable hash = keccak256(fillTxHash)** (non-hooked path, off-chain link).
+
