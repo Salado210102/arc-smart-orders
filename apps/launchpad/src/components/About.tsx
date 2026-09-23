@@ -1,4 +1,4 @@
-import { BookOpen, Coins, ExternalLink, Github, Landmark, Layers, Rocket, ShieldCheck, Zap } from "lucide-react";
+import { BookOpen, Coins, ExternalLink, Github, Landmark, Layers, Mail, Rocket, Send, ShieldCheck, Zap } from "lucide-react";
 import { ADDR } from "../contracts";
 import { EXPLORER } from "../arc";
 import { Badge } from "./ui/badge";
@@ -130,6 +130,20 @@ export function About() {
             href={`${EXPLORER}/address/${ADDR.safe}`}
             label="Treasury Safe (explorer)"
           />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-4 w-4 text-violet-400" /> Contact
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-2 sm:grid-cols-2">
+          <ResourceLink icon={<Mail className="h-3.5 w-3.5" />} href="mailto:hello@basepump.dev" label="hello@basepump.dev" />
+          <ResourceLink icon={<Send className="h-3.5 w-3.5" />} href="https://x.com/VICENTEGon651262" label="X — @VICENTEGon651262" />
+          <ResourceLink icon={<Send className="h-3.5 w-3.5" />} href="https://t.me/Cryptofun2026" label="Telegram — @Cryptofun2026" />
+          <ResourceLink icon={<Landmark className="h-3.5 w-3.5" />} href="https://community.arc.io" label="Arc House community" />
         </CardContent>
       </Card>
 

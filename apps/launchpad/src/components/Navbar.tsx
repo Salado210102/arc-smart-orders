@@ -46,12 +46,10 @@ export function Navbar({
       <div className="mx-auto flex h-16 max-w-[1500px] items-center gap-4 px-4">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-emerald-500 shadow-lg shadow-violet-900/30">
-            <Spark />
-          </div>
+          <img src="/logo.svg" alt="Arc Smart Orders" className="h-9 w-9 rounded-xl shadow-lg shadow-violet-900/30" />
           <div className="leading-tight">
-            <div className="text-sm font-semibold tracking-tight text-zinc-100">Arc Agent Launchpad</div>
-            <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">smart orders · erc-8004</div>
+            <div className="text-sm font-semibold tracking-tight text-zinc-100">Arc Smart Orders</div>
+            <div className="font-mono text-[10px] uppercase tracking-widest text-zinc-500">launchpad · erc-8004</div>
           </div>
         </div>
 
@@ -128,13 +126,5 @@ export function Navbar({
         ))}
       </nav>
     </header>
-  );
-}
-
-function Spark() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2 4 15h6l-1 7 8-13h-6l1-7z" />
-    </svg>
   );
 }
