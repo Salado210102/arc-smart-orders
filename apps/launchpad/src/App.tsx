@@ -174,8 +174,8 @@ export default function App() {
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
             <strong className="font-semibold">Smart orders: live</strong> — on Arc mainnet, signed orders fill
-            on-chain via <strong className="font-semibold">Uniswap v3</strong> (non-custodial). Arc Testnet uses a
-            mock FX router.
+            on-chain via <strong className="font-semibold">Uniswap v3</strong> (non-custodial).{" "}
+            <span className="text-amber-300">Unaudited — use with care.</span> Arc Testnet uses a mock FX router.
           </span>
         </div>
 
