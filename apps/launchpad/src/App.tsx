@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Rocket, Sparkles } from "lucide-react";
+import { Info, Plus, Rocket, Sparkles } from "lucide-react";
 import { formatUnits, parseUnits } from "viem";
 import { EXPLORER, connect, publicClient, walletClient } from "./arc";
 import { ADDR, erc20Abi, factoryAbi, registryAbi } from "./contracts";
@@ -140,6 +140,15 @@ export default function App() {
       <Navbar account={account} usdc={usdc} tab={tab} setTab={setTab} onConnect={doConnect} />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+        <div className="mb-5 flex items-start gap-2 rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-[11px] text-amber-300/90">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            <strong className="font-semibold">Smart orders: Beta preview</strong> — the order engine runs in{" "}
+            <strong className="font-semibold">dry-run</strong> (off-chain simulation) on Arc mainnet. On-chain fills
+            activate with the Arc FX venue.
+          </span>
+        </div>
+
         {msg && (
           <div className="mb-6 rounded-lg border border-zinc-800 bg-zinc-900/60 px-4 py-3 font-mono text-xs text-zinc-300 break-all">
             {msg}
@@ -177,7 +186,7 @@ export default function App() {
 
         {tab === "create" && (
           <div className="mx-auto max-w-xl">
-            <SectionHeading title="Launch an AI Agent" subtitle="ERC-8004 identity + USDC bonding curve" />
+            <SectionHeading title="Launch an AI Agent" subtitle="Live on the native USDC bonding curve" />
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -221,7 +230,9 @@ export default function App() {
                   </Button>
                 </div>
                 <p className="text-[11px] text-zinc-600">
-                  Live on Arc mainnet. Bonding-curve trading is active now; graduation & smart-order fills turn on once the Arc FX venue (StableFX) is live.
+                  Your agent launches on its own native USDC bonding curve and trades immediately. On-chain
+                  ERC-8004 identity, DEX graduation and LP locking activate once Arc&apos;s registry and liquidity venues
+                  are live.
                 </p>
               </CardContent>
             </Card>
