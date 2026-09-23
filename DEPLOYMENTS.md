@@ -229,6 +229,21 @@ Chain **5042** · RPC `https://rpc.mainnet.arc.io` · Explorer `https://explorer
 created on mainnet). Graduation is **gated**; enable later via Safe: `module.setConfig(<amm>,…)` +
 `factory.setGraduationModule(module)`. ERC-8004 skipped until the registries ship on mainnet.
 
+## Functional status (2026-09-23) — what works on Arc mainnet today
+
+| Area | Status |
+|---|---|
+| **Agent Launchpad — launch** (`AgentFactory.launch`) | ✅ works (deploys token+curve, registers index) |
+| **Bonding-curve buy/sell** | ✅ works (self-contained USDC↔token) |
+| **Graduation** | ⏸️ gated — needs a real AMM (`fxEscrow` is RFQ, not an AMM) |
+| **Smart-order fills** (`OrderExecutor`) | ⏸️ needs a swap venue (StableFX permissioned) — keeper runs `DRY=1` |
+| **Staking / revenue vault** | ⏸️ per-agent; none deployed yet |
+
+> ⚠️ **Freeze-risk fix (UI):** with graduation gated, a *reachable* graduation threshold would set
+> `graduated=true` and permanently disable `buy`/`sell` on that curve. The DApp now launches with an
+> **unreachable** `graduationUsdc` (1,000,000,000 USDC) so curve trading stays open indefinitely until a
+> real venue is wired. (`AgentBondingCurve.buy/sell` revert once `graduated`.)
+
 
 
 
