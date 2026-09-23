@@ -6,8 +6,22 @@ export const ADDR = {
   registry: "0x8a29Ca54c59e8853E5D15F9B4F42E1CC1650246c",
   module: "0x7D4c0013c770CA7b9ffA40D6a182c4d0fB0C8873",
   locker: "0x9A20D5f7856F936F7eEDBa0e46a6A839fbd70C57",
+  vault: "0x8c58fee840EE397d59362B39A6Eb59F4EdcC1bD7",
+  splitter: "0xFbfDa3712332347AF32ACeA10e981F36fb5734ED",
+  vaultAsset: "0x5D6862CfE0b619BCE781c5fa88661e6CE28f889C", // demo AgentToken
   usdc: "0x3600000000000000000000000000000000000000",
 } as const satisfies Record<string, Address>;
+
+export const vaultAbi = [
+  { type: "function", name: "deposit", stateMutability: "nonpayable", inputs: [{ name: "assets", type: "uint256" }, { name: "receiver", type: "address" }], outputs: [{ name: "shares", type: "uint256" }] },
+  { type: "function", name: "withdraw", stateMutability: "nonpayable", inputs: [{ name: "assets", type: "uint256" }, { name: "receiver", type: "address" }, { name: "owner", type: "address" }], outputs: [{ name: "shares", type: "uint256" }] },
+  { type: "function", name: "claim", stateMutability: "nonpayable", inputs: [], outputs: [{ name: "p", type: "uint256" }] },
+  { type: "function", name: "pendingRewards", stateMutability: "view", inputs: [{ name: "user", type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "totalAssets", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "totalSupply", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "asset", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+] as const;
 
 export const factoryAbi = [
   {

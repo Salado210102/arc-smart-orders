@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { parseUnits, formatUnits } from "viem";
 import { publicClient, connect, walletClient, EXPLORER } from "./arc.ts";
-import { ADDR, factoryAbi, registryAbi, curveAbi, erc20Abi } from "./contracts.ts";
+import { ADDR, factoryAbi, registryAbi, curveAbi, erc20Abi, vaultAbi } from "./contracts.ts";
 
 type Agent = {
   agentId: bigint;
@@ -14,7 +14,7 @@ type Agent = {
 
 export default function App() {
   const [account, setAccount] = useState<`0x${string}` | null>(null);
-  const [tab, setTab] = useState<"agents" | "create" | "trade">("agents");
+  const [tab, setTab] = useState<"agents" | "create" | "trade" | "stake">("agents");
   const [agents, setAgents] = useState<Agent[]>([]);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -181,6 +181,81 @@ export default function App() {
     }
   }
 
+  // ---- staking ----
+  const [stakeAmt, setStakeAmt] = useState("100");
+  const [staked, setStaked] = useState("");
+  const [pending, setPending] = useState("");
+  const [tvAssets, setTvAssets] = useState("");
+  async function refreshStake() {
+    if (!account) return;
+    try {
+      const [b, p, t] = await Promise.all([
+        publicClient.readContract({ address: ADDR.vault, abi: vaultAbi, functionName: "balanceOf", args: [account] }),
+        publicClient.readContract({ address: ADDR.vault, abi: vaultAbi, functionName: "pendingRewards", args: [account] }),
+        publicClient.readContract({ address: ADDR.vault, abi: vaultAbi, functionName: "totalAssets" }),
+      ]);
+      setStaked(formatUnits(b as bigint, 18));
+      setPending(formatUnits(p as bigint, 6));
+      setTvAssets(formatUnits(t as bigint, 18));
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  useEffect(() => {
+    void refreshStake();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account, msg]);
+
+  async function stake() {
+    if (!account) return;
+    setBusy(true);
+    setMsg("Approving + staking…");
+    try {
+      const w = walletClient() as any;
+      const amt = parseUnits(stakeAmt, 18);
+      const a = await w.writeContract({ account, chain: null, address: ADDR.vaultAsset, abi: erc20Abi, functionName: "approve", args: [ADDR.vault, amt] });
+      await publicClient.waitForTransactionReceipt({ hash: a });
+      const h = await w.writeContract({ account, chain: null, address: ADDR.vault, abi: vaultAbi, functionName: "deposit", args: [amt, account] });
+      await publicClient.waitForTransactionReceipt({ hash: h });
+      setMsg(`Staked ✓ ${EXPLORER}/tx/${h}`);
+    } catch (e) {
+      setMsg((e as { shortMessage?: string }).shortMessage ?? (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function unstake() {
+    if (!account) return;
+    setBusy(true);
+    setMsg("Unstaking…");
+    try {
+      const w = walletClient() as any;
+      const amt = parseUnits(stakeAmt, 18);
+      const h = await w.writeContract({ account, chain: null, address: ADDR.vault, abi: vaultAbi, functionName: "withdraw", args: [amt, account, account] });
+      await publicClient.waitForTransactionReceipt({ hash: h });
+      setMsg(`Unstaked ✓ ${EXPLORER}/tx/${h}`);
+    } catch (e) {
+      setMsg((e as { shortMessage?: string }).shortMessage ?? (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function claimStake() {
+    if (!account) return;
+    setBusy(true);
+    setMsg("Claiming USDC…");
+    try {
+      const w = walletClient() as any;
+      const h = await w.writeContract({ account, chain: null, address: ADDR.vault, abi: vaultAbi, functionName: "claim" });
+      await publicClient.waitForTransactionReceipt({ hash: h });
+      setMsg(`Claimed ✓ ${EXPLORER}/tx/${h}`);
+    } catch (e) {
+      setMsg((e as { shortMessage?: string }).shortMessage ?? (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="wrap">
       <h1>🤖 Agent Launchpad — Arc</h1>
@@ -196,6 +271,7 @@ export default function App() {
         <button className={tab === "agents" ? "" : "sec"} onClick={() => setTab("agents")}>Agents ({agents.length})</button>
         <button className={tab === "create" ? "" : "sec"} onClick={() => setTab("create")}>Create</button>
         <button className={tab === "trade" ? "" : "sec"} onClick={() => setTab("trade")}>Trade</button>
+        <button className={tab === "stake" ? "" : "sec"} onClick={() => setTab("stake")}>Staking &amp; Yield</button>
       </div>
 
       {msg && <p className="card" style={{ wordBreak: "break-all" }}>{msg}</p>}
@@ -249,6 +325,28 @@ export default function App() {
             <button className="sec" disabled={!account || !sel || busy} onClick={sell}>Sell</button>
           </div>
           <p className="muted">Buy input is USDC (6 dec). Sell input is the agent token (18 dec). 1% slippage guard.</p>
+        </div>
+      )}
+
+      {tab === "stake" && (
+        <div className="card">
+          <h2>Staking &amp; Yield (ERC-4626)</h2>
+          <p className="muted">
+            Vault <code>{ADDR.vault}</code> · TVL {tvAssets} sAGT · your stake <b>{staked}</b> sAGT
+          </p>
+          <p className="muted">
+            Pending USDC: <b>{pending}</b>
+          </p>
+          <input value={stakeAmt} onChange={(e) => setStakeAmt(e.target.value)} placeholder="Amount (sAGT)" />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button disabled={!account || busy} onClick={stake}>Stake</button>
+            <button className="sec" disabled={!account || busy} onClick={unstake}>Unstake</button>
+            <button className="sec" disabled={!account || busy} onClick={claimStake}>Claim USDC</button>
+          </div>
+          <p className="muted">
+            Deposits the agent token (demo) and earns the agent's USDC revenue — 70% is routed to this
+            vault via <code>RevenueSplitter</code> (30% treasury).
+          </p>
         </div>
       )}
     </div>

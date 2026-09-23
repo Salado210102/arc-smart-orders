@@ -124,6 +124,30 @@ Domain: `name="ArcSmartOrders", version="1", verifyingContract=executor` — mus
 >
 > Full model, projections and the mainnet treasury plan: **[`docs/REVENUE.md`](docs/REVENUE.md)**.
 
+---
+
+## Agent Launchpad (live on Arc testnet)
+
+A complete launchpad for AI agents, built on the same non-custodial primitives:
+
+- **Identity** — ERC-8004 `register` on launch (`AgentFactory`).
+- **Token + USDC bonding curve** — `AgentToken` (fixed supply, anti-sniper limits), `AgentBondingCurve`
+  (virtual reserves `k = x·y`, 1% fee split 50/50 protocol/agent, sniper fee, graduation),
+  `AgentFactory` (orchestrator).
+- **Registry + graduation** — `AgentRegistry` (agentId ⟷ token ⟷ curve ⟷ creator), `GraduationModule`
+  (pulls liquidity, seeds the DEX), `LiquidityLocker` (LP locked 365d → anti-rug).
+- **Revenue + staking** — `RevenueSplitter` (agent USDC revenue → 70% stakers / 30% treasury),
+  `AgentStakingVault` (ERC-4626-style, deposit the agent token, earn USDC yield).
+- **UI** — Create · Trade (curve buy/sell) · **Staking & Yield** (stake/unstake/claim) with IPFS
+  (Pinata) metadata, at **https://launchpad-neon-chi.vercel.app**.
+- **Tests** — **34/34** Foundry (orders 17 · launchpad 8 · graduation 3 · staking 5 · revenue wiring 1).
+
+Addresses & tx hashes: [`DEPLOYMENTS.md`](DEPLOYMENTS.md). Architecture: [`docs/AGENT_LAUNCHPAD.md`](docs/AGENT_LAUNCHPAD.md).
+
+**Revenue wiring:** an order filled by the keeper through `OrderExecutor v2` takes a **0.30% input-side
+fee** which is sent to the agent's `RevenueSplitter`; calling `distributeBalance()` pushes **70% to the
+staking vault** and 30% to the treasury. Verified by `test/RevenueWiring.t.sol`.
+
 ## Repo layout
 
 ```
