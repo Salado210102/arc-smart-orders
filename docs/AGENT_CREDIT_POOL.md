@@ -131,8 +131,43 @@ ops/                                    # reuse alerts bot for Loaned/Repaid/Def
 - [ ] Keeper: auto‑`repay` on revenue; events → alerts bot.
 - [ ] Audit the credit math + risk controls before opening any LP deposit.
 
-## 8. Open questions
-1. Do we open the **LP side publicly** (regulatory) or keep it invite-only at first?
-2. Auto-repay source: `RevenueSplitter`, `AgentStakingVault`, or ERC-8183 escrow — which first?
-3. Is a **USDC bond** acceptable to agents, or do we go reputation-only once ERC-8004 is live?
-4. Legal wrapper for pooled USDC lending as a solo builder.
+## 8. Decisions locked (2026-09-23)
+
+1. **Invite-only / whitelist** for the MVP — both LPs and agents are whitelisted (`approvedLP` / `approvedAgent`);
+   **no public deposit** until traction + audit.
+2. **Auto-repay via ERC-8183** (job escrow) is the primary mechanism: credit is extended against work whose
+   funds are already locked in escrow; the **keeper** calls `repayFrom(loanId)` (pays from escrow/keeper) as
+   soon as the deliverable is validated. `repay(loanId)` (pull from the borrower) remains as a fallback.
+3. **Hybrid collateral**: a **minimum USDC bond** (`minBond`, default 10 USDC, held by the pool) **plus
+   ERC-8004** identity/reputation — default **slashes the bond** (on-chain) and the **reputation** (off-chain).
+4. **Contract finalized** in `contracts/src/credit/AgentCreditPool.sol` with: flat per-loan interest,
+   first-loss **reserve**, **per-agent / per-epoch caps**, a **max utilization** guard, and **pause**.
+
+### Draft parameters (defaults in code)
+| Param | Default | Notes |
+|---|---|---|
+| `interestBps` | 100 (1%) | flat per loan, cap 2000 bps |
+| `performanceFeeBps` | 1500 (15%) | on interest → treasury (cap 3000) |
+| `reserveShareBps` | 2000 (20%) | of interest → first-loss reserve (cap 3000) |
+| `minLoan` / `maxLoan` | 5 / 50 USDC | micro-loans |
+| `maxTerm` | 7 days | short-term only |
+| `maxPerAgent` | 50 USDC | per-agent outstanding cap |
+| `epochCap` / `epochDuration` | 500 USDC / 1 day | origination cap per epoch |
+| `maxUtilizationBps` | 8000 (80%) | LPs can always withdraw |
+| `minBond` | 10 USDC | hybrid collateral |
+
+### Tests
+Foundry suite at `contracts/test/AgentCreditPool.t.sol` (deposit/withdraw shares, whitelist gates, bond,
+loan caps, epoch/utilization caps, repay interest split, default slashing + reserve, pause, access control).
+
+> ⚠️ **Compilation pending:** `forge.exe` is blocked by Windows Application Control in the dev environment,
+> so the suite was written but **not executed** here. Run in your env:
+> ```bash
+> cd contracts && forge test --match-contract AgentCreditPoolTest -vvv
+> ```
+
+## 9. Notes
+- The `keeper` role is reserved for ERC-8183 auto-repay (`repayFrom`).
+- Reserve is held by the pool and **not** LP-withdrawable (first-loss buffer).
+- ERC-8004 reputation slash on default remains an off-chain action (recorded via `Defaulted`).
+
