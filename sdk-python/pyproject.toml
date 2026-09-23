@@ -1,0 +1,23 @@
+# DRAFT — Python SDK for the Arc Agent Credit Pool.
+# Publish target: PyPI (name: arc-agent-treasury) + GitHub.
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arc-agent-treasury"
+version = "0.0.1"
+description = "Treasury & micro-credit client for AI agents on Arc (USDC). Non-custodial, single-block loans."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "BasePump", email = "hello@basepump.dev" }]
+keywords = ["arc", "circle", "usdc", "agents", "credit", "defi"]
+dependencies = ["web3>=6.11.0"]
+
+[project.urls]
+Homepage = "https://github.com/Salado210102/arc-smart-orders"
+Source = "https://github.com/Salado210102/arc-smart-orders"
+
+[tool.setuptools]
+packages = ["arc_agent_treasury"]
