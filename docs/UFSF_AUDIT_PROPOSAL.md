@@ -76,7 +76,7 @@ also co-fund a portion.
 
 ## 7. Links
 
-- Repo: https://github.com/Salado210102/arc-smart-orders (audited commit: `fe4c977`)
+- Repo: https://github.com/Salado210102/arc-smart-orders (frozen tag: `pre-audit-v1`; package: `AUDIT_PACKAGE.md`)
 - Scope: `docs/AUDIT_SCOPE.md` · Runbook: `docs/MAINNET_RUNBOOK.md`
 - Deployments & tx hashes: `DEPLOYMENTS.md`
 - Live UI: https://launchpad-neon-chi.vercel.app

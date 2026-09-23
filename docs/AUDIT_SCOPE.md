@@ -3,7 +3,7 @@
 **Project:** Arc Smart Orders + Agent Launchpad
 **Repo:** https://github.com/Salado210102/arc-smart-orders
 **Network:** Arc (testnet 5042002 · mainnet 5042)
-**Commit at scope:** `7ba3e10` (freeze this commit for the audit)
+**Commit at scope:** git tag **`pre-audit-v1`** (`git rev-parse pre-audit-v1`) — frozen package in [`AUDIT_PACKAGE.md`](AUDIT_PACKAGE.md)
 
 ---
 
