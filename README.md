@@ -502,10 +502,11 @@ lives in `keeper/src/agentic.ts`.
 ## Roadmap
 
 1. **Wire the real swap venue.** The swap leg is a pluggable `swapTarget` (owner-whitelisted). On
-   testnet we use `MockStableRouter`. **Update (2026-09):** StableFX is **permissioned** (institutions
-   only — declined for independent builders) and **App Kit Swap is not an on-chain router** (it is
-   API-orchestrated), so it cannot be plugged in atomically. We are evaluating a **public AMM on Arc** when
-   one exists, or a keeper-side execution. Until then, order fills stay in **dry-run**.
+   testnet we use `MockStableRouter`. **Update (2026-09-23): Uniswap v3 + v4 are live on Arc mainnet**
+   with a liquid **USDC/EURC pool** (fee 0.05%, `liquidity ≈ 7.76e11`). StableFX stays permissioned and
+   App Kit Swap is not an on-chain router, but Uniswap **unblocks mainnet fills**: whitelist
+   `SwapRouter02 0x53BF…6F77` via the Safe and set keeper `DRY=0`. See
+   [`docs/VENUE_INTEGRATION.md`](docs/VENUE_INTEGRATION.md).
 2. **Off-chain readiness.** Replace the manual `ready` flag with a real FX price source (App Kit
    quote / StableFX / oracle) compared against the signed `minOut` / `minRate`.
 3. **Agentic track (ERC-8004 identity + ERC-8183 jobs).** Let AI agents register and run these
@@ -520,7 +521,7 @@ Both keepers + the alerts bot run on the same VPS, isolated by port (see [`docs/
 
 | PM2 process | Role | Port | Network |
 |---|---|---|---|
-| `arc-keeper` | order keeper — **dry-run** (no fills until a venue exists) | `8788` | Arc **5042** (mainnet) |
+| `arc-keeper` | order keeper — **dry-run** (venue live: Uniswap v3/v4 on Arc; enable via Safe whitelist + `DRY=0`) | `8788` | Arc **5042** (mainnet) |
 | `arc-keeper-testnet` | order keeper — **live fills** | `8789` | Arc **5042002** (testnet) |
 | `arc-alerts` | Telegram alerts: new agents + **keeper low-gas** (mainnet & testnet) | — | Arc 5042 / 5042002 |
 | `pm2-logrotate` | log rotation (`max_size 10M`, `retain 7`, compressed) | — | — |
@@ -533,7 +534,7 @@ Both keepers + the alerts bot run on the same VPS, isolated by port (see [`docs/
 |---|---|
 | **Live on Arc mainnet (5042)** | `OrderExecutor`, `AgentFactory`, `AgentRegistry`, `GraduationModule`, `LiquidityLocker` — all **Safe-owned** (see [`DEPLOYMENTS.md`](DEPLOYMENTS.md)) |
 | **Works today** | launching an agent, trading on its USDC bonding curve (non-custodial) |
-| **Pending (external, not bugs)** | smart-order **fills** + **graduation** (need a swap venue); **ERC-8004** identity (registry not on mainnet); the order engine runs in **dry-run** |
+| **Pending (external, not bugs)** | smart-order **fills** + **graduation** — venue **now exists (Uniswap v3/v4 on Arc)**; pending Safe whitelist + audit. **ERC-8004** identity (registry not on mainnet yet); order engine runs in **dry-run** until enabled |
 | **Not deployed / draft** | Phase 2 `AgentCreditPool` (credit) — **unaudited**, not deployed |
 | **Not audited** | the whole codebase — see [`docs/AUDIT_PACKAGE.md`](docs/AUDIT_PACKAGE.md) |
 
