@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Info, Plus, Rocket, Sparkles } from "lucide-react";
 import { formatUnits, parseUnits } from "viem";
-import { EXPLORER, connectProvider, listWallets, publicClient, walletClient, type WalletInfo } from "./arc";
+import { EXPLORER, connectProvider, disconnect, listWallets, publicClient, walletClient, type WalletInfo } from "./arc";
 import { ADDR, erc20Abi, factoryAbi, registryAbi } from "./contracts";
 import { AgentCard, type Agent } from "./components/AgentCard";
 import { Dashboard } from "./components/Dashboard";
@@ -88,6 +88,17 @@ export default function App() {
     }
   }
 
+  async function doDisconnect() {
+    try {
+      await disconnect();
+    } catch {
+      /* ignore */
+    }
+    setAccount(null);
+    setUsdc("0");
+    setMsg("Wallet disconnected");
+  }
+
   async function pinMeta() {
     if (!pinataJwt) return setMsg("Paste a Pinata JWT first (stored locally in your browser).");
     setBusy(true);
@@ -155,7 +166,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <Navbar account={account} usdc={usdc} tab={tab} setTab={setTab} onConnect={doConnect} />
+      <Navbar account={account} usdc={usdc} tab={tab} setTab={setTab} onConnect={doConnect} onDisconnect={doDisconnect} />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <div className="mb-5 flex items-start gap-2 rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-[11px] text-amber-300/90">

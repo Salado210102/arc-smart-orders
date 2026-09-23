@@ -78,4 +78,14 @@ export function walletClient(): WalletClient {
   return createWalletClient({ chain: arc, transport: custom(provider as never) });
 }
 
+/** Disconnect: ask the wallet to revoke this dApp's account permission (best-effort) and forget it. */
+export async function disconnect(): Promise<void> {
+  try {
+    await evm?.request({ method: "wallet_revokePermissions", params: [{ eth_accounts: {} }] });
+  } catch {
+    /* ignore — not all wallets support it */
+  }
+  evm = null;
+}
+
 export const EXPLORER = "https://explorer.arc.io";

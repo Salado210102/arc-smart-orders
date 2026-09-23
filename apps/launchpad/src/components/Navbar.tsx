@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, BarChart3, Droplet, Plus, Wallet } from "lucide-react";
+import { Activity, BarChart3, Droplet, LogOut, Plus, Wallet } from "lucide-react";
 import { cn, short } from "../lib/utils";
 
 export type Tab = "agents" | "dashboard" | "create" | "trade" | "stake";
@@ -18,12 +18,14 @@ export function Navbar({
   tab,
   setTab,
   onConnect,
+  onDisconnect,
 }: {
   account: `0x${string}` | null;
   usdc: string;
   tab: Tab;
   setTab: (t: Tab) => void;
   onConnect: () => void;
+  onDisconnect: () => void;
 }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -87,6 +89,14 @@ export function Navbar({
               <span className="rounded-lg border border-violet-800/60 bg-violet-950/30 px-3 py-2 font-mono text-xs text-violet-300">
                 {short(account)}
               </span>
+              <button
+                onClick={onDisconnect}
+                title="Disconnect"
+                aria-label="Disconnect"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-zinc-800 bg-zinc-900/60 text-zinc-400 transition-colors hover:text-zinc-100"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
             </div>
           ) : (
             <button
