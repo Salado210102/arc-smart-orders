@@ -35,6 +35,14 @@ export async function buildServer() {
   const app = Fastify({ logger: true });
   await app.register(websocket);
 
+  //  CORS for the launchpad UI ("Smart Swap" widget) and other browser clients.
+  app.addHook("onRequest", async (req, reply) => {
+    reply.header("access-control-allow-origin", process.env.CORS_ORIGIN ?? "*");
+    reply.header("access-control-allow-methods", "GET,POST,OPTIONS");
+    reply.header("access-control-allow-headers", "content-type");
+    if (req.method === "OPTIONS") reply.code(204).send();
+  });
+
   //  Live feed: broadcasts order lifecycle events (created/filled/failed).
   app.get("/ws", { websocket: true }, (socket) => {
     try {

@@ -7,6 +7,7 @@ import { AgentCard, type Agent } from "./components/AgentCard";
 import { Dashboard } from "./components/Dashboard";
 import { Navbar, type Tab } from "./components/Navbar";
 import { StakingPanel } from "./components/StakingPanel";
+import { SmartSwap } from "./components/SmartSwap";
 import { SwapBox } from "./components/SwapBox";
 import { WalletPicker } from "./components/WalletPicker";
 import { Button } from "./components/ui/button";
@@ -279,6 +280,13 @@ export default function App() {
           <>
             <SectionHeading title="Trade" subtitle="Buy / sell on the bonding curve" />
             <SwapBox agents={agents} selected={selected} account={account} onSelect={setSelected} setMsg={setMsg} busy={busy} setBusy={setBusy} />
+          </>
+        )}
+
+        {tab === "swap" && (
+          <>
+            <SectionHeading title="Smart Swap" subtitle="Sign a signed limit order (0 gas) — USDC → EURC" />
+            <SmartSwap account={account} setMsg={setMsg} busy={busy} setBusy={setBusy} />
           </>
         )}
 
