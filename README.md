@@ -113,12 +113,16 @@ Domain: `name="ArcSmartOrders", version="1", verifyingContract=executor` — mus
 contracts/                        Foundry
   src/OrderExecutor.sol               the executor (witness + intent + whitelist)
   src/mocks/MockStableRouter.sol      fixed-rate USDC->EURC router for testnet/local
+  src/agentic/IERC8004.sol            interfaces for the deployed ERC-8004 registries
+  src/agentic/IAgenticCommerce.sol    interfaces for ERC-8183 + IACPHook
   test/OrderExecutor.t.sol            11 tests
   script/Deploy.s.sol                 deploy to Arc (+ optional mock router)
 sdk/                              TypeScript (viem)
   src/index.ts                        EIP-712 domains/types, signLimitOrder/signTwapOrder, Permit2 approval
 keeper/                           TypeScript (viem)
   src/index.ts                        executes ready orders, 20-gwei floor, USDC gas
+  src/agentic.ts                      ERC-8004 identity/reputation + ERC-8183 job lifecycle
+  src/setup-order.ts                  E2E: approve Permit2 + sign a LIMIT order
 .env.example
 ```
 
@@ -181,6 +185,43 @@ Then:
 
 The executor pulls exactly `amountIn` USDC via Permit2, swaps to EURC through the whitelisted
 router, and sends the EURC to the user — reverting entirely if the outcome is below `minOut`.
+
+---
+
+## Agentic track — ERC-8004 identity + ERC-8183 job escrow
+
+Arc already deploys the **canonical agent standards**, so we **do not redeploy them** — we integrate.
+In `contracts/` we only add **interfaces** (so our contracts *can* call them); the real integration
+lives in `keeper/src/agentic.ts`.
+
+| Standard | Contract (Arc testnet) | Address |
+|---|---|---|
+| ERC-8004 | IdentityRegistry | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
+| ERC-8004 | ReputationRegistry | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
+| ERC-8004 | ValidationRegistry | `0x8004Cb1BF31DAf7788923b405b754f57acEB4272` |
+| ERC-8183 | AgenticCommerce (jobs) | `0x0747EEf0706327138c69792bF28Cd525089e4583` |
+
+### "Agentic Smart Orders" lifecycle
+1. **Register the keeper agent** — `IdentityRegistry.register(metadataURI)` (ERC-8004).
+2. **Create a job** — the client/agent calls `AgenticCommerce.createJob(provider=keeper, evaluator=client, expiredAt, desc, hook=0)`.
+3. **Set the fee** — the keeper calls `setBudget(jobId, feeUSDC)`.
+4. **Fund escrow** — the client approves USDC and calls `fund(jobId)`.
+5. **Execute** — the keeper runs the signed intent through `OrderExecutor` → gets the fill tx hash.
+6. **Submit** — the keeper calls `submit(jobId, keccak256(fillTxHash))`.
+7. **Complete** — the evaluator calls `complete(jobId, reason)` → escrow released to the keeper.
+8. **Reputation** — a validator records feedback via `ReputationRegistry.giveFeedback(...)`.
+
+`keeper/src/agentic.ts` implements every step (`registerAgent`, `createJob`, `setBudget`, `fundJob`,
+`submitDeliverable`, `completeJob`, `giveReputation`).
+
+### Notes / boundaries
+- **ACP = payment/escrow; ERC-8004 = identity/reputation.** Interop is by calling registries and
+  (optionally) emitting/indexing events.
+- **ERC-8183 `hook` must be whitelisted** by the ACP admin (`setHookWhitelist`). We therefore use the
+  **non-hooked path** (`hook = address(0)`) and link job↔fill **off-chain** via the `deliverable` hash.
+  `IACPHook` is included in `contracts/src/agentic/` for a future whitelisted hook.
+- The ACP contract is **upgradeable + role-gated**; its admin/fee config is owned by the deployment
+  team (Arc/Circle) for the reference implementation.
 
 ---
 
