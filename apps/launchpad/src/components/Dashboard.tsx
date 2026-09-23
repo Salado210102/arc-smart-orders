@@ -64,8 +64,8 @@ export function Dashboard() {
           <ul className="flex flex-col gap-1.5">
             <li>• All fees flow to the Safe 2/2 <span className="font-mono text-zinc-400">0x0FBFAF…7e93</span> (owner + treasury).</li>
             <li>• Bonding-curve fee (1%) splits 50% → Safe / 50% → the agent&apos;s creator.</li>
-            <li>• Order-engine fee (0.30%, input-side) → Safe — active once on-chain fills go live (dry-run today).</li>
-            <li>• Graduation &amp; staking activate with the Arc FX venue / a public AMM.</li>
+            <li>• Order-engine fee (0.30%, input-side) → Safe — <span className="text-emerald-400/80">live now</span> via Uniswap v3 fills.</li>
+            <li>• <span className="text-emerald-400/80">Staking &amp; Yield vaults are live</span> per agent (70% stakers / 30% Safe); graduation is pending.</li>
           </ul>
           {err && <p className="mt-3 text-rose-400/80">read error: {err}</p>}
         </CardContent>

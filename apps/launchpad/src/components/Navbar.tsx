@@ -42,7 +42,7 @@ export function Navbar({
         scrolled ? "border-zinc-800 bg-zinc-950/80 backdrop-blur-xl" : "border-transparent bg-transparent",
       )}
     >
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
+      <div className="mx-auto flex h-16 max-w-[1500px] items-center gap-4 px-4">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
           <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-600 to-emerald-500 shadow-lg shadow-violet-900/30">

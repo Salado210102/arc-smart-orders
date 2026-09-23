@@ -169,7 +169,7 @@ export default function App() {
     <div className="flex min-h-screen flex-col">
       <Navbar account={account} usdc={usdc} tab={tab} setTab={setTab} onConnect={doConnect} onDisconnect={doDisconnect} />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-[1500px] flex-1 px-4 py-8">
         <div className="mb-5 flex items-start gap-2 rounded-lg border border-emerald-900/40 bg-emerald-950/20 px-3 py-2 text-[11px] text-emerald-300/90">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
@@ -205,7 +205,7 @@ export default function App() {
                 </Button>
               </Card>
             ) : (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {agents.map((a) => (
                   <AgentCard key={a.token} agent={a} onTrade={trade} />
                 ))}
