@@ -358,6 +358,8 @@ A **network selector** switches between:
 - **Arc Testnet (Live fills)** → keeper `…/arc-keeper-testnet` (`0xB19F…6Ee3`), fills on-chain (needs testnet USDC + one-time Permit2 approval).
 - **Arc Mainnet (Beta)** → keeper `…/arc-keeper`, dry-run until the FX venue is wired (order stays `PENDING`).
 
+Build-time env (Vite): `VITE_KEEPER_API` and `VITE_KEEPER_TESTNET_API` — see [`apps/launchpad/.env.example`](apps/launchpad/.env.example).
+
 ### Contracts — Foundry
 ```bash
 cd contracts
