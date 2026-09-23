@@ -20,7 +20,7 @@ adapted to Arc's stablecoin-native model.
 - SDK (signing): [`sdk/src/index.ts`](sdk/src/index.ts)
 - Keeper: [`keeper/src/index.ts`](keeper/src/index.ts)
 - 📦 **Audit package (start here):** [`docs/AUDIT_PACKAGE.md`](docs/AUDIT_PACKAGE.md) — scope, sizes, test evidence, fork rehearsal, checklist
-- 📄 **Launch writeup:** [`docs/LAUNCH.md`](docs/LAUNCH.md) · **Revenue model:** [`docs/REVENUE.md`](docs/REVENUE.md) · **Agent Launchpad:** [`docs/AGENT_LAUNCHPAD.md`](docs/AGENT_LAUNCHPAD.md) · **Mainnet treasury (Safe):** [`docs/SAFE_TREASURY.md`](docs/SAFE_TREASURY.md) · **Mainnet runbook:** [`docs/MAINNET_RUNBOOK.md`](docs/MAINNET_RUNBOOK.md) · **Audit scope:** [`docs/AUDIT_SCOPE.md`](docs/AUDIT_SCOPE.md) · **Python signing recipe:** [`examples/python/sign_limit_order.py`](examples/python/sign_limit_order.py) · **Deployments (tx tree):** [`DEPLOYMENTS.md`](DEPLOYMENTS.md)
+- 📄 **Launch writeup:** [`docs/LAUNCH.md`](docs/LAUNCH.md) · **Revenue model:** [`docs/REVENUE.md`](docs/REVENUE.md) · **Agent Launchpad:** [`docs/AGENT_LAUNCHPAD.md`](docs/AGENT_LAUNCHPAD.md) · **Mainnet treasury (Safe):** [`docs/SAFE_TREASURY.md`](docs/SAFE_TREASURY.md) · **Safe mainnet ops:** [`docs/SAFE_MAINNET.md`](docs/SAFE_MAINNET.md) · **Mainnet runbook:** [`docs/MAINNET_RUNBOOK.md`](docs/MAINNET_RUNBOOK.md) · **Audit scope:** [`docs/AUDIT_SCOPE.md`](docs/AUDIT_SCOPE.md) · **Python signing recipe:** [`examples/python/sign_limit_order.py`](examples/python/sign_limit_order.py) · **Deployments (tx tree):** [`DEPLOYMENTS.md`](DEPLOYMENTS.md)
 
 ---
 
@@ -298,9 +298,9 @@ keeper/                             TypeScript (viem)
   src/setup-order.ts                  E2E: approve Permit2 + sign a LIMIT order
   src/crosschain-builder.ts           sign a CrossChainIntent + encode executeCrossChain (draft)
 apps/launchpad/                     Vite + React + Tailwind launchpad UI (Vercel)
-ops/                                ops tooling (Safe execTransaction signer, reminder bot)
+ops/                                ops tooling (Safe execTransaction signer, alerts + metrics bots)
 examples/python/sign_limit_order.py Python EIP-712 signing recipe (verified to match the TS SDK)
-docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · CROSS_CHAIN_ORDERS · SDK_INTEGRATION · SAFE_TREASURY · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
+docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · CROSS_CHAIN_ORDERS · GEX_AGENT_SPEC · SDK_INTEGRATION · SAFE_TREASURY · SAFE_MAINNET · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
 ```
 
 ---
