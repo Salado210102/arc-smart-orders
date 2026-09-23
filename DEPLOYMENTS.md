@@ -202,6 +202,33 @@ module/factory/exec.owner == Safe`, `exec.feeBps == 30`, `feeRecipient == Safe`)
 **Soft-launch policy:** fee 30 bps · graduation cap **$10k/agent** (`SOFT_LAUNCH_MAX_GRADUATION_USDC`, applied
 by the DApp default) · LP lock 365d · emergency brake = owner-only setters (no `Pausable` in contracts).
 
+---
+
+# Arc MAINNET deployment — 2026-09-23 🚀
+
+Chain **5042** · RPC `https://rpc.mainnet.arc.io` · Explorer `https://explorer.arc.io`
+
+| Contract | Address | Deploy tx |
+|---|---|---|
+| **Safe 2/2** (owner + treasury + feeRecipient) | `0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93` | `0x…` (CreateSafe) |
+| **LiquidityLocker** | `0x9cb011A46A1127202Bc92F48f70Bf7010F1f9B6C` | [`0xa8821a61…40d3`](https://explorer.arc.io/tx/0xa8821a6151dec8b5ec4735620d71d8f033b964d21c1a29248b5e3de4198340d3) |
+| **AgentRegistry** | `0x8aE509565397C62a585c74aA44f7E3bFEab3Bb01` | [`0x725cda6b…1a47`](https://explorer.arc.io/tx/0x725cda6b6afd8a96043d92eec65db044a741e8e0379fc815bd506aa835e61a47) |
+| **GraduationModule** | `0x1B8CA122DFd1100C0873A517b4875611Ed9De792` | [`0xab9e7cfb…6a9d`](https://explorer.arc.io/tx/0xab9e7cfb025e2672fa01a6e01efd9a7b6d086e19855849ec9d3f9a9a35ab6a9d) |
+| **AgentFactory** | `0x4A80a4748A1d2AB37300780FcBC2FD28d2Ed393B` | [`0x0ead7a51…daae`](https://explorer.arc.io/tx/0x0ead7a51afc204a8d91f95acf8cf09ff9b5c0dd8109c092523d936051414daae) |
+| **OrderExecutor** | `0x9b3A990D1a31ff5E01DdB8702E10F2529811Fdb7` | [`0xfebd8ce7…2d86`](https://explorer.arc.io/tx/0xfebd8ce7409551c5c2d41bb7f8ed40e1ecca464d0acd607fcd74764d91f12d86) |
+| **Safe `setFactory(factory)`** | — | [`0x9ab16edb…bb14`](https://explorer.arc.io/tx/0x9ab16edba51a11f818ad8cf9f9cc07d2c5f86e20c95bef2201bbe24805bcbb14) |
+
+**Config (verified on-chain):**
+- `factory.owner`/`treasury` = Safe · `factory.registry` = AgentRegistry · **`factory.graduationModule` = 0x0 (gated V1)**.
+- `registry.owner` = Safe · `registry.factory` = AgentFactory.
+- `module.owner` = Safe · `module.dex` = StableFX FxEscrow `0xe2E5F173…DFe6` · `module.locker` = LiquidityLocker.
+- `executor.owner` = Safe · `keeper` = `0x327f…50bC` · `feeBps` = 30 · `feeRecipient` = Safe · `allowedTargets(FxEscrow)` = true.
+- `identity(8004)` = 0x0 (skip) · `escrow(8183)` = 0x0 (disabled).
+
+**Safety notes:** deploy required the Safe to exist first (script correctly reverted until the Safe was
+created on mainnet). Graduation is **gated**; enable later via Safe: `module.setConfig(<amm>,…)` +
+`factory.setGraduationModule(module)`. ERC-8004 skipped until the registries ship on mainnet.
+
 
 
 
