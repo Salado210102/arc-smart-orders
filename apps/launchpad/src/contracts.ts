@@ -1,14 +1,14 @@
 import type { Address } from "viem";
 
-//  Arc testnet (P2 deployment — see DEPLOYMENTS.md)
+//  Arc MAINNET (deployed 2026-09-23 — see DEPLOYMENTS.md)
 export const ADDR = {
-  factory: "0x3d66d4abE251Aa2bC92B7842002Eb822469369A9",
-  registry: "0xAD5Bf8f7BA4A0e51092F4419CeF7D40308289e16",
-  module: "0xBDF9BA264157EB634Dc65A61DfA512Fe5E3E1166",
-  locker: "0xDf1592E1e6a6ABA13eF7c8821004a4011Bd90Aba",
-  vault: "0x5D5e48336589f3d9fdC4EABd986a526D7BF1FE6d",
-  splitter: "0xad5ad6b09d52FA8BD5Acd7d0954da783e7a7b2dc",
-  vaultAsset: "0x23e904f3cba0a5a8b00612788650066e8cd49f99", // dry-run demo AgentToken
+  factory: "0x4A80a4748A1d2AB37300780FcBC2FD28d2Ed393B",
+  registry: "0x8aE509565397C62a585c74aA44f7E3bFEab3Bb01",
+  module: "0x1B8CA122DFd1100C0873A517b4875611Ed9De792",
+  locker: "0x9cb011A46A1127202Bc92F48f70Bf7010F1f9B6C",
+  vault: "0x0000000000000000000000000000000000000000", // per-agent, deployed on demand (none yet)
+  splitter: "0x0000000000000000000000000000000000000000", // per-agent
+  vaultAsset: "0x0000000000000000000000000000000000000000", // per-agent
   usdc: "0x3600000000000000000000000000000000000000",
 } as const satisfies Record<string, Address>;
 

@@ -53,7 +53,7 @@ export function Navbar({
         {/* Network pill */}
         <span className="ml-2 hidden items-center gap-1.5 rounded-full border border-emerald-800/60 bg-emerald-950/40 px-2.5 py-1 text-[11px] font-medium text-emerald-400 sm:flex">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-          Arc Testnet · 5042
+          Arc Mainnet · 5042
         </span>
 
         {/* Tabs */}

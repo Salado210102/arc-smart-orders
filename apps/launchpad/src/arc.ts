@@ -7,17 +7,17 @@ import {
   type WalletClient,
 } from "viem";
 
-export const arcTestnet = defineChain({
-  id: 5042002,
-  name: "Arc Testnet",
+export const arc = defineChain({
+  id: 5042,
+  name: "Arc Mainnet",
   nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
-  rpcUrls: { default: { http: ["https://rpc.testnet.arc.io"] } },
-  blockExplorers: { default: { name: "Arc Explorer", url: "https://explorer.testnet.arc.io" } },
+  rpcUrls: { default: { http: ["https://rpc.mainnet.arc.io"] } },
+  blockExplorers: { default: { name: "Arc Explorer", url: "https://explorer.arc.io" } },
 });
 
-export const publicClient = createPublicClient({ chain: arcTestnet, transport: http() });
+export const publicClient = createPublicClient({ chain: arc, transport: http() });
 
-const hexId = `0x${arcTestnet.id.toString(16)}`;
+const hexId = `0x${arc.id.toString(16)}`;
 
 export async function connect(): Promise<`0x${string}`> {
   const eth = (window as unknown as { ethereum?: any }).ethereum;
@@ -31,10 +31,10 @@ export async function connect(): Promise<`0x${string}`> {
       params: [
         {
           chainId: hexId,
-          chainName: "Arc Testnet",
+          chainName: "Arc Mainnet",
           nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
-          rpcUrls: ["https://rpc.testnet.arc.io"],
-          blockExplorerUrls: ["https://explorer.testnet.arc.io"],
+          rpcUrls: ["https://rpc.mainnet.arc.io"],
+          blockExplorerUrls: ["https://explorer.arc.io"],
         },
       ],
     });
@@ -44,9 +44,9 @@ export async function connect(): Promise<`0x${string}`> {
 
 export function walletClient(): WalletClient {
   return createWalletClient({
-    chain: arcTestnet,
+    chain: arc,
     transport: custom((window as unknown as { ethereum: any }).ethereum),
   });
 }
 
-export const EXPLORER = "https://explorer.testnet.arc.io";
+export const EXPLORER = "https://explorer.arc.io";

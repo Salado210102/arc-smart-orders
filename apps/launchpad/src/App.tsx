@@ -244,7 +244,7 @@ export default function App() {
       </main>
 
       <footer className="border-t border-zinc-800/60 py-6 text-center text-[11px] text-zinc-600">
-        Arc Agent Launchpad · <a className="hover:text-zinc-400" href="https://github.com/Salado210102/arc-smart-orders" target="_blank" rel="noreferrer">open source (MIT)</a> · non-custodial · testnet
+        Arc Agent Launchpad · <a className="hover:text-zinc-400" href="https://github.com/Salado210102/arc-smart-orders" target="_blank" rel="noreferrer">open source (MIT)</a> · non-custodial · mainnet
       </footer>
     </div>
   );
