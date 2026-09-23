@@ -39,8 +39,8 @@ export type CrossChainIntent = {
   tokenOut: Address; // desired output
   amountIn: bigint; // gross input (base units)
   minOut: bigint; // minimum output on the NET (after fee)
-  sourceChainId: number; // origin chain (must equal executor.sourceChainId)
-  destinationChainId: number; // execution chain (must equal block.chainid)
+  sourceChainId: bigint; // origin chain (must equal executor.sourceChainId)
+  destinationChainId: bigint; // execution chain (must equal block.chainid)
   nonce: bigint;
   deadline: bigint;
 };
@@ -57,7 +57,7 @@ export async function signCrossChainIntent(
   if (!wallet.account) throw new Error("wallet has no account");
   return wallet.signTypedData({
     account: wallet.account,
-    domain: crossChainDomain(executor, o.destinationChainId),
+    domain: crossChainDomain(executor, Number(o.destinationChainId)),
     types: CROSS_CHAIN_TYPES,
     primaryType: "CrossChainIntent",
     message: o,
