@@ -1,4 +1,4 @@
-// Launchpad alerts bot — posts new-agent launches to Telegram and/or Discord.
+// Launchpad alerts bot — posts new-agent launches and low-keeper-gas alerts to Telegram and/or Discord.
 // Plain Node (ESM) using the repo's viem.
 //
 //   node ops/launchpad-alerts.mjs         # run the watcher (24/7)
@@ -8,6 +8,9 @@
 //   ARC_RPC, REGISTRY, POLL_MS, START_BLOCK, STATE_FILE
 //   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID      (from @BotFather)
 //   DISCORD_WEBHOOK_URL                        (channel webhook)
+//   KEEPER_ADDRESS, KEEPER_MIN_USDC            (mainnet low-gas alert; base units, 6 dec)
+//   ARC_RPC_TESTNET, KEEPER_ADDRESS_TESTNET, KEEPER_MIN_USDC_TESTNET  (testnet low-gas alert)
+//   BALANCE_CHECK_MS                           (default 3600000 = 1h)
 import { createPublicClient, http, parseAbiItem } from "viem";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -30,12 +33,23 @@ const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TG_CHAT = process.env.TELEGRAM_CHAT_ID;
 const DISCORD = process.env.DISCORD_WEBHOOK_URL;
 const EXPLORER = "https://explorer.arc.io";
+const USDC = "0x3600000000000000000000000000000000000000";
+
+// ---- low-gas monitor ----
+const CHECK_MS = Number(process.env.BALANCE_CHECK_MS ?? 3600000);
+const KEEPER = process.env.KEEPER_ADDRESS; // mainnet keeper
+const KEEPER_MIN = BigInt(process.env.KEEPER_MIN_USDC ?? "1000000"); // 1 USDC
+const RPC_TESTNET = process.env.ARC_RPC_TESTNET;
+const KEEPER_TESTNET = process.env.KEEPER_ADDRESS_TESTNET;
+const KEEPER_MIN_TESTNET = BigInt(process.env.KEEPER_MIN_USDC_TESTNET ?? "1000000");
 
 const client = createPublicClient({ transport: http(RPC) });
+const clientTestnet = RPC_TESTNET ? createPublicClient({ transport: http(RPC_TESTNET) }) : null;
 
 const AGENT_REGISTERED = parseAbiItem(
   "event AgentRegistered(uint256 indexed agentId, address indexed token, address indexed curve, address creator, string metadataURI)",
 );
+const ERC20 = parseAbiItem("function balanceOf(address) view returns (uint256)");
 
 function loadState() {
   try {
@@ -88,11 +102,45 @@ if (process.argv.includes("test")) {
     console.error("[alerts] no target configured — set TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID or DISCORD_WEBHOOK_URL in", ENV_FILE);
     process.exit(1);
   }
-  const sent = await notify("✅ <b>Arc launchpad alerts</b> — test message. Watching AgentRegistry on Arc mainnet.");
+  const sent = await notify("✅ <b>Arc launchpad alerts</b> — test message. Watching AgentRegistry + keeper gas on Arc.");
   console.log("[alerts] test →", sent.join(", "));
   process.exit(0);
 }
 
+// ---- keeper low-gas check ----
+const lastLow = {}; // chain -> last alert ts (cooldown 6h)
+async function lowGas(label, pc, keeper, min) {
+  if (!pc || !keeper) return;
+  try {
+    const bal = await pc.readContract({ address: USDC, abi: ERC20, functionName: "balanceOf", args: [keeper] });
+    const low = bal < min;
+    const now = Date.now();
+    if (low && (!lastLow[label] || now - lastLow[label] > 6 * 3600 * 1000)) {
+      lastLow[label] = now;
+      const usd = (Number(bal) / 1e6).toFixed(4);
+      const need = (Number(min) / 1e6).toFixed(2);
+      const msg =
+        `⛽ <b>Low keeper gas — ${label}</b>\n` +
+        `• keeper: <code>${keeper}</code>\n` +
+        `• balance: <b>${usd} USDC</b> (min ${need})\n` +
+        `• top up, or the keeper can't pay gas for fills.`;
+      console.log(`[alerts] LOW GAS ${label}: ${usd} USDC`);
+      await notify(msg);
+    } else {
+      console.log(`[alerts] ${label} keeper gas: ${(Number(bal) / 1e6).toFixed(4)} USDC`);
+    }
+  } catch (e) {
+    console.error(`[alerts] balance(${label}):`, e.message);
+  }
+}
+
+async function balanceTick() {
+  await lowGas("mainnet", client, KEEPER, KEEPER_MIN);
+  await lowGas("testnet", clientTestnet, KEEPER_TESTNET, KEEPER_MIN_TESTNET);
+  setTimeout(balanceTick, CHECK_MS);
+}
+
+// ---- new-agent events ----
 async function tick() {
   const state = loadState();
   try {
@@ -135,8 +183,9 @@ async function tick() {
 }
 
 const targets = [TG_TOKEN && TG_CHAT ? "telegram" : null, DISCORD ? "discord" : null].filter(Boolean);
-console.log(`[alerts] watching ${REGISTRY} on ${RPC} · targets: ${targets.join(", ") || "NONE (configure " + ENV_FILE + ")"}`);
-if (targets.length === 0) {
-  console.log("[alerts] ⚠️  no targets yet — add TELEGRAM_* or DISCORD_WEBHOOK_URL to ops/launchpad-alerts.env, then: pm2 restart arc-alerts");
-}
+console.log(`[alerts] registry ${REGISTRY} on ${RPC} · targets: ${targets.join(", ") || "NONE (configure " + ENV_FILE + ")"}`);
+console.log(
+  `[alerts] low-gas monitor: mainnet=${KEEPER ? "on" : "off"} testnet=${KEEPER_TESTNET ? "on" : "off"} (every ${CHECK_MS / 60000}min)`,
+);
 void tick();
+if (KEEPER || KEEPER_TESTNET) void balanceTick();
