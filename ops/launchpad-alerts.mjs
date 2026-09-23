@@ -1,21 +1,29 @@
-// Launchpad alerts bot — posts new-agent launches (and graduation) to Telegram and/or Discord.
-// Plain Node (ESM) using the repo's viem. Run:  node ops/launchpad-alerts.mjs
+// Launchpad alerts bot — posts new-agent launches to Telegram and/or Discord.
+// Plain Node (ESM) using the repo's viem.
 //
-// Env (at least one target required):
-//   ARC_RPC               default https://rpc.mainnet.arc.io
-//   REGISTRY              default 0x8aE509565397C62a585c74aA44f7E3bFEab3Bb01 (Arc mainnet)
-//   POLL_MS               default 30000
-//   START_BLOCK           optional; default = current block (no historical backfill)
-//   STATE_FILE            default ops/.alerts-state.json
-//   TELEGRAM_BOT_TOKEN    from @BotFather
-//   TELEGRAM_CHAT_ID      channel/group id (e.g. -1001234567890)
-//   DISCORD_WEBHOOK_URL   channel webhook
+//   node ops/launchpad-alerts.mjs         # run the watcher (24/7)
+//   node ops/launchpad-alerts.mjs test     # send a one-off test message and exit
+//
+// Config: loaded from ops/launchpad-alerts.env (override path with ALERTS_ENV), else process env.
+//   ARC_RPC, REGISTRY, POLL_MS, START_BLOCK, STATE_FILE
+//   TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID      (from @BotFather)
+//   DISCORD_WEBHOOK_URL                        (channel webhook)
 import { createPublicClient, http, parseAbiItem } from "viem";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
+// ---- load env file first ----
+const ENV_FILE = process.env.ALERTS_ENV ?? "ops/launchpad-alerts.env";
+if (existsSync(ENV_FILE) && typeof process.loadEnvFile === "function") {
+  try {
+    process.loadEnvFile(ENV_FILE);
+  } catch {
+    /* ignore */
+  }
+}
+
 const RPC = process.env.ARC_RPC ?? "https://rpc.mainnet.arc.io";
-const REGISTRY = (process.env.REGISTRY ?? "0x8aE509565397C62a585c74aA44f7E3bFEab3Bb01");
+const REGISTRY = process.env.REGISTRY ?? "0x8aE509565397C62a585c74aA44f7E3bFEab3Bb01";
 const POLL_MS = Number(process.env.POLL_MS ?? 30000);
 const STATE_FILE = process.env.STATE_FILE ?? "ops/.alerts-state.json";
 const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -46,28 +54,43 @@ function saveState(s) {
 }
 
 async function notify(text) {
+  const targets = [];
   if (TG_TOKEN && TG_CHAT) {
     try {
-      await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ chat_id: TG_CHAT, text, parse_mode: "HTML", disable_web_page_preview: true }),
       });
+      targets.push(`telegram:${r.ok ? "ok" : "http " + r.status}`);
     } catch (e) {
-      console.error("telegram error:", e.message);
+      targets.push(`telegram:err ${e.message}`);
     }
   }
   if (DISCORD) {
     try {
-      await fetch(DISCORD, {
+      const r = await fetch(DISCORD, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ content: text.replace(/<[^>]+>/g, "") }),
       });
+      targets.push(`discord:${r.ok ? "ok" : "http " + r.status}`);
     } catch (e) {
-      console.error("discord error:", e.message);
+      targets.push(`discord:err ${e.message}`);
     }
   }
+  return targets;
+}
+
+// ---- one-off test ----
+if (process.argv.includes("test")) {
+  if (!TG_TOKEN && !DISCORD) {
+    console.error("[alerts] no target configured — set TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID or DISCORD_WEBHOOK_URL in", ENV_FILE);
+    process.exit(1);
+  }
+  const sent = await notify("✅ <b>Arc launchpad alerts</b> — test message. Watching AgentRegistry on Arc mainnet.");
+  console.log("[alerts] test →", sent.join(", "));
+  process.exit(0);
 }
 
 async function tick() {
@@ -77,6 +100,7 @@ async function tick() {
     if (!state.lastBlock) {
       state.lastBlock = process.env.START_BLOCK ? Number(process.env.START_BLOCK) - 1 : Number(latest);
       saveState(state);
+      console.log(`[alerts] primed at block ${state.lastBlock}`);
       return;
     }
     if (BigInt(state.lastBlock) >= latest) return;
@@ -98,7 +122,8 @@ async function tick() {
         `• creator: <code>${creator}</code>\n` +
         `<a href="https://launchpad-neon-chi.vercel.app">Open Launchpad →</a>`;
       console.log(`[alert] agent ${agentId} token ${token}`);
-      await notify(msg);
+      const sent = await notify(msg);
+      if (sent.length) console.log("[alerts] →", sent.join(", "));
     }
     state.lastBlock = Number(latest);
     saveState(state);
@@ -109,7 +134,9 @@ async function tick() {
   }
 }
 
-console.log(
-  `[alerts] watching ${REGISTRY} on ${RPC} · targets: ${[TG_TOKEN && TG_CHAT ? "telegram" : null, DISCORD ? "discord" : null].filter(Boolean).join(", ") || "NONE (set TELEGRAM_* or DISCORD_WEBHOOK_URL)"}`,
-);
+const targets = [TG_TOKEN && TG_CHAT ? "telegram" : null, DISCORD ? "discord" : null].filter(Boolean);
+console.log(`[alerts] watching ${REGISTRY} on ${RPC} · targets: ${targets.join(", ") || "NONE (configure " + ENV_FILE + ")"}`);
+if (targets.length === 0) {
+  console.log("[alerts] ⚠️  no targets yet — add TELEGRAM_* or DISCORD_WEBHOOK_URL to ops/launchpad-alerts.env, then: pm2 restart arc-alerts");
+}
 void tick();

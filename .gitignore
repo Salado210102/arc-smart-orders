@@ -16,3 +16,7 @@ keeper/logs/
 
 dist/
 
+ops/launchpad-alerts.env
+ops/.alerts-state.json
+logs/
+
