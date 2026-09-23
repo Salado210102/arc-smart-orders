@@ -1,8 +1,8 @@
 out/
 cache/
-lib/
 node_modules/
 .env
 *.log
 .secrets/
+
 
