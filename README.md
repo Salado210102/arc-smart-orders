@@ -292,14 +292,19 @@ sdk/                                TypeScript (viem)
   src/index.ts                        EIP-712 domains/types, signLimitOrder/signTwapOrder, Permit2 approval
 sdk-python/                         Python SDK — arc-agent-treasury (PyPI-ready)
   arc_agent_treasury/{__init__,client}.py  AgentTreasuryClient: usdc_balance / ensure_credit / request_credit / repay
+sdk/python/                         Python SDK — arc-smart-orders (EIP-712 sign + keeper submit)
+  arc_smart_orders/{__init__,client,signer,eip712,rpc,constants}.py  ArcSmartOrdersClient (eth-account, stdlib RPC)
+  tests/test_signing.py               signature/recovery tests (must match the on-chain types)
+  examples/submit_limit_order.py      sign + POST /v1/orders + poll
 keeper/                             TypeScript (viem)
   src/{server,worker,db,agentic,events}.ts  persistent keeper: HTTP API + WebSocket + SQLite worker
   src/agentic.ts                      ERC-8004 identity/reputation + ERC-8183 job lifecycle
   src/setup-order.ts                  E2E: approve Permit2 + sign a LIMIT order
   src/crosschain-builder.ts           sign a CrossChainIntent + encode executeCrossChain (draft)
-apps/launchpad/                     Vite + React + Tailwind launchpad UI (Vercel)
+apps/launchpad/                     Vite + React + Tailwind launchpad UI (Vercel) — incl. "Smart Swap" (sign 0-gas orders)
 ops/                                ops tooling (Safe execTransaction signer, alerts + metrics bots, keeper funding)
 examples/python/sign_limit_order.py Python EIP-712 signing recipe (verified to match the TS SDK)
+scripts/backtest_gex_signals.py     GEX (Call/Put Wall, Zero Gamma) signal backtest -> EIP-712 intents
 docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · CROSS_CHAIN_ORDERS · GEX_AGENT_SPEC · SDK_INTEGRATION · SAFE_TREASURY · SAFE_MAINNET · AUDIT_SCOPE · AUDIT_PACKAGE · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
 ```
 
@@ -321,6 +326,29 @@ tr = ArcAgentTreasury(
     private_key=os.environ["AGENT_PK"],
 )
 tx = tr.ensure_credit(min_balance=1_000_000, amount=10_000_000)  # borrow only if < 1 USDC
+```
+
+### Smart Orders Python SDK (`arc-smart-orders`)
+Sign EIP-712 / Permit2 limit & TWAP orders and submit them to the keeper API — for quant developers.
+```bash
+pip install -e ./sdk/python            # or: pip install eth-account
+```
+```python
+import os
+from arc_smart_orders import ArcSmartOrdersClient, to_units
+
+client = ArcSmartOrdersClient(private_key=os.environ["ARC_PK"], keeper_url=os.environ.get("KEEPER_API"))
+client.ensure_permit2_approval()                                          # one-time (gas)
+resp = client.submit_limit_order(amount_in=to_units("1"), min_out=to_units("0.90"))  # 0 gas
+final = client.wait_for_fill(resp["order"]["id"])                         # -> FILLED + fill_tx
+```
+- `sdk/python/` · example [`sdk/python/examples/submit_limit_order.py`](sdk/python/examples/submit_limit_order.py) · [README](sdk/python/README.md)
+- Tests: `python sdk/python/tests/test_signing.py`
+
+### GEX signal backtest
+```bash
+python scripts/backtest_gex_signals.py --steps 600 --seed 7 --out /tmp/gex.json
+# simulates GEX (Call/Put Wall, Zero Gamma) signals -> EIP-712 LIMIT intents with minOut + expected return
 ```
 
 ### Contracts — Foundry

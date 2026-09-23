@@ -55,3 +55,18 @@ jobs:
 
       - name: CrossChainOrderExecutor tests (verbose)
         run: forge test --match-contract CrossChainOrderExecutorTest -vvv
+
+  python:
+    name: python (sdk + gex backtest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install eth-account
+      - name: SDK signing tests
+        run: python sdk/python/tests/test_signing.py
+      - name: GEX backtest
+        run: python scripts/backtest_gex_signals.py --steps 300 --seed 7
