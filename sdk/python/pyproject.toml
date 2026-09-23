@@ -1,0 +1,25 @@
+[project]
+name = "arc-smart-orders"
+version = "0.1.0"
+description = "Lightweight Python client to build & sign Arc Smart Orders (EIP-712 / Permit2) and submit them to the keeper API."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Arc Smart Orders" }]
+keywords = ["arc", "eip712", "permit2", "usdc", "eurc", "defi", "quant"]
+dependencies = ["eth-account>=0.10"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.urls]
+Homepage = "https://arc.basepump.dev"
+Repository = "https://github.com/Salado210102/arc-smart-orders"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["arc_smart_orders*"]
