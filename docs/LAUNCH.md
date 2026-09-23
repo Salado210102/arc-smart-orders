@@ -172,6 +172,9 @@ print("0x" + sig.signature.hex())
 - **Non-custodial**: Permit2 pull of the exact signed amount; leftover refunded; no funds at rest.
 - **onlyKeeper / onlyOwner**; **whitelisted swap targets** (defense in depth).
 - **Agent-native**: identity (ERC-8004), paid execution (ERC-8183), reputation.
+- **Input-side platform fee**: `feeBps` (default 30 = 0.30%) + `feeRecipient` (your Safe), capped at
+  10%, taken from `tokenIn` **before** the swap → paid in USDC/EURC (no price risk). The signed
+  `minOut`/`minRate` is measured on the **net**, so a fee bump can't silently under-fill a user.
 - **Open item:** the real swap venue (App Kit Swap router / StableFX `FxEscrow`) is pluggable via
   `setAllowedTarget`; testnet uses a fixed-rate mock router.
 - **Not audited. Testnet first.**

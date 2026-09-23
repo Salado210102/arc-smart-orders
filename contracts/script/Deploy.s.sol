@@ -22,6 +22,7 @@ contract Deploy is Script {
     function run() external {
         address owner = vm.envOr("EXECUTOR_OWNER", msg.sender);
         address keeper = vm.envAddress("EXECUTOR_KEEPER");
+        address feeRecipient = vm.envOr("EXECUTOR_FEE_RECIPIENT", owner);
         bool deployMock = vm.envOr("DEPLOY_MOCK_ROUTER", false);
         address target = vm.envOr("EXECUTOR_TARGET", address(0));
 
@@ -33,7 +34,7 @@ contract Deploy is Script {
             console2.log("MockStableRouter:", target);
         }
 
-        OrderExecutor exec = new OrderExecutor(owner, keeper, target);
+        OrderExecutor exec = new OrderExecutor(owner, keeper, target, feeRecipient);
 
         vm.stopBroadcast();
 
@@ -41,6 +42,7 @@ contract Deploy is Script {
         console2.log("owner       :", owner);
         console2.log("keeper      :", keeper);
         console2.log("swapTarget  :", target);
+        console2.log("feeRecipient:", feeRecipient);
         console2.log("");
         console2.log("NEXT:");
         console2.log("  1) Fund the mock router with testnet EURC (so it can pay swaps).");

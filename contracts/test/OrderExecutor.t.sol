@@ -76,6 +76,7 @@ contract OrderExecutorTest is Test {
 
     address constant SAFE = address(0x5AFE);
     address constant KEEPER = address(0xFEED);
+    address constant TREASURY = address(0x7EA5);
     uint256 constant USER_PK = 0xA11CE;
     address USER;
 
@@ -88,9 +89,12 @@ contract OrderExecutorTest is Test {
         tokenIn = new MockERC20();
         tokenOut = new MockERC20();
         router = new MockSwap();
-        exec = new OrderExecutor(SAFE, KEEPER, address(0));
+        exec = new OrderExecutor(SAFE, KEEPER, address(0), TREASURY);
         vm.prank(SAFE);
         exec.setAllowedTarget(address(router), true);
+        //  Fee a 0 por defecto en los tests base (los tests de fee lo suben).
+        vm.prank(SAFE);
+        exec.setFee(0, TREASURY);
 
         tokenIn.mint(USER, 1_000e6);
         tokenOut.mint(address(router), 1_000e18);
@@ -306,5 +310,105 @@ contract OrderExecutorTest is Test {
         vm.prank(SAFE);
         exec.setKeeper(address(0xBEEF));
         assertEq(exec.keeper(), address(0xBEEF));
+    }
+
+    //  ---- Fee (input-side) ----
+
+    function test_fee_defaultEs30() public {
+        OrderExecutor fresh = new OrderExecutor(SAFE, KEEPER, address(0), TREASURY);
+        assertEq(fresh.feeBps(), 30, "default 30 bps");
+        assertEq(fresh.feeRecipient(), TREASURY);
+        OrderExecutor fresh2 = new OrderExecutor(SAFE, KEEPER, address(0), address(0));
+        assertEq(fresh2.feeRecipient(), SAFE, "recipient 0 -> owner");
+    }
+
+    function test_setFee_soloOwner_yCap() public {
+        vm.prank(KEEPER);
+        vm.expectRevert(OrderExecutor.NotOwner.selector);
+        exec.setFee(50, TREASURY);
+
+        vm.prank(SAFE);
+        vm.expectRevert(abi.encodeWithSelector(OrderExecutor.FeeTooHigh.selector, 1001));
+        exec.setFee(1001, TREASURY);
+
+        vm.prank(SAFE);
+        exec.setFee(50, address(0xBEEF));
+        assertEq(exec.feeBps(), 50);
+        assertEq(exec.feeRecipient(), address(0xBEEF));
+    }
+
+    function test_feeOrder_inputSide() public {
+        vm.prank(SAFE);
+        exec.setFee(300, TREASURY); // 3%
+
+        uint256 amountIn = 10e6;
+        uint256 fee = (amountIn * 300) / 10_000; // 0.3e6
+        uint256 swapAmount = amountIn - fee; // 9.7e6
+        uint256 amountOut = 5e18;
+
+        //  El keeper construye el swap para el importe NETO.
+        bytes memory data = abi.encodeCall(MockSwap.swap, (address(tokenIn), swapAmount, address(tokenOut), USER, amountOut));
+        uint256 beforeIn = tokenIn.balanceOf(USER);
+
+        vm.prank(KEEPER);
+        exec.executeOrder(_permit(amountIn), USER, "", address(router), data, address(tokenOut), amountOut);
+
+        assertEq(tokenIn.balanceOf(TREASURY), fee, "tesoreria recibe el fee en tokenIn");
+        assertEq(beforeIn - tokenIn.balanceOf(USER), amountIn, "el usuario paga el bruto");
+        assertEq(tokenOut.balanceOf(USER), amountOut, "el usuario recibe el output (minOut sobre el neto)");
+        assertEq(tokenIn.balanceOf(address(exec)), 0, "executor sin fondos");
+        assertEq(tokenIn.balanceOf(address(router)), swapAmount, "el router recibe el neto");
+    }
+
+    function test_feeOrder_sinRecipient_noCobra() public {
+        vm.prank(SAFE);
+        exec.setFee(300, address(0)); // sin recipient -> no cobra
+
+        uint256 amountIn = 10e6;
+        uint256 amountOut = 5e18;
+        bytes memory data = abi.encodeCall(MockSwap.swap, (address(tokenIn), amountIn, address(tokenOut), USER, amountOut));
+
+        vm.prank(KEEPER);
+        exec.executeOrder(_permit(amountIn), USER, "", address(router), data, address(tokenOut), amountOut);
+
+        assertEq(tokenIn.balanceOf(TREASURY), 0, "sin fee");
+        assertEq(tokenIn.balanceOf(address(router)), amountIn, "swap con el bruto completo");
+    }
+
+    function test_feeOrder_minOutNeto_revierte() public {
+        vm.prank(SAFE);
+        exec.setFee(300, TREASURY);
+
+        uint256 amountIn = 10e6;
+        uint256 fee = (amountIn * 300) / 10_000;
+        uint256 swapAmount = amountIn - fee;
+        //  El swap entrega 5e18, pero pedimos 6e18 -> revierte (fee ya retenido, todo atomico).
+        bytes memory data = abi.encodeCall(MockSwap.swap, (address(tokenIn), swapAmount, address(tokenOut), USER, 5e18));
+        vm.prank(KEEPER);
+        vm.expectRevert(abi.encodeWithSelector(OrderExecutor.InsufficientOutput.selector, 5e18, 6e18));
+        exec.executeOrder(_permit(amountIn), USER, "", address(router), data, address(tokenOut), 6e18);
+    }
+
+    function test_feeDca_inputSide() public {
+        vm.prank(SAFE);
+        exec.setFee(300, TREASURY);
+
+        uint256 partAmount = 5e6;
+        uint256 fee = (partAmount * 300) / 10_000;
+        uint256 swapAmount = partAmount - fee;
+        uint256 amountOut = 2e18;
+
+        (IPermit2Allowance.PermitSingle memory ps,) = _dcaSetup(partAmount, amountOut);
+        bytes memory data = abi.encodeCall(MockSwap.swap, (address(tokenIn), swapAmount, address(tokenOut), USER, amountOut));
+        uint256 minRate = (amountOut * 1e18) / partAmount; // required == amountOut
+        (OrderExecutor.DcaIntent memory it, bytes memory isig) =
+            _intent(20e6, minRate, address(tokenOut), block.timestamp + 7 days);
+
+        vm.prank(KEEPER);
+        exec.executeDca(ps, hex"01", USER, partAmount, address(router), data, address(tokenOut), amountOut, it, isig);
+
+        assertEq(tokenIn.balanceOf(TREASURY), fee, "fee DCA en tokenIn");
+        assertEq(tokenOut.balanceOf(USER), amountOut, "output DCA");
+        assertEq(tokenIn.balanceOf(address(exec)), 0, "executor sin fondos");
     }
 }

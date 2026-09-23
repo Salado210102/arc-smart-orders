@@ -108,6 +108,20 @@ Domain: `name="ArcSmartOrders", version="1", verifyingContract=executor` — mus
 
 ---
 
+### Fees (input-side)
+
+`OrderExecutor` charges a platform fee on the **input token**, taken **before** the swap:
+
+- `feeBps` (default **30** = 0.30%) and `feeRecipient` (your Safe/multisig), set at deploy or via
+  `setFee(bps, recipient)` (**onlyOwner**, hard cap **1000 bps / 10%**).
+- The fee is sent to `feeRecipient` in `tokenIn` (USDC/EURC) → stable, no price/slippage risk.
+- The user's signed `minOut` (LIMIT) / `minRate` (TWAP) is measured on the **net** amount, so a fee
+  increase can never push a fill below what the user signed — it simply reverts.
+- If `feeRecipient == address(0)`, no fee is charged.
+
+> Revenue has two separate rails: **(1)** this platform fee → your treasury, and
+> **(2)** the keeper's ERC-8183 execution fee (`setBudget`) → the keeper wallet.
+
 ## Repo layout
 
 ```

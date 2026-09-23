@@ -118,6 +118,11 @@ contract OrderExecutor {
 
     bool private _locked;
 
+    //  Fee de plataforma (input-side): se retiene de tokenIn ANTES del swap. Default 30 bps (0.30%).
+    //  Cap de seguridad 1000 bps (10%). Si feeRecipient == address(0) no se cobra.
+    uint256 public feeBps = 30;
+    address public feeRecipient;
+
     error NotKeeper();
     error NotOwner();
     error ZeroAddr();
@@ -130,6 +135,7 @@ contract OrderExecutor {
     error IntentAmountTooHigh();
     error IntentRateTooLow();
     error BadIntentSignature();
+    error FeeTooHigh(uint256 bps);
 
     event OrderExecuted(
         address indexed orderOwner,
@@ -141,6 +147,7 @@ contract OrderExecutor {
     );
     event KeeperUpdated(address keeper);
     event TargetAllowed(address target, bool allowed);
+    event FeeUpdated(uint256 feeBps, address feeRecipient);
 
     modifier onlyKeeper() {
         if (msg.sender != keeper) revert NotKeeper();
@@ -159,10 +166,11 @@ contract OrderExecutor {
         _locked = false;
     }
 
-    constructor(address owner_, address keeper_, address initialTarget) {
+    constructor(address owner_, address keeper_, address initialTarget, address feeRecipient_) {
         if (owner_ == address(0) || keeper_ == address(0)) revert ZeroAddr();
         owner = owner_;
         keeper = keeper_;
+        feeRecipient = feeRecipient_ == address(0) ? owner_ : feeRecipient_;
         if (initialTarget != address(0)) {
             allowedTargets[initialTarget] = true;
             emit TargetAllowed(initialTarget, true);
@@ -180,6 +188,14 @@ contract OrderExecutor {
         if (target == address(0)) revert ZeroAddr();
         allowedTargets[target] = allowed;
         emit TargetAllowed(target, allowed);
+    }
+
+    /// @notice Configura la comision de plataforma (input-side). Cap 1000 bps (10%).
+    function setFee(uint256 bps_, address feeRecipient_) external onlyOwner {
+        if (bps_ > 1000) revert FeeTooHigh(bps_);
+        feeBps = bps_;
+        feeRecipient = feeRecipient_;
+        emit FeeUpdated(bps_, feeRecipient_);
     }
 
     /**
@@ -220,17 +236,20 @@ contract OrderExecutor {
             permitSignature
         );
 
-        //  2) Aprobar al router exacto y ejecutar el swap.
-        _forceApprove(tokenIn, swapTarget, amountIn);
+        //  2) Fee de plataforma (input-side): se retiene de tokenIn ANTES del swap.
+        uint256 swapAmount = _takeFee(tokenIn, amountIn);
+
+        //  3) Aprobar al router exacto (importe NETO) y ejecutar el swap.
+        _forceApprove(tokenIn, swapTarget, swapAmount);
         (bool ok, bytes memory ret) = swapTarget.call(swapData);
         if (!ok) revert SwapFailed(ret);
         _forceApprove(tokenIn, swapTarget, 0);
 
-        //  3) Devolver cualquier resto del tokenIn al usuario.
+        //  4) Devolver cualquier resto del tokenIn al usuario.
         uint256 leftover = IERC20Min(tokenIn).balanceOf(address(this));
         if (leftover > 0) IERC20Min(tokenIn).transfer(orderOwner, leftover);
 
-        //  4) Verificar que el usuario recibio al menos minOut del tokenOut.
+        //  5) Verificar que el usuario recibio al menos minOut del tokenOut (sobre el NETO).
         uint256 outAfter = IERC20Min(tokenOut).balanceOf(orderOwner);
         uint256 received = outAfter > outBefore ? outAfter - outBefore : 0;
         if (received < minOut) revert InsufficientOutput(received, minOut);
@@ -270,7 +289,10 @@ contract OrderExecutor {
         //  Tira de UNA parte del tokenIn (Permit2 descuenta del allowance firmado).
         IPermit2Allowance(PERMIT2).transferFrom(orderOwner, address(this), uint160(partAmount), tokenIn);
 
-        _forceApprove(tokenIn, swapTarget, partAmount);
+        //  Fee de plataforma (input-side): se retiene ANTES del swap.
+        uint256 swapAmount = _takeFee(tokenIn, partAmount);
+
+        _forceApprove(tokenIn, swapTarget, swapAmount);
         (bool ok, bytes memory ret) = swapTarget.call(swapData);
         if (!ok) revert SwapFailed(ret);
         _forceApprove(tokenIn, swapTarget, 0);
@@ -339,6 +361,16 @@ contract OrderExecutor {
             abi.encodeWithSelector(IERC1271_MIN.isValidSignature.selector, digest, sig)
         );
         return ok && ret.length >= 32 && abi.decode(ret, (bytes4)) == IERC1271_MIN.isValidSignature.selector;
+    }
+
+    /// @dev Retiene `feeBps` de `amount` en `tokenIn` y lo envia a `feeRecipient`; devuelve el NETO a swapear.
+    ///      No cobra si `feeRecipient == address(0)`. Cap garantizado por `setFee` (<= 1000 bps).
+    function _takeFee(address tokenIn, uint256 amount) private returns (uint256) {
+        uint256 fee = feeRecipient == address(0) ? 0 : (amount * feeBps) / 10_000;
+        if (fee > 0) {
+            IERC20Min(tokenIn).transfer(feeRecipient, fee);
+        }
+        return amount - fee;
     }
 
     /// @dev Aprueba con soporte para tokens tipo USDT (exige poner 0 antes).
