@@ -2,13 +2,13 @@ import type { Address } from "viem";
 
 //  Arc testnet (P2 deployment — see DEPLOYMENTS.md)
 export const ADDR = {
-  factory: "0x756DA207Bd7f15BAe616cB0cc10775e3bd1F3372",
-  registry: "0x8a29Ca54c59e8853E5D15F9B4F42E1CC1650246c",
-  module: "0x7D4c0013c770CA7b9ffA40D6a182c4d0fB0C8873",
-  locker: "0x9A20D5f7856F936F7eEDBa0e46a6A839fbd70C57",
-  vault: "0x8c58fee840EE397d59362B39A6Eb59F4EdcC1bD7",
-  splitter: "0xFbfDa3712332347AF32ACeA10e981F36fb5734ED",
-  vaultAsset: "0x5D6862CfE0b619BCE781c5fa88661e6CE28f889C", // demo AgentToken
+  factory: "0x3d66d4abE251Aa2bC92B7842002Eb822469369A9",
+  registry: "0xAD5Bf8f7BA4A0e51092F4419CeF7D40308289e16",
+  module: "0xBDF9BA264157EB634Dc65A61DfA512Fe5E3E1166",
+  locker: "0xDf1592E1e6a6ABA13eF7c8821004a4011Bd90Aba",
+  vault: "0x5D5e48336589f3d9fdC4EABd986a526D7BF1FE6d",
+  splitter: "0xad5ad6b09d52FA8BD5Acd7d0954da783e7a7b2dc",
+  vaultAsset: "0x23e904f3cba0a5a8b00612788650066e8cd49f99", // dry-run demo AgentToken
   usdc: "0x3600000000000000000000000000000000000000",
 } as const satisfies Record<string, Address>;
 

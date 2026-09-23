@@ -137,6 +137,31 @@ Deploy txs: Vault `0x952803a5…` · Splitter `0x32b4d2bb…`. asset = demo toke
 **Flow:** agent revenue (USDC) → `RevenueSplitter.distribute(amount)` → 70% to the vault (`notifyReward` → accrued pro-rata to stakers) + 30% to treasury. Stakers `deposit` the AgentToken and `claim()` USDC; `withdraw` returns the principal exactly.
 **Tests:** `test/Staking.t.sol` — 5/5 (deposit, yield via splitter, proportional without precision loss, pool-before-stakers, second-yield accrual). **Full suite: 33/33.**
 
+---
+
+# `DeployMainnet.s.sol` DRY-RUN on Arc testnet — 2026-09-22
+
+Ran the **exact mainnet script** (`CONFIRM_MAINNET=1`) on Arc testnet in **one execution** to validate the
+sequence + ownership wiring.
+
+| Contract | Address | tx |
+|---|---|---|
+| LiquidityLocker | `0xDf1592E1e6a6ABA13eF7c8821004a4011Bd90Aba` | `0x39f4158f…258c` |
+| AgentRegistry | `0xAD5Bf8f7BA4A0e51092F4419CeF7D40308289e16` | `0x30bb61e9…9c1f` |
+| GraduationModule | `0xBDF9BA264157EB634Dc65A61DfA512Fe5E3E1166` | `0xa9da5020…7169` |
+| AgentFactory | `0x3d66d4abE251Aa2bC92B7842002Eb822469369A9` | `0x9ef9ceeb…7618` |
+| OrderExecutor | `0x909102EAe94F964F33ea586aA8E215F170c1fde9` | `0xef09f9c9…cb985` |
+| `registry.setFactory(factory)` | _(call)_ | `0x839b7b6d…390d` |
+
+**Ownership/variable check (all ✅ in one run):** `factory.owner`=A · `factory.treasury`=T · `factory.registry`=AgentRegistry · `factory.graduationModule`=GraduationModule · `registry.factory`=AgentFactory · `module.dex`=MockDEX/`module.locker`=LiquidityLocker · `executor.owner`=A/`keeper`=B · `executor.feeBps`=30/`feeRecipient`=T · `allowedTargets(dex)`=true.
+
+**Demo agent launched on the new factory:** token `0x23e904f3cba0a5a8b00612788650066e8cd49f99`, curve `0x69ce89460fbe341ee4ddc760e02874d17eae457d`, tx `0x26d80ccc86e218bdb6c895bface17b69f051432524bfc6f2022fa5f41abcaa81` · ERC-8004 identity minted · `registry.count()==1` · curve `price()==5000` (0.005 USDC).
+
+**Per-agent vault+splitter:** `AgentStakingVault 0x5D5e48336589f3d9fdC4EABd986a526D7BF1FE6d` · `RevenueSplitter 0xad5ad6b09d52FA8BD5Acd7d0954da783e7a7b2dc`.
+
+**UI:** repointed to the dry-run deployment and redeployed → **https://launchpad-neon-chi.vercel.app** (200; the Agents tab reads the new registry).
+
+
 
 
 
