@@ -1,6 +1,8 @@
 # Alerts bot — Arc Launchpad (Telegram / Discord)
 
 Watches `AgentRegistry.AgentRegistered` on **Arc mainnet** and posts a message for every new agent launch.
+It also watches **`OrderExecutor.OrderExecuted`** and posts a **Telegram alert for every smart-order fill**
+(owner, tokens in/out, and the explorer tx link).
 
 - **Runs on the VPS** (`root@2.29.24.106`), PM2 process **`arc-alerts`** (auto-restart + systemd boot).
 - **Code:** `ops/launchpad-alerts.mjs` · **PM2 config:** `ops/launchpad-alerts.ecosystem.config.cjs`
