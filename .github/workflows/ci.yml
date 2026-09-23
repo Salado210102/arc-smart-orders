@@ -27,10 +27,24 @@ jobs:
         run: forge --version
 
       - name: Build
-        run: forge build --sizes
+        run: |
+          set +e
+          forge build --sizes 2>&1 | tee build.log
+          code=${PIPESTATUS[0]}
+          if [ $code -ne 0 ]; then
+            echo "::error title=forge build failed::$(grep -iE 'error' build.log | head -n 6 | tr '\n' ' ' | cut -c1-950)"
+          fi
+          exit $code
 
-      - name: Core + Phase 2 tests
-        run: forge test -vv
+      - name: Tests
+        run: |
+          set +e
+          forge test -vv 2>&1 | tee test.log
+          code=${PIPESTATUS[0]}
+          if [ $code -ne 0 ]; then
+            echo "::error title=forge test failed::$(grep -iE 'error|FAIL' test.log | head -n 6 | tr '\n' ' ' | cut -c1-950)"
+          fi
+          exit $code
 
       - name: AgentCreditPool tests (verbose)
         run: forge test --match-contract AgentCreditPoolTest -vvv
