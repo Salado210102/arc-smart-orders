@@ -161,6 +161,25 @@ sequence + ownership wiring.
 
 **UI:** repointed to the dry-run deployment and redeployed → **https://launchpad-neon-chi.vercel.app** (200; the Agents tab reads the new registry).
 
+---
+
+# Safe-owned `DeployMainnet` DRY-RUN (owner = Safe 2/2) — 2026-09-23
+
+Re-ran the exact mainnet script on testnet but with **`LAUNCHPAD_OWNER` = `LAUNCHPAD_TREASURY` = `ORDERS_FEE_RECIPIENT` = the Safe 2/2 `0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93`**, to validate the production ownership model (no EOA admin).
+
+| Contract | Address |
+|---|---|
+| LiquidityLocker | `0x8410f54ad875B802135716F2BdFCb855478F33e7` |
+| AgentRegistry | `0xD37Ca66d792927ED9220633d504D859E1B83aAf0` |
+| GraduationModule | `0xf1255892220A02b11239118c3e78481DbB666b7e` |
+| AgentFactory | `0x31De735997A7E430B6F11D619926509083dCD80A` |
+| OrderExecutor | `0xbD66d0f7cDf01dF4281D90cbE6F24d5899a03a74` |
+| **Safe `setFactory(factory)`** (execTransaction, signed A+C) | [`0xcbd367adcaa0a1dcfb54d549ad43e8c75092ebb3e7729821b037cd49e9a85ac7`](https://explorer.testnet.arc.io/tx/0xcbd367adcaa0a1dcfb54d549ad43e8c75092ebb3e7729821b037cd49e9a85ac7) |
+
+**Verified on-chain:** `factory.owner`/`treasury` = Safe · `registry.owner` = Safe · `module.dex` = MockDEX · `module.locker` = Locker · `executor.owner`/`feeRecipient` = Safe, `keeper` = B, `feeBps` = 30, `allowedTargets(dex)` = true · **after** the Safe tx, `registry.factory` = AgentFactory.
+
+> **Script change:** `DeployMainnet.s.sol` is now **Safe-aware** — when `owner` has code it does **not** call `setFactory` (which is `onlyOwner`); it prints the calldata the Safe must execute. Reusable executor: **`ops/safe-exec.mjs`** (signs with A + C, calls `execTransaction`).
+
 
 
 

@@ -80,3 +80,26 @@ also co-fund a portion.
 - Scope: `docs/AUDIT_SCOPE.md` · Runbook: `docs/MAINNET_RUNBOOK.md`
 - Deployments & tx hashes: `DEPLOYMENTS.md`
 - Live UI: https://launchpad-neon-chi.vercel.app
+
+## 8. UFSF portal — submission requirements & eligibility
+
+Application form: **`https://areta.fillout.com/ufsf-projects`** (monthly cohorts; closes 7th, 23:59 UTC;
+max **3 applications per project**; every 3rd project that books an audit via the Marketplace is eligible
+for up to **$10k cashback**).
+
+Fields requested: project name · contact name · email · **Telegram** · website · **contract addresses on
+all chains** · then three attestations:
+
+1. Accept the **Head Agreement** + Application Conditions (Grant Agreement signed during **KYC/KYB**).
+2. **Not deployed on a DEX other than Uniswap** (and not within 6 months).
+3. **The applicant is an established legal entity (LLC, corporation) registered and operational.**
+
+> ⚠️ **Eligibility blocker:** attestation **#3 requires a registered legal entity**. The team is currently
+> a **solo independent builder with no incorporated entity**, so this box **cannot be confirmed truthfully**
+> → the application should **not** be submitted until either (a) an entity is registered (e.g. autónomo /
+> SL), or (b) the application is routed to a programme that accepts individuals (e.g. **Circle / Arc
+> ecosystem grants**). Attestation #2 is fine: liquidity is deployed on **Uniswap v4** only (third-party
+> routers/aggregators used to *route* swaps do not count as deploying on another DEX).
+
+**Recommended path while unincorporated:** apply to **Circle / Arc ecosystem grants** first, and keep this
+UFSF proposal ready for when an entity exists (it also fits the "materially new information" reappeal).

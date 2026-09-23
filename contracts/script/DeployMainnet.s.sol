@@ -49,8 +49,16 @@ contract DeployMainnet is Script {
         GraduationModule module = new GraduationModule(owner, USDC, dex, address(locker), lockSeconds);
         //  4) Factory (token + curve + ERC-8004 identity + registry).
         AgentFactory factory = new AgentFactory(USDC, IDENTITY, treasury, owner, address(registry), address(module));
-        //  5) Wire the registry's factory.
-        registry.setFactory(address(factory));
+        //  5) Wire the registry's factory. `setFactory` is onlyOwner: if the owner is a contract
+        //     (Safe), the deployer EOA is NOT authorized — the Safe must execute this after deploy.
+        if (owner.code.length == 0) {
+            registry.setFactory(address(factory));
+        } else {
+            console2.log("!! owner is a contract: the Safe MUST call registry.setFactory(factory)");
+            console2.log("   to       :", address(registry));
+            console2.log("   function : setFactory(address)");
+            console2.log("   arg      :", address(factory));
+        }
         //  6) Non-custodial order engine (fee → treasury/splitter).
         OrderExecutor exec = new OrderExecutor(owner, keeper, dex, feeRecipient);
 

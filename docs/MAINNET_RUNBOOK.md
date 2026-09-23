@@ -33,10 +33,13 @@ order; verify after each.
 
 Full guide: [`SAFE_TREASURY.md`](SAFE_TREASURY.md). Summary:
 
-- [ ] Create a **Safe 2/2** on Arc mainnet (two distinct signers).
+- [x] **Safe address decided (deterministic):** `0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93`
+  (owners `0x3df3…c977` + `0xE34A…1279`, threshold 2, salt 0). Created & verified on **testnet**; the
+  same address results on mainnet. **Pending:** fund the deployer with mainnet USDC, then broadcast:
   ```bash
   cd contracts
-  SAFE_OWNER_1=0x… SAFE_OWNER_2=0x… \
+  SAFE_OWNER_1=0x3df362854B3981b1367aC2DFa41533386628c977 \
+  SAFE_OWNER_2=0xE34AA475d6F606671DB886fE9db3baFA428a1279 \
   forge script script/CreateSafe.s.sol --rpc-url https://rpc.mainnet.arc.io --broadcast
   ```
 - [ ] Record the **Safe address** → this is `OWNER` **and** `TREASURY` (fee recipient).
@@ -44,6 +47,12 @@ Full guide: [`SAFE_TREASURY.md`](SAFE_TREASURY.md). Summary:
 - [ ] The **Safe owns everything**: OrderExecutor, AgentFactory, vaults, splitter, registry.
 
 ## 2. Pre-flight
+
+> 🟥 **BLOCKER (verified 2026-09-22):** the **ERC-8004** registries (`0x8004A8…`, `0x8004B6…`,
+> `0x8004Cb…`) and **ERC-8183** AgenticCommerce (`0x0747…`) have **no code on Arc mainnet** (they exist on
+> testnet). `AgentFactory` calls `IdentityRegistry.register()` on launch, so the launchpad **cannot go live
+> on mainnet until these are deployed there** (or the factory is pointed at real mainnet addresses).
+> USDC, Permit2 and the Safe v1.4.1 stack *are* present on mainnet.
 
 - [ ] **Audit completed** and Critical/High findings fixed ([`AUDIT_SCOPE.md`](AUDIT_SCOPE.md)).
 - [ ] **Testnet dry-run**: run the exact `DeployMainnet.s.sol` on Arc testnet and verify end-to-end.

@@ -15,6 +15,31 @@ production `OrderExecutor` on **Arc mainnet**.
 
 ---
 
+## Status (recorded) — 2026-09-22
+
+| Field | Value |
+|---|---|
+| **Safe address (2/2)** | `0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93` |
+| Owners | `0x3df362854B3981b1367aC2DFa41533386628c977` (A · deployer) · `0xE34AA475d6F606671DB886fE9db3baFA428a1279` (C · validator) |
+| Threshold | 2 · Safe **v1.4.1** |
+| Salt nonce | 0 |
+| Testnet | ✅ created & verified on **Arc testnet** (`getThreshold=2`, `getOwners=[A,C]`) |
+| Mainnet | ⏳ **deterministic → same address** once the deployer is funded (see below) |
+
+> The CREATE2 address depends only on the ProxyFactory, the `setup` initializer and the salt — identical
+> on testnet and mainnet — so the **mainnet Safe will be `0x0FBFAF…7e93`**.
+>
+> **Mainnet blocker:** the deployer keys currently hold **0 USDC** on Arc mainnet, so the Safe cannot be
+> broadcast yet. Fund `0x3df362854B3981b1367aC2DFa41533386628c977` with mainnet USDC, then:
+> ```bash
+> cd contracts
+> SAFE_OWNER_1=0x3df362854B3981b1367aC2DFa41533386628c977 \
+> SAFE_OWNER_2=0xE34AA475d6F606671DB886fE9db3baFA428a1279 \
+> forge script script/CreateSafe.s.sol --rpc-url https://rpc.mainnet.arc.io --broadcast
+> ```
+
+---
+
 ## Step 1 — Create the Safe 2/2
 
 ### Path A · Safe Web UI (if Arc is listed)
