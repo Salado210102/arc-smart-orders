@@ -10,6 +10,10 @@ rate.
 Built on the proven pattern from [basepump-smart-orders](https://github.com/Salado210102/basepump-smart-orders),
 adapted to Arc's stablecoin-native model.
 
+- Executor contract: [`contracts/src/OrderExecutor.sol`](contracts/src/OrderExecutor.sol)
+- SDK (signing): [`sdk/src/index.ts`](sdk/src/index.ts)
+- Keeper: [`keeper/src/index.ts`](keeper/src/index.ts)
+
 ---
 
 ## Why Arc fits this
@@ -32,7 +36,7 @@ adapted to Arc's stablecoin-native model.
 
 ---
 
-## Architecture
+## How it works
 
 ```
    USER (browser/SDK)                     KEEPER (Node)                       ARC
@@ -48,70 +52,154 @@ adapted to Arc's stablecoin-native model.
                                                                       └─ output to user's wallet
 ```
 
-### Two signing flows
-1. **LIMIT (one-shot)** → Permit2 `permitWitnessTransferFrom` with witness `OrderIntent{tokenOut,minOut}`.
-   The executor recomputes the witness on-chain → keeper can't redirect or under-fill.
-2. **TWAP (recurring)** → Permit2 `AllowanceTransfer` (`PermitSingle`, one signature, many pulls) **plus**
-   a signed `DcaIntent{owner, tokenIn, tokenOut, maxAmountIn, minRate, deadline}` verified on **every** part.
+### Flow 1 — LIMIT (one-shot) → Permit2 SignatureTransfer **with a witness**
 
-The `DcaIntent` domain is `name="ArcSmartOrders", version="1", verifyingContract=executor` — this must
-match `OrderExecutor.EIP712_NAME_HASH` / `intentDomain()` in the SDK.
+The user signs a Permit2 `PermitWitnessTransferFrom` whose **witness** commits the exact output and
+a minimum:
+
+```
+PermitWitnessTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline,OrderIntent witness)
+OrderIntent(address tokenOut, uint256 minOut)
+TokenPermissions(address token, uint256 amount)
+```
+
+The executor **recomputes the witness on-chain** from the actual `tokenOut`/`minOut` it is about to
+execute, so a keeper **cannot redirect the output nor fill below the signed minimum**.
+
+```solidity
+function executeOrder(
+    IPermit2.PermitTransferFrom calldata permit,
+    address orderOwner,
+    bytes calldata permitSignature,
+    address swapTarget,          // whitelisted router/venue
+    bytes calldata swapData,     // pre-built swap calldata (output -> orderOwner)
+    address tokenOut,
+    uint256 minOut
+) external onlyKeeper;
+```
+
+### Flow 2 — TWAP (recurring) → Permit2 AllowanceTransfer **+ a signed intent**
+
+Permit2's AllowanceTransfer has **no witness variant** (one `permit` authorizes many transfers —
+needed for TWAP). So we add our own EIP-712 intent, verified by the executor on **every** execution:
+
+```
+DcaIntent(address owner, address tokenIn, address tokenOut, uint256 maxAmountIn, uint256 minRate, uint256 deadline)
+```
+
+`minRate` = minimum `tokenOut` (base units) per `1e18` of `tokenIn` (base units) — i.e. the FX limit.
+The contract requires `minOut >= partAmount * minRate / 1e18`, plus `owner`/`tokenIn`/`tokenOut`/
+`maxAmountIn`/`deadline` checks. Signatures are verified for **EOA (ECDSA)** and **smart wallets
+(EIP-1271)**.
+
+Domain: `name="ArcSmartOrders", version="1", verifyingContract=executor` — must match
+`OrderExecutor.EIP712_NAME_HASH` and `intentDomain()` in the SDK.
+
+---
+
+## Contract guarantees (`OrderExecutor`)
+
+- **onlyKeeper** to execute; **onlyOwner** to change the keeper or the swap-target whitelist.
+- **Whitelisted swap targets** (defense in depth against a malicious keeper).
+- **Atomic**: pull → swap → refund leftover → verify `minOut`, all in one transaction.
+- No funds held at rest; any leftover `tokenIn` is refunded to the user.
+- Reentrancy guard; `TokenPermissions` / witness hashing pinned by a regression test.
 
 ---
 
 ## Repo layout
 
 ```
-contracts/                 Foundry
-  src/OrderExecutor.sol        the executor (witness + intent + whitelist)
-  src/mocks/MockStableRouter.sol  fixed-rate USDC->EURC router for testnet/local
-  test/OrderExecutor.t.sol     11 tests
-  script/Deploy.s.sol          deploy to Arc
-sdk/                       TypeScript (viem)
-  src/index.ts               EIP-712 domains/types + signLimitOrder / signTwapOrder
-keeper/                    TypeScript (viem)
-  src/index.ts               executes ready orders, 20-gwei floor, USDC gas
+contracts/                        Foundry
+  src/OrderExecutor.sol               the executor (witness + intent + whitelist)
+  src/mocks/MockStableRouter.sol      fixed-rate USDC->EURC router for testnet/local
+  test/OrderExecutor.t.sol            11 tests
+  script/Deploy.s.sol                 deploy to Arc (+ optional mock router)
+sdk/                              TypeScript (viem)
+  src/index.ts                        EIP-712 domains/types, signLimitOrder/signTwapOrder, Permit2 approval
+keeper/                           TypeScript (viem)
+  src/index.ts                        executes ready orders, 20-gwei floor, USDC gas
 .env.example
 ```
 
 ---
 
-## Quickstart
+## Testing
 
 ```bash
-# 1) Contracts
 cd contracts
-forge install foundry-rs/forge-std
-forge test -vv            # 11 tests
-
-# 2) Deploy on Arc testnet (fund the deployer with testnet USDC: https://faucet.circle.com)
-export EXECUTOR_KEEPER=<keeper address>
-export EXECUTOR_TARGET=<mock router address, optional>
-forge script script/Deploy.s.sol --rpc-url https://rpc.testnet.arc.io --broadcast
-
-# 3) Keeper
-cd ../keeper
-cp ../.env.example .env   # set KEEPER_PK, EXECUTOR, ROUTER
-npm install
-npm start
+forge install foundry-rs/forge-std     # once
+forge test -vv                         # 11 tests
 ```
 
-Request testnet USDC/EURC at <https://faucet.circle.com> (select **Arc Testnet**).
+Covers: atomic pull+swap, DCA parts, `minOut`/`minRate` reverts, whitelist, keeper/owner access,
+**canonical Permit2 witness typehash**, and DcaIntent rejections (wrong `tokenOut`, low `minOut`,
+foreign signature, expired).
+
+Typecheck the TS:
+```bash
+cd sdk    && npm install && npx tsc --noEmit
+cd keeper && npm install && npx tsc --noEmit
+```
+
+---
+
+## Deploy & end-to-end on Arc Testnet
+
+> Chain **5042002**, RPC `https://rpc.testnet.arc.io`, faucet <https://faucet.circle.com> (select **Arc Testnet** for USDC + EURC).
+
+```bash
+cd contracts
+export EXECUTOR_KEEPER=<keeper EOA address>
+export DEPLOY_MOCK_ROUTER=1                     # deploys MockStableRouter(USDC, EURC) and whitelists it
+forge script script/Deploy.s.sol --rpc-url https://rpc.testnet.arc.io --broadcast
+# → prints OrderExecutor + MockStableRouter addresses
+```
+
+Then:
+
+1. **Fund the MockStableRouter with testnet EURC** (it must hold EURC to pay swaps):
+   send some testnet EURC to the router address.
+2. **Approve Permit2 for USDC once** from the user wallet:
+   ```ts
+   await ensurePermit2Approval(publicClient, wallet, USDC);
+   ```
+3. **Create a LIMIT order** (sign it, put it in `keeper/orders.json`):
+   ```ts
+   const signature = await signLimitOrder(wallet, {
+     tokenIn: USDC, tokenOut: EURC.testnet,
+     amountIn: 1_000_000n,        // 1 USDC (6 dec)
+     minOut: 920_000n,            // ≥0.92 EURC
+     spender: EXECUTOR, nonce: 1n, deadline: BigInt(now + 3600), chainId: 5042002,
+   });
+   ```
+4. **Run the keeper**:
+   ```bash
+   cd keeper && cp ../.env.example .env   # KEEPER_PK, EXECUTOR, ROUTER
+   npm install && npm start
+   ```
+
+The executor pulls exactly `amountIn` USDC via Permit2, swaps to EURC through the whitelisted
+router, and sends the EURC to the user — reverting entirely if the outcome is below `minOut`.
 
 ---
 
 ## Roadmap
 
-1. **Wire the real swap venue.** Today the swap leg is a pluggable `swapTarget` (whitelisted by the
-   owner). On testnet we use `MockStableRouter`. For production, authorize the real venue
-   (Circle **App Kit Swap** router / **StableFX** FxEscrow) via `setAllowedTarget`.
-   → *This is the main open question: identify the public on-chain router/venue address.*
-2. **Off-chain readiness.** Replace the manual `ready` flag with a real FX price source
-   (App Kit quote / StableFX / an oracle) compared against the signed `minOut` / `minRate`.
+1. **Wire the real swap venue.** The swap leg is a pluggable `swapTarget` (owner-whitelisted). On
+   testnet we use `MockStableRouter`. For production, authorize the real venue (Circle **App Kit
+   Swap** router / **StableFX** `FxEscrow`) via `setAllowedTarget`.
+   → *Main open question: identify the public on-chain router/venue address.*
+2. **Off-chain readiness.** Replace the manual `ready` flag with a real FX price source (App Kit
+   quote / StableFX / oracle) compared against the signed `minOut` / `minRate`.
 3. **Agentic track (ERC-8004 identity + ERC-8183 jobs).** Let AI agents register and run these
    orders / settle jobs in USDC — Arc's headline use case.
-4. **API + UI** for creating/cancelling orders (like BasePump's order panel).
+4. **API + UI** for creating/cancelling orders.
 
 ## Status
 
 Reference implementation — **not audited**. Testnet first.
+
+## License
+
+MIT

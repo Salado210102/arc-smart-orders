@@ -7,8 +7,8 @@
 //   - USDC uses the ERC-20 interface (6 decimals) at 0x3600...0000 for Permit2 flows.
 //   - Permit2 is deployed at the canonical address 0x0000...BA3.
 //   - The DcaIntent domain name MUST match the executor ("ArcSmartOrders", version "1").
-import type { Address, Hex, TypedDataDomain, WalletClient } from "viem";
-import { keccak256, stringToHex } from "viem";
+import type { Address, Hex, PublicClient, TypedDataDomain, WalletClient } from "viem";
+import { keccak256, maxUint256, stringToHex } from "viem";
 
 export const ARC_MAINNET_CHAIN_ID = 5042;
 export const ARC_TESTNET_CHAIN_ID = 5042002;
@@ -173,3 +173,58 @@ export function minRateFromFx(humanTokenOutPerIn: number, bufferPct = 98): bigin
 }
 
 export { keccak256, stringToHex };
+
+// ---- One-time Permit2 approval (required before any order can be filled) ----
+export const erc20Abi = [
+  {
+    type: "function",
+    name: "allowance",
+    stateMutability: "view",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ type: "bool" }],
+  },
+] as const;
+
+/**
+ * Approves Permit2 to pull `token` (e.g. USDC) from the user's wallet — one time per token.
+ * Required before the executor can `permitWitnessTransferFrom` / `transferFrom`.
+ */
+export async function ensurePermit2Approval(
+  publicClient: PublicClient,
+  wallet: WalletClient,
+  token: Address,
+  amount: bigint = maxUint256,
+): Promise<{ alreadyApproved: boolean; txHash?: Hex }> {
+  if (!wallet.account) throw new Error("wallet has no account");
+  const owner = wallet.account.address;
+  const current = (await publicClient.readContract({
+    address: token,
+    abi: erc20Abi,
+    functionName: "allowance",
+    args: [owner, PERMIT2],
+  })) as bigint;
+  if (current >= amount) return { alreadyApproved: true };
+
+  const txHash = await wallet.writeContract({
+    account: wallet.account,
+    address: token,
+    abi: erc20Abi,
+    functionName: "approve",
+    args: [PERMIT2, amount],
+  } as never);
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  return { alreadyApproved: false, txHash };
+}
