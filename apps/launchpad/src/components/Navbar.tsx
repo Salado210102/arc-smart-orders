@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Activity, BarChart3, Droplet, LogOut, Plus, Wallet, Zap } from "lucide-react";
+import { Activity, BarChart3, BookOpen, Droplet, LogOut, Plus, Wallet, Zap } from "lucide-react";
 import { cn, short } from "../lib/utils";
 
-export type Tab = "agents" | "dashboard" | "create" | "trade" | "swap" | "stake";
+export type Tab = "agents" | "dashboard" | "create" | "trade" | "swap" | "stake" | "about";
 
 const TABS: { key: Tab; label: string; icon: typeof Activity }[] = [
   { key: "agents", label: "Agents", icon: Activity },
@@ -11,6 +11,7 @@ const TABS: { key: Tab; label: string; icon: typeof Activity }[] = [
   { key: "trade", label: "Trade", icon: Droplet },
   { key: "swap", label: "Smart Swap", icon: Zap },
   { key: "stake", label: "Staking & Yield", icon: Wallet },
+  { key: "about", label: "About", icon: BookOpen },
 ];
 
 export function Navbar({

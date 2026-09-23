@@ -4,6 +4,7 @@ import { formatUnits, parseUnits } from "viem";
 import { EXPLORER, connectProvider, disconnect, listWallets, publicClient, walletClient, type WalletInfo } from "./arc";
 import { ADDR, erc20Abi, factoryAbi, registryAbi } from "./contracts";
 import { AgentCard, type Agent } from "./components/AgentCard";
+import { About } from "./components/About";
 import { Dashboard } from "./components/Dashboard";
 import { Navbar, type Tab } from "./components/Navbar";
 import { StakingPanel } from "./components/StakingPanel";
@@ -294,6 +295,12 @@ export default function App() {
           <>
             <SectionHeading title="Staking & Yield" subtitle="Stake the agent token, earn USDC" />
             <StakingPanel account={account} setMsg={setMsg} busy={busy} setBusy={setBusy} refreshKey={msg} />
+          </>
+        )}
+        {tab === "about" && (
+          <>
+            <SectionHeading title="About & Docs" subtitle="What it is, how it works, and where the code lives" />
+            <About />
           </>
         )}
       </main>
