@@ -23,7 +23,7 @@
 | **Project name** | Arc Smart Orders + Agent Launchpad |
 | **Live deployment link (Arc mainnet)** | https://launchpad-neon-chi.vercel.app (DApp on Arc mainnet, chain 5042) |
 | **Public repo** | https://github.com/Salado210102/arc-smart-orders (frozen tag `pre-audit-v2`) |
-| **Builder profile** | GitHub `Salado210102` · X `@Cryptofun2026` |
+| **Builder profile** | GitHub `Salado210102` · Telegram `@Cryptofun2026` |
 | **Contact email** | hello@basepump.dev |
 | **Payout wallet (USDC on Arc)** | `0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93` (Safe 2/2) — or any wallet that can receive USDC on Arc |
 | **Short description** | see below |
@@ -86,6 +86,6 @@ All verified on-chain at `https://explorer.arc.io` (see `DEPLOYMENTS.md`).
 - [x] Mainnet deploy done (Safe 2/2 + 5 contracts on Arc 5042)
 - [x] Live mainnet link opens (`launchpad-neon-chi.vercel.app`)
 - [x] Repo public + frozen tag `pre-audit-v2` pushed
-- [x] Builder profile set (GitHub `Salado210102` / X `@Cryptofun2026`)
+- [x] Builder profile set (GitHub `Salado210102` / Telegram `@Cryptofun2026`)
 - [x] Payout wallet can receive USDC on Arc
 - [x] No secrets in the repo (`.secrets/` gitignored)

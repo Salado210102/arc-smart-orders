@@ -1,7 +1,7 @@
 # Audit Proposal — Uniswap Foundation Security Fund (UFSF) / Circle Grant
 
 **Project:** Arc Smart Orders + Agent Launchpad
-**Applicant:** BasePump (independent builder) · hello@basepump.dev · @Cryptofun2026
+**Applicant:** BasePump (independent builder) · hello@basepump.dev · Telegram @Cryptofun2026
 **Repo (MIT):** https://github.com/Salado210102/arc-smart-orders
 **Live UI:** https://launchpad-neon-chi.vercel.app
 **Network:** Arc mainnet (5042, live) + testnet (5042002)
