@@ -9,3 +9,7 @@ node_modules/
 
 keeper/orders.json
 
+
+keeper/data/
+keeper/logs/
+

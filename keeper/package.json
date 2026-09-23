@@ -1,18 +1,22 @@
 {
   "name": "@arc-smart-orders/keeper",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "private": true,
   "scripts": {
     "start": "tsx src/index.ts",
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "demo": "tsx src/agentic-demo.ts",
+    "setup-order": "tsx src/setup-order.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "viem": "^2.56.8"
+    "fastify": "^5.2.0",
+    "viem": "^2.30.0"
   },
   "devDependencies": {
-    "@types/node": "^26.6.2",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
   }
 }

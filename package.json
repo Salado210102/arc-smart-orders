@@ -1,0 +1,5 @@
+{
+  "name": "arc-smart-orders",
+  "private": true,
+  "workspaces": ["sdk", "keeper"]
+}

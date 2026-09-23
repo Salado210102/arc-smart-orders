@@ -1,0 +1,20 @@
+# Arc Smart Orders — persistent keeper (systemd)
+# Install:  cp arc-keeper.service /etc/systemd/system/ && systemctl daemon-reload
+#           systemctl enable --now arc-keeper
+[Unit]
+Description=Arc Smart Orders Keeper (API + worker)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/arc-smart-orders/keeper
+EnvironmentFile=/opt/arc-smart-orders/keeper/.env
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/arc-keeper.log
+StandardError=append:/var/log/arc-keeper.err.log
+
+[Install]
+WantedBy=multi-user.target

@@ -205,6 +205,37 @@ router, and sends the EURC to the user — reverting entirely if the outcome is 
 
 ---
 
+## Persistent keeper (24/7)
+
+`keeper/` runs an **HTTP API + a worker loop** (no external DB engine — `node:sqlite`):
+
+- **`POST /v1/orders`** — a signed order (Permit2 witness) is validated **off-chain**: EIP-712
+  signature (`spender = executor`), maker **balance**, **Permit2 allowance** and deadline. Persisted
+  to **SQLite** (`data/orders.db`).
+- **`GET /v1/orders?maker=` · `/v1/orders/:id` · `/v1/mempool` · `/health`**.
+- **Worker loop** (every `LOOP_MS`): expires overdue orders, reads `PENDING`, checks the on-chain
+  rate vs the signed `minOut`, builds the swap for the **net** (gross − fee), calls
+  `OrderExecutor.executeOrder`, marks **FILLED** with the `fillTxHash`, and — when the order is
+  linked to an **ERC-8183 job** (`jobId`) — submits `keccak256(fillTxHash)` as the deliverable.
+
+```bash
+cd keeper
+cp .env.example .env     # KEEPER_PK, EXECUTOR, ROUTER, PORT, DB_PATH
+npm install
+npm start                # API on :8788 + worker loop
+```
+
+**Deploy on a VPS (Ubuntu):**
+```bash
+# systemd (recommended)
+cp keeper/arc-keeper.service /etc/systemd/system/
+systemctl daemon-reload && systemctl enable --now arc-keeper
+# or pm2
+cd keeper && npm i -g pm2 && pm2 start ecosystem.config.cjs && pm2 save
+```
+
+---
+
 ## Agentic track — ERC-8004 identity + ERC-8183 job escrow
 
 Arc already deploys the **canonical agent standards**, so we **do not redeploy them** — we integrate.
