@@ -40,6 +40,8 @@ contract CirBtcCreditTest is Test {
         pool.setRiskParams(7000, 8000, 500); // 70% LTV, 80% liq, 5% penalty
 
         // LP funds the pool
+        vm.prank(risk);
+        pool.setLP(lp, true);
         usdc.mint(lp, 1_000_000 * USDC_1);
         vm.startPrank(lp);
         usdc.approve(address(pool), type(uint256).max);
