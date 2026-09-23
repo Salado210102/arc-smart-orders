@@ -31,6 +31,9 @@ import {LiquidityLocker} from "../src/launchpad/LiquidityLocker.sol";
 ///   ORDERS_FEE_BPS        default: 30 (0.30%), cap 1000
 ///   SOFT_LAUNCH_MAX_GRADUATION_USDC  default: 10000e6 ($10k) — policy guardrail (see note)
 ///   LAUNCHPAD_LOCK_SECONDS           default: 365 days
+///   GRADUATION_GATED      default: 1 — V1 keeps graduation DISABLED (factory.graduationModule = 0);
+///                         raised USDC stays in each curve until the Safe enables a real AMM pool
+///                         (module.setConfig(<amm>, …) + factory.setGraduationModule(module)).
 ///
 /// Arc mainnet:
 ///   forge script script/DeployMainnet.s.sol --rpc-url https://rpc.mainnet.arc.io \
@@ -65,6 +68,8 @@ contract DeployMainnet is Script {
         uint256 softCapUsdc = vm.envOr("SOFT_LAUNCH_MAX_GRADUATION_USDC", uint256(10_000e6));
         uint64 lockSeconds = uint64(vm.envOr("LAUNCHPAD_LOCK_SECONDS", uint256(365 days)));
         require(feeBps <= 1000, "ORDERS_FEE_BPS > 10%");
+        //  V1: graduation is gated by default (capital stays in the curve until a real AMM is enabled).
+        bool gated = vm.envOr("GRADUATION_GATED", uint256(1)) == 1;
 
         vm.startBroadcast();
 
@@ -72,10 +77,13 @@ contract DeployMainnet is Script {
         LiquidityLocker locker = new LiquidityLocker(owner);
         //  2) On-chain agent index.
         AgentRegistry registry = new AgentRegistry(owner);
-        //  3) Graduation module (seeds DEX liquidity + locks LP).
+        //  3) Graduation module (seeds DEX liquidity + locks LP). Deployed for later activation.
         GraduationModule module = new GraduationModule(owner, usdc, dex, address(locker), lockSeconds);
         //  4) Factory (token + curve + ERC-8004 identity + registry).
-        AgentFactory factory = new AgentFactory(usdc, identity, treasury, owner, address(registry), address(module));
+        //     V1 gating: when `gated`, the factory is wired with NO module -> curves accumulate USDC and
+        //     CANNOT graduate until the Safe enables a real pool (module.setConfig + setGraduationModule).
+        address moduleWiring = gated ? address(0) : address(module);
+        AgentFactory factory = new AgentFactory(usdc, identity, treasury, owner, address(registry), moduleWiring);
         //  5) Non-custodial order engine (fee → treasury/splitter). Default feeBps = 30 in the ctor.
         OrderExecutor exec = new OrderExecutor(owner, keeper, dex, feeRecipient);
 
@@ -92,6 +100,7 @@ contract DeployMainnet is Script {
         require(factory.treasury() == treasury, "factory treasury mismatch");
         require(module.dex() == dex, "module dex mismatch");
         require(module.locker() == address(locker), "module locker mismatch");
+        require(factory.graduationModule() == moduleWiring, "graduation gate mismatch");
 
         console2.log("=== Arc deployment ===");
         console2.log("LiquidityLocker :", address(locker));
@@ -107,6 +116,7 @@ contract DeployMainnet is Script {
         console2.log("feeRecipient    :", feeRecipient);
         console2.log("ORDS feeBps     :", feeBps);
         console2.log("soft-launch cap :", softCapUsdc, "USDC graduation/agent");
+        console2.log("graduation gated:", gated);
 
         //  ---- optional-infra warnings ----
         if (identity == address(0)) {
@@ -124,6 +134,16 @@ contract DeployMainnet is Script {
         console2.log("   function : setFactory(address)");
         console2.log("   arg      :", address(factory));
         console2.log("   helper   : node ops/safe-exec.mjs");
+
+        if (gated) {
+            console2.log("");
+            console2.log("GRADUATION GATED (V1):");
+            console2.log("  - factory.graduationModule = 0 -> graduation DISABLED; raised USDC stays in each curve.");
+            console2.log("  - To enable once a real AMM pool exists, the Safe calls:");
+            console2.log("      module.setConfig(<amm>, <locker>, <lockSeconds>)");
+            console2.log("      factory.setGraduationModule(<module>)");
+            console2.log("    module:", address(module), " locker:", address(locker));
+        }
 
         //  ---- soft-launch policy notes ----
         console2.log("");

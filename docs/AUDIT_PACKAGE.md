@@ -98,8 +98,12 @@ Full history + tx hashes: [`../DEPLOYMENTS.md`](../DEPLOYMENTS.md).
   `setGraduationModule(0)`, `setIdentity(0)`, `setKeeper`. See `MAINNET_RUNBOOK.md` §3.2.
 - **ERC-8004 / ERC-8183 are not deployed on Arc mainnet yet** → the launchpad cannot go live there until
   they exist (mainnet deploy intentionally reverts). USDC, Permit2 and the Safe stack *are* on mainnet.
-- **DEX venue TBD** — `swapTarget`/`dex` are pluggable; testnet uses `MockDEX`. Candidate: Circle App Kit
-  Swap / StableFX. Reviewers should treat the `IDEX` interface as the integration boundary.
+- **DEX venue TBD** — `swapTarget`/`dex` are pluggable; testnet uses `MockDEX`. Verified on Arc mainnet:
+  **StableFX `FxEscrow` `0xe2E5F173…DFe6`** (permissioned RFQ, request via `sales@circle.com`) for the order
+  engine; **no public AMM** yet for graduation. Reviewers should treat the `IDEX` interface as the boundary.
+- **Graduation is GATED in V1** — deployed with `GRADUATION_GATED=1` → `factory.graduationModule = 0`, so
+  graduation is disabled and raised USDC stays in each curve until the Safe enables a real AMM pool. The
+  `GraduationModule`/`LiquidityLocker` code ships deployed-but-inactive (still in audit scope).
 - **Graduation cap ($10k)** is a **DApp policy**, not an on-chain factory cap (deliberately: no bytecode
   change pre-audit). `AgentFactory.launch` accepts `graduationUsdc` per agent.
 - `forge` **lint warnings** are present (informational: `missing-zero-check`, `reentrancy-events`,

@@ -67,8 +67,12 @@ Full guide: [`SAFE_TREASURY.md`](SAFE_TREASURY.md). Summary:
   [`CIRCLE_STABLEFX_EMAIL.md`](CIRCLE_STABLEFX_EMAIL.md).
 - **No public AMM/router** on Arc mainnet yet.
 - `GraduationModule` still needs an `IDEX` with `addLiquidity(tokenA,tokenB,amountA,amountB,to)` +
-  `lpToken()`. Options: **(a)** gate graduation until an Arc AMM exists, or **(b)** deploy a minimal AMM
-  as a documented soft-launch venue. **Do not ship a mock as the production venue.**
+  `lpToken()`.
+- **DECISION (V1): gate graduation.** Deploy with **`GRADUATION_GATED=1`** (default) → the factory is wired
+  with **no module** (`factory.graduationModule = 0`), so curves **cannot graduate** and raised USDC stays
+  in each curve. Enable later **from the Safe** once a real AMM pool is live:
+  `module.setConfig(<amm>, <locker>, lockSeconds)` then `factory.setGraduationModule(<module>)`.
+  Rationale: avoids the risk of an unaudited self-deployed AMM. Do **not** ship a mock as the venue.
 
 ### 2.4 ERC-8004 / ERC-8183 on mainnet (not deployed yet)
 The registries are **not on Arc mainnet** (verified: `0x8004A8…` / `0x0747…` have no code there). The
