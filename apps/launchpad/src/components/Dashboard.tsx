@@ -4,6 +4,7 @@ import { formatUnits } from "viem";
 import { publicClient } from "../arc";
 import { ADDR, curveAbi, erc20Abi, registryAbi } from "../contracts";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { HealthMonitor } from "./HealthMonitor";
 import type { Agent } from "./AgentCard";
 
 export function Dashboard() {
@@ -47,6 +48,7 @@ export function Dashboard() {
 
   return (
     <>
+      <HealthMonitor />
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         <Stat icon={<Users className="h-4 w-4 text-violet-400" />} label="Agents launched" value={String(count)} />
         <Stat icon={<Coins className="h-4 w-4 text-emerald-400" />} label="USDC raised on curves" value={`$${usd(raised)}`} />
