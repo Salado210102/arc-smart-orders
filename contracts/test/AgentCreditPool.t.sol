@@ -30,8 +30,9 @@ contract AgentCreditPoolTest is Test {
         pool.setLP(lp, true);
         pool.setLP(lp2, true);
         pool.setAgent(agent, true);
-        pool.setRoles(risk, keeper);
         vm.stopPrank();
+        vm.prank(owner);
+        pool.setRoles(risk, keeper);
 
         // fund + approve LP
         usdc.mint(lp, 10_000 * USDC_1);

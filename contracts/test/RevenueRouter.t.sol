@@ -73,6 +73,7 @@ contract RevenueRouterTest is Test {
 
         uint256 revenue = 20 * USDC_1;
         usdc.mint(revenueSrc, revenue);
+        uint256 treasuryBefore = usdc.balanceOf(treasury);
         vm.startPrank(revenueSrc);
         usdc.approve(address(router), revenue);
         router.route(agent, revenue);
@@ -82,14 +83,14 @@ contract RevenueRouterTest is Test {
         assertEq(pool.debtOf(agent), 0);
         assertEq(pool.outstanding(), 0);
 
-        // 2) remainder = revenue − debt, split 70/30
+        // 2) remainder = revenue − debt, split 70/30; the pool also pays its 15% performance fee to treasury
         uint256 rest = revenue - debt;
-        uint256 toTreasury = rest - (rest * 7000) / 10_000;
-        assertEq(usdc.balanceOf(treasury), toTreasury);
+        uint256 toTreasurySplit = rest - (rest * 7000) / 10_000;
+        uint256 perf = (((10 * USDC_1 * 100) / 10_000) * 1500) / 10_000;
+        assertEq(usdc.balanceOf(treasury), treasuryBefore + toTreasurySplit + perf);
 
-        // staker earns the 70%
-        uint256 toStakers = (rest * 7000) / 10_000;
-        assertEq(vault.pendingRewards(staker), toStakers);
+        // staker earns the 70% of the remainder
+        assertEq(vault.pendingRewards(staker), (rest * 7000) / 10_000);
     }
 
     function test_routeWithNoDebtForwardsAllToSplitter() public {
@@ -100,19 +101,21 @@ contract RevenueRouterTest is Test {
 
         uint256 revenue = 5 * USDC_1;
         usdc.mint(revenueSrc, revenue);
+        uint256 treasuryBefore = usdc.balanceOf(treasury);
         vm.startPrank(revenueSrc);
         usdc.approve(address(router), revenue);
         router.route(agent, revenue);
         vm.stopPrank();
 
-        uint256 toTreasury = revenue - (revenue * 7000) / 10_000;
-        assertEq(usdc.balanceOf(treasury), toTreasury);
+        uint256 toTreasurySplit = revenue - (revenue * 7000) / 10_000;
+        assertEq(usdc.balanceOf(treasury), treasuryBefore + toTreasurySplit);
         assertEq(vault.pendingRewards(staker), (revenue * 7000) / 10_000);
     }
 
-    function test_routeEmitsAndHandlesPartialRevenue() public {
-        // revenue smaller than the debt: it all goes to the pool, nothing is split
+    /// @dev Whole-loan settlement: if revenue < the full debt, no loan is settled and the amount is split.
+    function test_partialRevenueBelowDebtIsSplitWhole() public {
         uint256 revenue = 3 * USDC_1;
+        uint256 debtBefore = pool.debtOf(agent);
         usdc.mint(revenueSrc, revenue);
         uint256 treasuryBefore = usdc.balanceOf(treasury);
         vm.startPrank(revenueSrc);
@@ -120,8 +123,8 @@ contract RevenueRouterTest is Test {
         router.route(agent, revenue);
         vm.stopPrank();
 
-        // debt is still open (couldn't fully settle the 10 USDC loan), nothing was split
-        assertGt(pool.debtOf(agent), 0);
-        assertEq(usdc.balanceOf(treasury), treasuryBefore);
+        assertEq(pool.debtOf(agent), debtBefore); // unchanged (no whole loan could be settled)
+        uint256 toTreasurySplit = revenue - (revenue * 7000) / 10_000;
+        assertEq(usdc.balanceOf(treasury), treasuryBefore + toTreasurySplit);
     }
 }
