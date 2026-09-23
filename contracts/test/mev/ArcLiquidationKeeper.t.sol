@@ -125,6 +125,7 @@ contract ArcLiquidationKeeperTest is Test {
 
         usdc.mint(address(provider), 1_000_000_000); // lending liquidity for the flash loan
         coll.mint(address(pool), 1_000_000_000); // collateral the pool can hand out
+        usdc.mint(address(router), 1_000_000_000); // USDC the swap router pays out
     }
 
     function _params(uint256 minProfit) internal view returns (ArcLiquidationKeeper.LiquidationParams memory) {
