@@ -23,7 +23,7 @@
 | **Project name** | Arc Smart Orders + Agent Launchpad |
 | **Live deployment link (Arc mainnet)** | https://launchpad-neon-chi.vercel.app (DApp on Arc mainnet, chain 5042) |
 | **Public repo** | https://github.com/Salado210102/arc-smart-orders (frozen tag `pre-audit-v2`) |
-| **Builder profile** | GitHub `Salado210102` · X `@VICENTEGon651262` · Telegram `@Cryptofun2026` |
+| **Builder profile** | GitHub `Salado210102` · X `@VICENTEGon651262` · LinkedIn `vicente-gonzalez-4a051b2a3` · Telegram `@Cryptofun2026` |
 | **Contact email** | hello@basepump.dev |
 | **Payout wallet (USDC on Arc)** | `0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93` (Safe 2/2) — or any wallet that can receive USDC on Arc |
 | **Short description** | see below |
