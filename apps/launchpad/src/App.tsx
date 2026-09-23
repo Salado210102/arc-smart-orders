@@ -113,9 +113,9 @@ export default function App() {
           symbol,
           parseUnits("1000000", 18),
           parseUnits("5000", 6),
-          parseUnits("1000000", 6),
-          parseUnits("1000000", 18),
-          parseUnits("1000000", 18),
+          parseUnits("10000", 6),
+          parseUnits("100000", 18),
+          parseUnits("100000", 18),
           meta,
         ],
       });
@@ -221,7 +221,7 @@ export default function App() {
                   </Button>
                 </div>
                 <p className="text-[11px] text-zinc-600">
-                  Defaults: 1,000,000 supply · 5,000 USDC virtual · 1,000,000 USDC graduation · 1% fee · LP locked 365d.
+                  Soft launch: 1,000,000 supply · 5,000 USDC virtual · 10,000 USDC graduation cap · 1% fee · LP locked 365d.
                 </p>
               </CardContent>
             </Card>

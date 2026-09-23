@@ -180,6 +180,28 @@ Re-ran the exact mainnet script on testnet but with **`LAUNCHPAD_OWNER` = `LAUNC
 
 > **Script change:** `DeployMainnet.s.sol` is now **Safe-aware** — when `owner` has code it does **not** call `setFactory` (which is `onlyOwner`); it prints the calldata the Safe must execute. Reusable executor: **`ops/safe-exec.mjs`** (signs with A + C, calls `execTransaction`).
 
+---
+
+# Soft-launch hardening DRY-RUN (dynamic addresses + guardrails) — 2026-09-23
+
+`DeployMainnet.s.sol` now reads `USDC_MAINNET` / `DEX_ROUTER` / `ERC8004_REGISTRY` / `ERC8183_ESCROW` from
+env and **reverts if a var is missing/zero or has no code**, and requires `owner`/`treasury`/`feeRecipient`
+to be **contracts** (Safe). Re-ran on testnet (all post-deploy invariants passed; e.g. `locker/registry/
+module/factory/exec.owner == Safe`, `exec.feeBps == 30`, `feeRecipient == Safe`).
+
+| Contract | Address |
+|---|---|
+| LiquidityLocker | `0x0FCB434377cf1F3E4f2275282b4977E5e6CEC92a` |
+| AgentRegistry | `0xD435e6aB455642fa8CEd73B296b48fCd28Bb2CBe` |
+| GraduationModule | `0xbfBeF2cA0E494654517AE1966af94c618aF2362c` |
+| AgentFactory | `0xE8C6E41A94941a1143d29a23E07EaD9D954578Dc` |
+| OrderExecutor | `0xa47ecED9be785A64A2ac5819D6F509a6D8C423bE` |
+
+**Guardrails verified (simulation reverts):** missing `CONFIRM_MAINNET` → revert · `DEX_ROUTER` = EOA →
+`no contract code` · `LAUNCHPAD_OWNER` = EOA → `must be a contract (Safe)`.
+**Soft-launch policy:** fee 30 bps · graduation cap **$10k/agent** (`SOFT_LAUNCH_MAX_GRADUATION_USDC`, applied
+by the DApp default) · LP lock 365d · emergency brake = owner-only setters (no `Pausable` in contracts).
+
 
 
 

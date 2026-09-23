@@ -68,17 +68,37 @@ Uniswap-v4-style pool if deployed on Arc.
 
 ## 3. Deploy (deterministic, sequential)
 
+The script reads every external address from env and **reverts if a var is missing/zero or has no code**,
+and requires `owner`/`treasury`/`feeRecipient` to be **contracts** (the Safe) — so it will *refuse* to run on
+mainnet until the real ERC-8004/8183 + a real DEX exist there.
+
 ```bash
 cd contracts
 export CONFIRM_MAINNET=1                     # safety gate (script reverts without it)
 export RPC=https://rpc.mainnet.arc.io
-export LAUNCHPAD_OWNER=<SAFE_ADDRESS>
-export LAUNCHPAD_TREASURY=<SAFE_ADDRESS>
+export USDC_MAINNET=0x3600000000000000000000000000000000000000
+export DEX_ROUTER=<real AMM / graduation venue>
+export ERC8004_REGISTRY=<ERC-8004 IdentityRegistry on Arc mainnet>
+export ERC8183_ESCROW=<ERC-8183 AgenticCommerce on Arc mainnet>
 export ORDERS_KEEPER=<KEEPER_EOA>
-export DEX=<chosen DEX address>
+# defaults: owner/treasury/feeRecipient = Safe 0x0FBFAF…7e93 · fee 30 bps · graduation cap $10k · lock 365d
 forge script script/DeployMainnet.s.sol \
   --rpc-url $RPC --private-key $PK --broadcast --slow --verify
 ```
+
+### 3.1 Safe follow-up (owner-only)
+`AgentRegistry.setFactory` is `onlyOwner` → the **Safe must execute** it after deploy:
+```bash
+$env:RPC="https://rpc.mainnet.arc.io"; $env:SAFE="0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93"
+$env:SAFE_TO="<AgentRegistry>"
+$env:SAFE_DATA=$(cast calldata "setFactory(address)" <AgentFactory>)
+node ../ops/safe-exec.mjs
+```
+
+### 3.2 Emergency brake (no `Pausable` in the contracts)
+There is **no pause function**; the kill-switches are the owner-only (Safe) setters:
+`exec.setAllowedTarget(dex,false)` (all swaps revert) · `factory.setGraduationModule(0)` (graduation off) ·
+`factory.setIdentity(0)` (launches skip ERC-8004) · `exec.setKeeper(newKeeper)`.
 
 The script deploys **in order** (same as the audited testnet run):
 1. `LiquidityLocker(owner)`

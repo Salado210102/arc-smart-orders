@@ -9,35 +9,60 @@ import {GraduationModule} from "../src/launchpad/GraduationModule.sol";
 import {LiquidityLocker} from "../src/launchpad/LiquidityLocker.sol";
 
 /// @notice Deterministic, sequential MAINNET deployment of the full Arc Smart Orders + Agent Launchpad.
-/// @dev Safety gate: reverts unless `CONFIRM_MAINNET=1`. Per-agent vaults/splitters are deployed on
-///      demand by the operator (see docs/MAINNET_RUNBOOK.md). Idempotent ordering; verify after each.
+/// @dev Safety gates:
+///      - reverts unless `CONFIRM_MAINNET=1`;
+///      - every external address (USDC / DEX / ERC-8004 / ERC-8183) is read from env and **must be a
+///        deployed contract** — so the script refuses to run on mainnet until the real venues/registries
+///        exist there;
+///      - `owner` / `treasury` / `feeRecipient` **must be contracts** (i.e. the Safe), never an EOA.
 ///
 /// Required env:
 ///   CONFIRM_MAINNET=1
-///   LAUNCHPAD_OWNER     (Safe)
-///   ORDERS_KEEPER       (keeper EOA)
-///   DEX                 (real AMM / graduation venue on Arc)
+///   USDC_MAINNET          USDC (ERC-20) address
+///   DEX_ROUTER            real AMM / graduation venue on Arc
+///   ERC8004_REGISTRY      ERC-8004 IdentityRegistry
+///   ERC8183_ESCROW        ERC-8183 AgenticCommerce (validated; consumed by the keeper/agents)
+///   ORDERS_KEEPER         keeper EOA
 /// Optional env:
-///   LAUNCHPAD_TREASURY  (default: owner)
-///   ORDERS_FEE_RECIPIENT(default: treasury — or an agent RevenueSplitter)
-///   LAUNCHPAD_LOCK_SECONDS (default: 365 days)
+///   LAUNCHPAD_OWNER       default: the Arc Safe 2/2 (0x0FBFAF…7e93)
+///   LAUNCHPAD_TREASURY    default: owner
+///   ORDERS_FEE_RECIPIENT  default: treasury
+///   ORDERS_FEE_BPS        default: 30 (0.30%), cap 1000
+///   SOFT_LAUNCH_MAX_GRADUATION_USDC  default: 10000e6 ($10k) — policy guardrail (see note)
+///   LAUNCHPAD_LOCK_SECONDS           default: 365 days
 ///
 /// Arc mainnet:
 ///   forge script script/DeployMainnet.s.sol --rpc-url https://rpc.mainnet.arc.io \
 ///     --private-key $PK --broadcast --slow --verify
 contract DeployMainnet is Script {
-    address internal constant USDC = 0x3600000000000000000000000000000000000000;
-    address internal constant IDENTITY = 0x8004A818BFB912233c491871b3d84c89A494BD9e;
+    /// @dev Default owner/treasury/feeRecipient (Arc Safe 2/2).
+    address internal constant ARC_SAFE = 0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93;
 
     function run() external {
         require(vm.envOr("CONFIRM_MAINNET", uint256(0)) == 1, "DeployMainnet: set CONFIRM_MAINNET=1");
 
-        address owner = vm.envAddress("LAUNCHPAD_OWNER");
+        //  ---- dynamic, validated addresses ----
+        address usdc = _contractEnv("USDC_MAINNET");
+        address dex = _contractEnv("DEX_ROUTER");
+        address identity = _contractEnv("ERC8004_REGISTRY");
+        address erc8183 = _contractEnv("ERC8183_ESCROW");
+
+        //  ---- roles (owner/treasury/feeRecipient MUST be contracts = the Safe) ----
+        address owner = vm.envOr("LAUNCHPAD_OWNER", ARC_SAFE);
         address treasury = vm.envOr("LAUNCHPAD_TREASURY", owner);
-        address keeper = vm.envAddress("ORDERS_KEEPER");
-        address dex = vm.envAddress("DEX");
         address feeRecipient = vm.envOr("ORDERS_FEE_RECIPIENT", treasury);
+        address keeper = vm.envAddress("ORDERS_KEEPER");
+
+        require(owner.code.length > 0, "LAUNCHPAD_OWNER must be a contract (Safe)");
+        require(treasury.code.length > 0, "LAUNCHPAD_TREASURY must be a contract");
+        require(feeRecipient.code.length > 0, "ORDERS_FEE_RECIPIENT must be a contract");
+        require(keeper != address(0), "ORDERS_KEEPER = 0");
+
+        //  ---- soft-launch policy ----
+        uint256 feeBps = vm.envOr("ORDERS_FEE_BPS", uint256(30));
+        uint256 softCapUsdc = vm.envOr("SOFT_LAUNCH_MAX_GRADUATION_USDC", uint256(10_000e6));
         uint64 lockSeconds = uint64(vm.envOr("LAUNCHPAD_LOCK_SECONDS", uint256(365 days)));
+        require(feeBps <= 1000, "ORDERS_FEE_BPS > 10%");
 
         vm.startBroadcast();
 
@@ -46,25 +71,27 @@ contract DeployMainnet is Script {
         //  2) On-chain agent index.
         AgentRegistry registry = new AgentRegistry(owner);
         //  3) Graduation module (seeds DEX liquidity + locks LP).
-        GraduationModule module = new GraduationModule(owner, USDC, dex, address(locker), lockSeconds);
+        GraduationModule module = new GraduationModule(owner, usdc, dex, address(locker), lockSeconds);
         //  4) Factory (token + curve + ERC-8004 identity + registry).
-        AgentFactory factory = new AgentFactory(USDC, IDENTITY, treasury, owner, address(registry), address(module));
-        //  5) Wire the registry's factory. `setFactory` is onlyOwner: if the owner is a contract
-        //     (Safe), the deployer EOA is NOT authorized — the Safe must execute this after deploy.
-        if (owner.code.length == 0) {
-            registry.setFactory(address(factory));
-        } else {
-            console2.log("!! owner is a contract: the Safe MUST call registry.setFactory(factory)");
-            console2.log("   to       :", address(registry));
-            console2.log("   function : setFactory(address)");
-            console2.log("   arg      :", address(factory));
-        }
-        //  6) Non-custodial order engine (fee → treasury/splitter).
+        AgentFactory factory = new AgentFactory(usdc, identity, treasury, owner, address(registry), address(module));
+        //  5) Non-custodial order engine (fee → treasury/splitter). Default feeBps = 30 in the ctor.
         OrderExecutor exec = new OrderExecutor(owner, keeper, dex, feeRecipient);
 
         vm.stopBroadcast();
 
-        console2.log("=== Arc Mainnet deployment ===");
+        //  ---- post-deploy invariants: everything is owned by the Safe ----
+        require(locker.owner() == owner, "locker owner != Safe");
+        require(registry.owner() == owner, "registry owner != Safe");
+        require(module.owner() == owner, "module owner != Safe");
+        require(factory.owner() == owner, "factory owner != Safe");
+        require(exec.owner() == owner, "executor owner != Safe");
+        require(exec.feeBps() == 30, "executor feeBps != 30");
+        require(exec.feeRecipient() == feeRecipient, "executor feeRecipient mismatch");
+        require(factory.treasury() == treasury, "factory treasury mismatch");
+        require(module.dex() == dex, "module dex mismatch");
+        require(module.locker() == address(locker), "module locker mismatch");
+
+        console2.log("=== Arc deployment ===");
         console2.log("LiquidityLocker :", address(locker));
         console2.log("AgentRegistry   :", address(registry));
         console2.log("GraduationModule:", address(module));
@@ -73,8 +100,36 @@ contract DeployMainnet is Script {
         console2.log("owner/treasury  :", owner, treasury);
         console2.log("keeper          :", keeper);
         console2.log("dex             :", dex);
+        console2.log("identity(8004)  :", identity);
+        console2.log("escrow(8183)    :", erc8183);
         console2.log("feeRecipient    :", feeRecipient);
+        console2.log("ORDS feeBps     :", feeBps);
+        console2.log("soft-launch cap :", softCapUsdc, "USDC graduation/agent");
+
+        //  ---- Safe follow-up: registry.setFactory is onlyOwner (the deployer cannot call it) ----
         console2.log("");
-        console2.log("NEXT: verify sources, then deploy per-agent AgentStakingVault + RevenueSplitter on demand.");
+        console2.log("!! The Safe MUST execute registry.setFactory(factory):");
+        console2.log("   to       :", address(registry));
+        console2.log("   function : setFactory(address)");
+        console2.log("   arg      :", address(factory));
+        console2.log("   helper   : node ops/safe-exec.mjs");
+
+        //  ---- soft-launch policy notes ----
+        console2.log("");
+        console2.log("SOFT LAUNCH:");
+        console2.log("  - fee fixed at 30 bps (Safe can change via setFee / setFeeDefaults).");
+        console2.log("  - graduation cap is per-agent (AgentFactory.launch arg); the DApp defaults to the cap.");
+        console2.log("  - EMERGENCY BRAKE (owner-only, no Pausable in contracts):");
+        console2.log("      exec.setAllowedTarget(dex, false)  -> all swaps revert");
+        console2.log("      factory.setGraduationModule(0)     -> graduation disabled");
+        console2.log("      factory.setIdentity(0)             -> launches skip ERC-8004");
+        console2.log("      exec.setKeeper(newKeeper)          -> rotate/neutralise the keeper");
+    }
+
+    /// @dev Reads a required address env var; reverts if missing/zero or if it has no code.
+    function _contractEnv(string memory key) internal view returns (address a) {
+        a = vm.envOr(key, address(0));
+        require(a != address(0), string.concat(key, ": missing or zero"));
+        require(a.code.length > 0, string.concat(key, ": no contract code at address"));
     }
 }
