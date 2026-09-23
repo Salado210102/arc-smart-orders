@@ -345,6 +345,8 @@ Enabled per-agent staking for the demo agent (`AgentToken 0xD81d4A4e…60De`, cu
 - Seed flow verified: `approve` [`0x36347551…5848`](https://explorer.arc.io/tx/0x363475516f4b68965d9420400d1b1ea02ff0e61fc80d0f3b471c798748205848) + `RevenueSplitter.distribute(0.2 USDC)` [`0x1522007b…ab2f`](https://explorer.arc.io/tx/0x1522007bda686d3210692a10c7676b4f6b17d000836b7af14c6b542c7606ab2f) → **0.14 USDC vault (`pool`) / 0.06 USDC Safe**.
 - UI: **Staking & Yield** tab live at <https://arc.basepump.dev> (approve+stake, claim USDC, unstake).
 
+**Live E2E (2026-09-23):** A bought **19.798** agent tokens on the curve, **staked** them, and **claimed 0.139991 USDC** of the seeded yield → tx [`0x465ae805…f795`](https://explorer.arc.io/tx/0x465ae805b8294be4394fc44ab736c9987807b5d7a4c6b01bd9d4a5b54233f795).
+
 
 
 
