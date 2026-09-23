@@ -32,7 +32,7 @@ jobs:
           forge build --sizes 2>&1 | tee build.log
           code=${PIPESTATUS[0]}
           if [ $code -ne 0 ]; then
-            echo "::error title=forge build failed::$(grep -iE 'error' build.log | head -n 6 | tr '\n' ' ' | cut -c1-950)"
+            echo "::error title=forge build failed::$(tail -c 950 build.log | tr '\n' ' ')"
           fi
           exit $code
 
@@ -42,7 +42,7 @@ jobs:
           forge test -vv 2>&1 | tee test.log
           code=${PIPESTATUS[0]}
           if [ $code -ne 0 ]; then
-            echo "::error title=forge test failed::$(grep -iE 'error|FAIL' test.log | head -n 6 | tr '\n' ' ' | cut -c1-950)"
+            echo "::error title=forge test failed::$(tail -c 950 test.log | tr '\n' ' ')"
           fi
           exit $code
 
