@@ -48,7 +48,7 @@ One repo, full stack:
 Three atomic, capital-efficient strategies in [`contracts/src/mev/`](contracts/src/mev/) with off-chain
 bots in [`bots/`](bots/):
 
-- **Liquidations** (`ArcLiquidationKeeper`) — flash-loan-funded liquidation of Health-Factor < 1.0 borrowers.
+- **Liquidations** (`ArcLiquidationKeeper` + **`ArcMorphoLiquidator`**) — flash-loan-funded liquidation of Health-Factor < 1.0 borrowers (**Morpho Blue** on Arc, fee-free flash loans).
 - **Oracle arbitrage** (`ArcOracleArbitrage`) — Uniswap v3 flash loan vs a misaligned oracle feed.
 - **JIT liquidity** (`ArcJITLiquidity`) — mint a 1-tick position for one whale swap, capture the fee, burn.
 

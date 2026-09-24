@@ -78,14 +78,18 @@ flowchart TD
 
 ## 3 · Modules
 
-### 3.1 · Liquidations (`ArcLiquidationKeeper`)
+### 3.1 · Liquidations (`ArcLiquidationKeeper` + `ArcMorphoLiquidator`)
 - **Why**: borrowers whose **Health Factor < 1.0** can be liquidated for a bonus; this executes that with
   **no upfront capital**.
-- **Flow**: `executeLiquidation` → `provider.flashLoan(USDC)` → `receiveFlashLoan`:
-  `lendingPool.liquidationCall` → Uniswap v3 `exactInputSingle` (collateral→USDC) → repay the flash loan →
-  send profit to the owner.
-- **Guard**: `USDC_balance >= borrowed + flashFee + minProfit`, else `InsufficientProfit` (revert).
-- **Bot**: `liquidation_monitor.py` scans HF, discovers borrowers from `Borrow` logs, simulates, alerts.
+- **Two flavours:**
+  - `ArcLiquidationKeeper` — Aave-v3-style pool + Balancer-style flash loan (generic).
+  - **`ArcMorphoLiquidator` — Morpho Blue** (Arc mainnet `0x34CD04070dD72b14E241112F6d83812Df5Af7fCD`):
+    Morpho's native **fee-free** `flashLoan` + `onMorphoFlashLoan` callback + `liquidate(MarketParams, …)`.
+- **Flow (Morpho)**: `executeLiquidation` → `morpho.flashLoan(USDC)` → `onMorphoFlashLoan`:
+  `morpho.liquidate` → Uniswap v3 `exactInputSingle` (collateral→USDC) → repay the flash loan → profit to owner.
+- **Guard**: `USDC_balance >= flashAmount + minProfit`, else `InsufficientProfit` (Morpho flash loans are fee-free).
+- **Bot**: `bots/mev_morpho_liquidator.py` reads `position(marketId, borrower)` + `market(marketId)` + the
+  Morpho oracle, computes the **HF off-chain**, discovers borrowers from `Borrow` logs, simulates, alerts.
 
 ### 3.2 · Oracle arbitrage (`ArcOracleArbitrage`)
 - **Why**: when a Uniswap v3 pool lags the oracle feed, a flash-loaned swap along a misaligned multi-hop

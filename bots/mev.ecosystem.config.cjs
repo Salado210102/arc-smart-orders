@@ -42,5 +42,17 @@ module.exports = {
       out_file: "logs/mev-jit.out.log",
       error_file: "logs/mev-jit.err.log",
     },
+    {
+      name: "mev-morpho",
+      cwd: __dirname + "/..",
+      script: "bots/mev_morpho_liquidator.py",
+      interpreter: "python3",
+      autorestart: true,
+      max_restarts: 100,
+      restart_delay: 5000,
+      time: true,
+      out_file: "logs/mev-morpho.out.log",
+      error_file: "logs/mev-morpho.err.log",
+    },
   ],
 };
