@@ -22,7 +22,10 @@ import time
 import aiohttp
 from eth_account import Account
 from web3 import AsyncWeb3
-from web3.providers.async_rpc import AsyncHTTPProvider
+try:
+    from web3 import AsyncHTTPProvider  # web3 >= 7
+except ImportError:  # web3 6.x
+    from web3.providers.async_rpc import AsyncHTTPProvider
 
 # ----------------------------------------------------------------------------- env
 def load_env(path: str = "bots/.env") -> None:
@@ -89,6 +92,7 @@ SWAP_EVENT_ABI = [
 ]
 
 w3 = AsyncWeb3(AsyncHTTPProvider(RPC))
+ZERO_ADDR = "0x0000000000000000000000000000000000000000"
 _last: dict[str, float] = {}
 _last_block = 0
 
@@ -148,8 +152,8 @@ async def sim_jit(lower: int, upper: int) -> int:
     jit = w3.eth.contract(address=AsyncWeb3.to_checksum_address(JIT), abi=JIT_ABI)
     owner = OWNER_ENV or await jit.functions.owner().call()
     p = (
-        AsyncWeb3.to_checksum_address(POOL), AsyncWeb3.ZERO_ADDRESS, AsyncWeb3.to_checksum_address(TOKEN1),
-        FEE, lower, upper, CAPITAL0, CAPITAL1, 0, 0, AsyncWeb3.ZERO_ADDRESS, b"",
+        AsyncWeb3.to_checksum_address(POOL), ZERO_ADDR, AsyncWeb3.to_checksum_address(TOKEN1),
+        FEE, lower, upper, CAPITAL0, CAPITAL1, 0, 0, ZERO_ADDR, b"",
         PRICE, GAS_COST, MIN_PROFIT, int(time.time()) + 600,
     )
     try:
@@ -180,8 +184,8 @@ async def handle_whale(amount_usd: float) -> None:
         return
     jit = w3.eth.contract(address=AsyncWeb3.to_checksum_address(JIT), abi=JIT_ABI)
     p = (
-        AsyncWeb3.to_checksum_address(POOL), AsyncWeb3.ZERO_ADDRESS, AsyncWeb3.to_checksum_address(TOKEN1),
-        FEE, lower, upper, CAPITAL0, CAPITAL1, 0, 0, AsyncWeb3.ZERO_ADDRESS, b"",
+        AsyncWeb3.to_checksum_address(POOL), ZERO_ADDR, AsyncWeb3.to_checksum_address(TOKEN1),
+        FEE, lower, upper, CAPITAL0, CAPITAL1, 0, 0, ZERO_ADDR, b"",
         PRICE, GAS_COST, MIN_PROFIT, int(time.time()) + 600,
     )
     try:

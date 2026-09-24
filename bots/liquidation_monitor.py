@@ -28,7 +28,10 @@ from typing import Iterable
 import aiohttp
 from eth_account import Account
 from web3 import AsyncWeb3
-from web3.providers.async_rpc import AsyncHTTPProvider
+try:
+    from web3 import AsyncHTTPProvider  # web3 >= 7
+except ImportError:  # web3 6.x
+    from web3.providers.async_rpc import AsyncHTTPProvider
 
 # ----------------------------------------------------------------------------- env
 def load_env(path: str = "bots/.env") -> None:

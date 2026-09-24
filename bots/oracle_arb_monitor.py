@@ -25,7 +25,10 @@ import time
 import aiohttp
 from eth_account import Account
 from web3 import AsyncWeb3
-from web3.providers.async_rpc import AsyncHTTPProvider
+try:
+    from web3 import AsyncHTTPProvider  # web3 >= 7
+except ImportError:  # web3 6.x
+    from web3.providers.async_rpc import AsyncHTTPProvider
 
 # ----------------------------------------------------------------------------- env
 def load_env(path: str = "bots/.env") -> None:
@@ -84,6 +87,7 @@ ORACLE_ABI = [
 ]
 
 w3 = AsyncWeb3(AsyncHTTPProvider(RPC))
+ZERO_ADDR = "0x0000000000000000000000000000000000000000"
 _last_alert: dict[str, float] = {}
 
 
