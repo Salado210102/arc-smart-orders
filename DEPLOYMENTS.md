@@ -347,6 +347,27 @@ Enabled per-agent staking for the demo agent (`AgentToken 0xD81d4A4e…60De`, cu
 
 **Live E2E (2026-09-23):** A bought **19.798** agent tokens on the curve, **staked** them, and **claimed 0.139991 USDC** of the seeded yield → tx [`0x465ae805…f795`](https://explorer.arc.io/tx/0x465ae805b8294be4394fc44ab736c9987807b5d7a4c6b01bd9d4a5b54233f795).
 
+---
+
+# MEV suite — status (verified in CI, NOT deployed) — 2026-09-23
+
+Three MEV modules are **implemented and verified in CI** (GitHub Actions `forge test`), integrated in the
+Forge suite (**86 tests total, incl. 15 MEV tests**), and **ready for parametrization**. **Not audited, not
+deployed** — they wait on Arc/Circle infrastructure (a flash-loan provider, a lending pool, an oracle feed
+and liquid Uniswap v3 pools).
+
+| Module | Contract | Forge tests | Off-chain bot | Status |
+|---|---|---:|---|---|
+| Liquidations | `contracts/src/mev/ArcLiquidationKeeper.sol` | 6 | `bots/liquidation_monitor.py` | 🧪 CI-verified · not deployed |
+| Oracle arbitrage | `contracts/src/mev/ArcOracleArbitrage.sol` | 4 | `bots/oracle_arb_monitor.py` | 🧪 CI-verified · not deployed |
+| JIT liquidity | `contracts/src/mev/ArcJITLiquidity.sol` | 5 | `bots/jit_liquidity_monitor.py` | 🧪 CI-verified · not deployed |
+
+- **Owner (when deployed):** Safe 2/2 `0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93`.
+- **Each module enforces on-chain:** `out >= in + costs + minProfit`, else it reverts (no capital at risk).
+- Overview & architecture: [`docs/MEV_SUITE_OVERVIEW.md`](docs/MEV_SUITE_OVERVIEW.md) ·
+  Production checklist: [`docs/PRODUCTION_CHECKLIST.md`](docs/PRODUCTION_CHECKLIST.md).
+- **Parametrization pending:** real provider / pool / oracle / NFPM addresses (supplied at deploy time).
+
 
 
 

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Salado210102/arc-smart-orders/actions/workflows/ci.yml/badge.svg)](https://github.com/Salado210102/arc-smart-orders/actions/workflows/ci.yml)
 
-**Non-custodial limit & TWAP orders for stablecoin FX on Arc (USDC ⇄ EURC).**
+**Non-custodial smart orders for stablecoin FX · an AI-agent launchpad · an MEV suite — all on Arc (USDC-native).**
 
 > ⚠️ **Reference implementation — not audited.** On Arc mainnet today: **launching agents, bonding-curve
 > trading and smart-order fills are live** (fills execute on Uniswap v3). **Graduation** and **ERC-8004
@@ -26,20 +26,35 @@ adapted to Arc's stablecoin-native model.
 
 ## Modules
 
-Three layers, one repo:
+One repo, full stack:
 
 | Layer | What | Where | State |
 |---|---|---|---|
-| **1 · Core protocol** | Smart orders (Permit2 witness + EIP-712 **intent engine**) + **Agent Launchpad** | `contracts/src/OrderExecutor.sol`, `contracts/src/launchpad/*` | ✅ **live on Arc mainnet** |
+| **1 · Core protocol** | Smart orders (Permit2 witness + EIP-712 **intent engine**) + **Agent Launchpad** (USDC bonding curve) + **cirBTC vaults** (`AgentStakingVault` ERC-4626, `RevenueSplitter`) | `contracts/src/OrderExecutor.sol`, `contracts/src/launchpad/*` | ✅ **live on Arc mainnet** |
 | **1b · Cross-chain orders** | Sign an intent on a **source** chain, fill it **atomically on Arc** (interop/CCTP delivery) | `contracts/src/CrossChainOrderExecutor.sol` | 🧪 draft (not deployed) |
-| **2 · Monetization & agentic credit** | **`AgentCreditPool`** (peer-to-contract USDC micro-loans), **`RevenueSplitter`** + **`AgentStakingVault`** (ERC-4626 yield accumulator) | `contracts/src/credit/*`, `contracts/src/launchpad/*` | 🧪 Phase 2 (draft, not deployed) |
-| **3 · Agent SDK** | **`arc-agent-treasury`** — check balance / borrow / repay from an AI agent | `sdk-python/` | 🧪 Phase 2 |
+| **2 · Monetization & agentic credit** | **`AgentCreditPool`** (peer-to-contract USDC micro-loans), **`RevenueRouter`** (repay-before-split), **`AgentYieldVault`** (cirBTC) | `contracts/src/credit/*` | 🧪 Phase 2 (draft, not deployed) |
+| **3 · MEV suite** | **Liquidations · Oracle arbitrage · JIT liquidity** (flash loans + Uniswap v3) | `contracts/src/mev/*`, `bots/*` | 🧪 draft · **CI-verified** |
+| **4 · SDKs** | **TS SDK** (signing) + **`arc-agent-treasury`** Python SDK | `sdk/`, `sdk-python/` | ✅ / 🧪 |
 
 - **Smart Orders** → [`contracts/src/OrderExecutor.sol`](contracts/src/OrderExecutor.sol) · [SDK](sdk/src/index.ts) · [Keeper](keeper/src/index.ts)
 - **Agent Launchpad** → [`docs/AGENT_LAUNCHPAD.md`](docs/AGENT_LAUNCHPAD.md)
 - **Agent Credit Pool** → [`contracts/src/credit/AgentCreditPool.sol`](contracts/src/credit/AgentCreditPool.sol) · [`docs/AGENT_CREDIT_POOL.md`](docs/AGENT_CREDIT_POOL.md)
 - **Cross-chain orders (draft)** → [`contracts/src/CrossChainOrderExecutor.sol`](contracts/src/CrossChainOrderExecutor.sol) · [`docs/CROSS_CHAIN_ORDERS.md`](docs/CROSS_CHAIN_ORDERS.md)
+- **MEV suite (draft)** → [`docs/MEV_SUITE_OVERVIEW.md`](docs/MEV_SUITE_OVERVIEW.md)
 - **Python SDK** → [`sdk-python/`](sdk-python/)
+
+## MEV suite (draft)
+
+Three atomic, capital-efficient strategies in [`contracts/src/mev/`](contracts/src/mev/) with off-chain
+bots in [`bots/`](bots/):
+
+- **Liquidations** (`ArcLiquidationKeeper`) — flash-loan-funded liquidation of Health-Factor < 1.0 borrowers.
+- **Oracle arbitrage** (`ArcOracleArbitrage`) — Uniswap v3 flash loan vs a misaligned oracle feed.
+- **JIT liquidity** (`ArcJITLiquidity`) — mint a 1-tick position for one whale swap, capture the fee, burn.
+
+Each enforces `out >= in + costs + minProfit` **on-chain** (else it reverts) and pays the net profit to the
+Safe. Overview & architecture: [`docs/MEV_SUITE_OVERVIEW.md`](docs/MEV_SUITE_OVERVIEW.md) ·
+Production: [`docs/PRODUCTION_CHECKLIST.md`](docs/PRODUCTION_CHECKLIST.md). **Draft — not audited, not deployed.**
 
 ---
 
@@ -306,7 +321,7 @@ apps/launchpad/                     Vite + React + Tailwind launchpad UI (Vercel
 ops/                                ops tooling (Safe execTransaction signer, alerts + metrics bots, keeper funding)
 examples/python/sign_limit_order.py Python EIP-712 signing recipe (verified to match the TS SDK)
 scripts/backtest_gex_signals.py     GEX (Call/Put Wall, Zero Gamma) signal backtest -> EIP-712 intents
-docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · CROSS_CHAIN_ORDERS · GEX_AGENT_SPEC · MEV_LIQUIDATION_KEEPER · MEV_ORACLE_ARB · MEV_JIT_LIQUIDITY · PYTHON_SDK · SDK_INTEGRATION · CONTENT_PLAN · SAFE_TREASURY · SAFE_MAINNET · AUDIT_SCOPE · AUDIT_PACKAGE · ARC_CIRCLE_AUDIT_PROPOSAL · ARC_CIRCLE_AUDIT_EMAIL · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
+docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · CROSS_CHAIN_ORDERS · GEX_AGENT_SPEC · MEV_SUITE_OVERVIEW · MEV_LIQUIDATION_KEEPER · MEV_ORACLE_ARB · MEV_JIT_LIQUIDITY · PRODUCTION_CHECKLIST · PYTHON_SDK · SDK_INTEGRATION · CONTENT_PLAN · SAFE_TREASURY · SAFE_MAINNET · AUDIT_SCOPE · AUDIT_PACKAGE · ARC_CIRCLE_AUDIT_PROPOSAL · ARC_CIRCLE_AUDIT_EMAIL · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
 ```
 
 ---
