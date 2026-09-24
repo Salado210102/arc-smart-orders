@@ -63,6 +63,7 @@ interface ISwapRouterV3M {
 
 contract ArcMorphoLiquidator is IMorphoFlashLoanCallback {
     address public owner;
+    address public keeper; // hot key allowed to execute liquidations (owner can too)
     address public morpho;
     address public usdc;
     ISwapRouterV3M public swapRouter;
@@ -95,12 +96,14 @@ contract ArcMorphoLiquidator is IMorphoFlashLoanCallback {
         uint256 profit
     );
     event ConfigUpdated(address morpho, address usdc, address swapRouter);
+    event KeeperUpdated(address keeper);
     event FlashCapUpdated(uint256 cap);
     event ProfitSent(address indexed to, uint256 amount);
     event OwnershipTransferred(address indexed from, address indexed to);
     event EmergencyWithdraw(address indexed token, address indexed to, uint256 amount);
 
     error NotOwner();
+    error NotKeeper();
     error NotMorpho();
     error ZeroAddr();
     error NothingToLiquidate();
@@ -115,6 +118,12 @@ contract ArcMorphoLiquidator is IMorphoFlashLoanCallback {
         _;
     }
 
+    /// @dev owner (Safe) or the low-privilege keeper hot key may execute; only the owner may configure.
+    modifier onlyKeeper() {
+        if (msg.sender != keeper && msg.sender != owner) revert NotKeeper();
+        _;
+    }
+
     modifier nonReentrant() {
         if (_locked) revert Reentrancy();
         _locked = true;
@@ -122,16 +131,21 @@ contract ArcMorphoLiquidator is IMorphoFlashLoanCallback {
         _locked = false;
     }
 
-    constructor(address morpho_, address usdc_, address swapRouter_, address owner_) {
+    constructor(address morpho_, address usdc_, address swapRouter_, address owner_, address keeper_) {
         if (morpho_ == address(0) || usdc_ == address(0) || owner_ == address(0)) revert ZeroAddr();
         morpho = morpho_;
         usdc = usdc_;
         swapRouter = ISwapRouterV3M(swapRouter_);
         owner = owner_;
+        keeper = keeper_;
         emit ConfigUpdated(morpho_, usdc_, swapRouter_);
     }
 
     // --------------------------------------------------------------- admin
+    function setKeeper(address k) external onlyOwner {
+        keeper = k;
+        emit KeeperUpdated(k);
+    }
     function setConfig(address morpho_, address usdc_, address swapRouter_) external onlyOwner {
         if (morpho_ == address(0) || usdc_ == address(0)) revert ZeroAddr();
         morpho = morpho_;
@@ -162,7 +176,7 @@ contract ArcMorphoLiquidator is IMorphoFlashLoanCallback {
     // --------------------------------------------------------------- entrypoint
     /// @notice Flash-borrow USDC from Morpho and liquidate `p.borrower`.
     /// @dev NOT nonReentrant: Morpho re-enters via `onMorphoFlashLoan` (which IS guarded).
-    function executeLiquidation(LiqParams calldata p, uint256 flashAmount) external onlyOwner returns (uint256 profit) {
+    function executeLiquidation(LiqParams calldata p, uint256 flashAmount) external onlyKeeper returns (uint256 profit) {
         if (p.borrower == address(0) || flashAmount == 0) revert NothingToLiquidate();
         if (p.seizedAssets == 0 && p.repaidShares == 0) revert NothingToLiquidate();
         if (maxFlashAmount != 0 && flashAmount > maxFlashAmount) revert FlashCapExceeded(flashAmount, maxFlashAmount);

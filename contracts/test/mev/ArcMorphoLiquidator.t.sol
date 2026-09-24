@@ -110,7 +110,7 @@ contract ArcMorphoLiquidatorTest is Test {
         coll = new MockERC20("cirBTC", "cirBTC", 8);
         morpho = new MockMorpho(IERC20T(address(usdc)), IERC20T(address(coll)));
         router = new MockSwapM(usdc);
-        keeper = new ArcMorphoLiquidator(address(morpho), address(usdc), address(router), owner);
+        keeper = new ArcMorphoLiquidator(address(morpho), address(usdc), address(router), owner, owner);
 
         usdc.mint(address(morpho), 1_000_000_000); // flash liquidity
         coll.mint(address(morpho), 1_000_000_000); // collateral to hand out
@@ -168,9 +168,19 @@ contract ArcMorphoLiquidatorTest is Test {
         keeper.executeLiquidation(_params(10_000), ONE_USDC);
     }
 
-    function test_only_owner() public {
+    function test_keeper_executes() public {
+        vm.prank(owner);
+        keeper.setKeeper(address(0xB0B));
+        morpho.setLiquidation(ONE_USDC, 105_000_000);
+        router.setOut(1_020_000);
+        vm.prank(address(0xB0B));
+        uint256 profit = keeper.executeLiquidation(_params(10_000), ONE_USDC);
+        assertEq(profit, 20_000, "keeper can execute");
+    }
+
+    function test_only_keeper() public {
         vm.prank(address(0xBAD));
-        vm.expectRevert(ArcMorphoLiquidator.NotOwner.selector);
+        vm.expectRevert(ArcMorphoLiquidator.NotKeeper.selector);
         keeper.executeLiquidation(_params(10_000), ONE_USDC);
     }
 

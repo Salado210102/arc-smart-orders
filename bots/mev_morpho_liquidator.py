@@ -63,6 +63,15 @@ LOOKBACK_BLOCKS = int(os.getenv("LOOKBACK_BLOCKS", "50000"))
 HISTORY_FILE = os.getenv("HISTORY_FILE", "bots/morpho_liq_history.json")
 KEEPER_PK = os.getenv("KEEPER_PK", "")
 EXECUTOR = os.getenv("MORPHO_EXECUTOR", "")  # ArcMorphoLiquidator (optional until deployed)
+MORPHO_KEEPER = os.getenv("MORPHO_KEEPER", "")  # the contract's keeper hot key (for sim when no PK)
+try:
+    KEEPER_ADDR = (
+        AsyncWeb3.to_checksum_address(MORPHO_KEEPER)
+        if MORPHO_KEEPER
+        else (Account.from_key(KEEPER_PK).address if KEEPER_PK else None)
+    )
+except Exception:  # noqa: BLE001
+    KEEPER_ADDR = None
 TG_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TG_CHAT = os.getenv("TELEGRAM_CHAT_ID", "")
 
@@ -218,7 +227,7 @@ async def check(borrower: str) -> None:
     p = (AsyncWeb3.to_checksum_address(COLLATERAL), AsyncWeb3.to_checksum_address(ORACLE), AsyncWeb3.to_checksum_address(IRM),
          int(LLTV * 1e18), AsyncWeb3.to_checksum_address(borrower), 0, repaid_shares, SWAP_FEE, MIN_PROFIT)
     try:
-        profit = int(await ex.functions.executeLiquidation(p, borrow_assets).call({"from": owner}))
+        profit = int(await ex.functions.executeLiquidation(p, borrow_assets).call({"from": KEEPER_ADDR or owner}))
     except Exception as e:  # noqa: BLE001
         await notify(msg + f"\n⚠️ sim revertió: {str(e)[:120]}")
         return
