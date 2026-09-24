@@ -306,7 +306,7 @@ apps/launchpad/                     Vite + React + Tailwind launchpad UI (Vercel
 ops/                                ops tooling (Safe execTransaction signer, alerts + metrics bots, keeper funding)
 examples/python/sign_limit_order.py Python EIP-712 signing recipe (verified to match the TS SDK)
 scripts/backtest_gex_signals.py     GEX (Call/Put Wall, Zero Gamma) signal backtest -> EIP-712 intents
-docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · CROSS_CHAIN_ORDERS · GEX_AGENT_SPEC · MEV_LIQUIDATION_KEEPER · PYTHON_SDK · SDK_INTEGRATION · CONTENT_PLAN · SAFE_TREASURY · SAFE_MAINNET · AUDIT_SCOPE · AUDIT_PACKAGE · ARC_CIRCLE_AUDIT_PROPOSAL · ARC_CIRCLE_AUDIT_EMAIL · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
+docs/                               LAUNCH · REVENUE · AGENT_LAUNCHPAD · AGENT_CREDIT_POOL · PHASE2_ARCHITECTURE · CROSS_CHAIN_ORDERS · GEX_AGENT_SPEC · MEV_LIQUIDATION_KEEPER · MEV_ORACLE_ARB · PYTHON_SDK · SDK_INTEGRATION · CONTENT_PLAN · SAFE_TREASURY · SAFE_MAINNET · AUDIT_SCOPE · AUDIT_PACKAGE · ARC_CIRCLE_AUDIT_PROPOSAL · ARC_CIRCLE_AUDIT_EMAIL · MAINNET_RUNBOOK · UFSF_AUDIT_PROPOSAL · DEV_COMMUNITY_POST · DEMO_SCRIPT · ALERTS_BOT · KEEPER_SETUP
 ```
 
 ---
