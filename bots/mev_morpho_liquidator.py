@@ -147,8 +147,15 @@ def to_assets_up(shares: int, total_assets: int, total_shares: int) -> int:
     return (num + den - 1) // den
 
 
-async def health_factor(borrower: str) -> tuple[int, int, int, int]:
-    """Returns (hf_wad, borrow_assets, collateral, borrow_shares)."""
+def to_shares_up(assets: int, total_assets: int, total_shares: int) -> int:
+    """Morpho SharesMathLib.toSharesUp: assets*(totalShares+VIRTUAL_SHARES)/(totalAssets+VIRTUAL_ASSETS)."""
+    num = assets * (total_shares + VIRTUAL_SHARES)
+    den = total_assets + VIRTUAL_ASSETS
+    return (num + den - 1) // den
+
+
+async def health_factor(borrower: str) -> tuple[int, int, int, int, int, int]:
+    """Returns (hf_wad, borrow_assets, collateral, borrow_shares, total_borrow_assets, total_borrow_shares)."""
     m = w3.eth.contract(address=AsyncWeb3.to_checksum_address(MORPHO), abi=MORPHO_ABI)
     mid = market_id()
     pos = await m.functions.position(mid, AsyncWeb3.to_checksum_address(borrower)).call()
@@ -157,12 +164,13 @@ async def health_factor(borrower: str) -> tuple[int, int, int, int]:
     price = int(await o.functions.price().call())
     borrow_shares = int(pos[1])
     collateral = int(pos[2])
+    tba, tbs = int(mkt[2]), int(mkt[3])
     if borrow_shares == 0 or collateral == 0:
-        return (10**30, 0, collateral, 0)  # no debt -> healthy
-    borrow_assets = to_assets_up(borrow_shares, int(mkt[2]), int(mkt[3]))
+        return (10**30, 0, collateral, 0, tba, tbs)  # no debt -> healthy
+    borrow_assets = to_assets_up(borrow_shares, tba, tbs)
     collateral_value = (collateral * price) // ORACLE_SCALE
     hf = (collateral_value * int(LLTV * 1e18)) // borrow_assets if borrow_assets else 10**30
-    return (hf, borrow_assets, collateral, borrow_shares)
+    return (hf, borrow_assets, collateral, borrow_shares, tba, tbs)
 
 
 async def watchlist() -> set[str]:
@@ -196,38 +204,38 @@ async def discover_borrowers() -> set[str]:
 
 
 async def check(borrower: str) -> None:
-    hf, borrow_assets, collateral, borrow_shares = await health_factor(borrower)
+    hf, borrow_assets, collateral, borrow_shares, tba, tbs = await health_factor(borrower)
     if borrow_assets == 0:
         return
     hf_f = hf / 1e18
     if hf_f >= HF_THRESHOLD:
         return
-    if borrow_assets > MAX_DEBT:
-        _log(f"{borrower}: debt {borrow_assets / 1e6:.4f} > pilot cap {MAX_DEBT / 1e6:.2f} USDC — skip")
-        return
     if time.time() - _last.get(borrower.lower(), 0) < 900:
         return
     _last[borrower.lower()] = time.time()
-    _log(f"AT RISK {borrower} HF={hf_f:.4f} debt={borrow_assets / 1e6:.4f} USDC")
+
+    # PARTIAL liquidation: repay at most MAX_DEBT, so it works on large underwater positions too.
+    repay_assets = min(borrow_assets, MAX_DEBT)
+    repaid_shares = to_shares_up(repay_assets, tba, tbs)
+    _log(f"AT RISK {borrower} HF={hf_f:.4f} debt={borrow_assets / 1e6:.4f} → partial repay {repay_assets / 1e6:.4f} USDC")
 
     msg = (
         f"🎯 <b>Morpho position liquidatable</b>\n"
         f"• borrower <code>{borrower}</code>\n"
         f"• HF <b>{hf_f:.4f}</b> · debt <b>{borrow_assets / 1e6:.4f} USDC</b>\n"
-        f"• collateral <code>{collateral}</code>"
+        f"• partial repay <b>{repay_assets / 1e6:.4f} USDC</b> (cap {MAX_DEBT / 1e6:.2f})"
     )
     if not EXECUTOR or not KEEPER_PK:
         await notify(msg + "\n🔒 monitor-only (set MORPHO_EXECUTOR + KEEPER_PK to execute)")
         return
 
-    # simulate the liquidation (executeLiquidation returns the profit)
+    # simulate the (partial) liquidation — executeLiquidation returns the profit
     ex = w3.eth.contract(address=AsyncWeb3.to_checksum_address(EXECUTOR), abi=EXECUTOR_ABI)
     owner = await ex.functions.owner().call()
-    repaid_shares = (borrow_shares * int(REPAY_PCT)) // 100
     p = (AsyncWeb3.to_checksum_address(COLLATERAL), AsyncWeb3.to_checksum_address(ORACLE), AsyncWeb3.to_checksum_address(IRM),
          int(LLTV * 1e18), AsyncWeb3.to_checksum_address(borrower), 0, repaid_shares, SWAP_FEE, MIN_PROFIT)
     try:
-        profit = int(await ex.functions.executeLiquidation(p, borrow_assets).call({"from": KEEPER_ADDR or owner}))
+        profit = int(await ex.functions.executeLiquidation(p, repay_assets).call({"from": KEEPER_ADDR or owner}))
     except Exception as e:  # noqa: BLE001
         await notify(msg + f"\n⚠️ sim revertió: {str(e)[:120]}")
         return
@@ -235,7 +243,7 @@ async def check(borrower: str) -> None:
     await notify(msg + f"\n💰 sim profit <b>{profit / 1e6:.4f} USDC</b>\n⏳ sending…")
     try:
         acct = Account.from_key(KEEPER_PK)
-        tx = await ex.functions.executeLiquidation(p, borrow_assets).build_transaction(
+        tx = await ex.functions.executeLiquidation(p, repay_assets).build_transaction(
             {"from": acct.address, "nonce": await w3.eth.get_transaction_count(acct.address), "value": 0})
         gas = await w3.eth.estimate_gas(tx)
         base = await w3.eth.gas_price
@@ -246,7 +254,7 @@ async def check(borrower: str) -> None:
         h = await w3.eth.send_raw_transaction(raw)
         rcpt = await w3.eth.wait_for_transaction_receipt(h, timeout=60)
         await notify(f"✅ <b>Morpho liquidation executed</b>\n<code>{h.hex()}</code> · status {rcpt.status} · profit ≈ {profit / 1e6:.4f} USDC")
-        _append({"ts": int(time.time()), "borrower": borrower, "hf": hf_f, "profit": profit, "tx": h.hex(), "status": rcpt.status})
+        _append({"ts": int(time.time()), "borrower": borrower, "hf": hf_f, "repaid": repay_assets, "profit": profit, "tx": h.hex(), "status": rcpt.status})
     except Exception as e:  # noqa: BLE001
         await notify(f"❌ <b>Morpho liquidation failed</b>\n{str(e)[:160]}")
 
