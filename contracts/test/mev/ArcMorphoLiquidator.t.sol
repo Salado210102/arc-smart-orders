@@ -141,7 +141,8 @@ contract ArcMorphoLiquidatorTest is Test {
         assertEq(profit, 20_000, "net profit (0.02 USDC)"); // 1.02 - 1.00 (fee-free flash loan)
         assertEq(usdc.balanceOf(owner), 20_000, "profit -> owner Safe");
         assertEq(usdc.balanceOf(address(keeper)), 0, "no funds stuck");
-        assertEq(usdc.balanceOf(address(morpho)), 1_000_000_000, "flash loan repaid (Morpho whole)");
+        // Morpho nets +1 USDC: the flash loan is returned in full (net 0) and the liquidated debt (1 USDC) stays in the pool.
+        assertEq(usdc.balanceOf(address(morpho)), 1_001_000_000, "flash repaid + liquidated debt in the pool");
     }
 
     function test_revert_when_not_profitable() public {
