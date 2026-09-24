@@ -91,6 +91,12 @@ def _log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
+async def _idle(missing: list[str]) -> None:
+    _log("⏸ idle — missing: " + ", ".join(missing) + " (fill bots/.env and `pm2 restart <name>`)")
+    while True:
+        await asyncio.sleep(3600)
+
+
 async def notify(text: str) -> None:
     if not (TG_TOKEN and TG_CHAT):
         _log(f"(no telegram) {text}")
@@ -189,6 +195,12 @@ async def evaluate() -> None:
         return
     _last_alert[key] = time.time()
 
+    if not ARB:
+        await notify(
+            f"🔀 <b>Oracle divergence</b>\npool vs oracle: <b>{disc_bps:+.1f} bps</b> (monitor-only — set ARB_EXECUTOR to simulate/execute)"
+        )
+        return
+
     amount, profit = await optimal_size()
     if profit <= MIN_PROFIT:
         _log(f"opportunity {disc_bps:+.1f} bps but optimal profit {profit} <= min")
@@ -228,10 +240,10 @@ async def evaluate() -> None:
 async def main() -> None:
     _log(f"Arc oracle-arb monitor · RPC={RPC} · pool={POOL or '—'} · arb={ARB or '—'} · oracle={ORACLE or '—'}")
     _log("mode: " + ("LIVE (sends arbitrage)" if KEEPER_PK else "MONITOR-ONLY (no KEEPER_PK)"))
-    for req in ("ARB_EXECUTOR", "POOL", "ORACLE", "TOKEN_MID"):
-        if not os.getenv(req):
-            _log(f"ERROR: set {req}")
-            return
+    missing = [r for r in ("POOL", "ORACLE", "TOKEN_MID") if not os.getenv(r)]
+    if missing:
+        await _idle(missing)
+        return
     while True:
         try:
             await evaluate()

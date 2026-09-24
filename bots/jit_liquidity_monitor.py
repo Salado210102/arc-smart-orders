@@ -97,6 +97,12 @@ def _log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
+async def _idle(missing: list[str]) -> None:
+    _log("⏸ idle — missing: " + ", ".join(missing) + " (fill bots/.env and `pm2 restart <name>`)")
+    while True:
+        await asyncio.sleep(3600)
+
+
 async def notify(text: str) -> None:
     if not (TG_TOKEN and TG_CHAT):
         _log(f"(no telegram) {text}")
@@ -155,6 +161,9 @@ async def sim_jit(lower: int, upper: int) -> int:
 
 async def handle_whale(amount_usd: float) -> None:
     current_tick, liq = await pool_state()
+    if not JIT:
+        await notify(f"🌊 <b>Whale swap detected</b>\n≈ <b>${amount_usd:,.0f}</b> on the pool (monitor-only — set JIT_EXECUTOR to simulate/execute)")
+        return
     lower, upper = optimal_range(amount_usd, liq, current_tick)
     profit = await sim_jit(lower, upper)
     if profit <= MIN_PROFIT:
@@ -232,10 +241,10 @@ async def scan() -> None:
 async def main() -> None:
     _log(f"Arc JIT monitor · RPC={RPC} · pool={POOL or '—'} · jit={JIT or '—'}")
     _log("mode: " + ("LIVE (sends JIT)" if KEEPER_PK else "MONITOR-ONLY (no KEEPER_PK)"))
-    for req in ("JIT_EXECUTOR", "POOL", "TOKEN1"):
-        if not os.getenv(req):
-            _log(f"ERROR: set {req}")
-            return
+    missing = [r for r in ("POOL", "TOKEN1") if not os.getenv(r)]
+    if missing:
+        await _idle(missing)
+        return
     while True:
         try:
             await scan()

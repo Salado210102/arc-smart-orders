@@ -131,6 +131,13 @@ def _log(msg: str) -> None:
     print(f"[{time.strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
+async def _idle(missing: list[str]) -> None:
+    """Stay alive (PM2 online) while required config is missing — avoids a restart loop."""
+    _log("⏸ idle — missing: " + ", ".join(missing) + " (fill bots/.env and `pm2 restart <name>`)")
+    while True:
+        await asyncio.sleep(3600)
+
+
 async def notify(text: str) -> None:
     if not (TG_TOKEN and TG_CHAT):
         _log(f"(no telegram) {text}")
@@ -283,8 +290,8 @@ async def main() -> None:
     _log(f"Arc liquidation monitor · RPC={RPC} · pool={LENDING_POOL or '—'} · executor={EXECUTOR or '—'}")
     _log("mode: " + ("LIVE (sends liquidations)" if KEEPER_PK else "MONITOR-ONLY (no KEEPER_PK)"))
     if not LENDING_POOL:
-        _log("ERROR: set LENDING_POOL")
-        sys.exit(1)
+        await _idle(["LENDING_POOL"])
+        return
     while True:
         try:
             await scan_once()
