@@ -368,6 +368,28 @@ and liquid Uniswap v3 pools).
   Production checklist: [`docs/PRODUCTION_CHECKLIST.md`](docs/PRODUCTION_CHECKLIST.md).
 - **Parametrization pending:** real provider / pool / oracle / NFPM addresses (supplied at deploy time).
 
+---
+
+# Morpho Blue liquidator — MAINNET deploy + live pilot — 2026-09-23
+
+`ArcMorphoLiquidator` deployed on **Arc mainnet** targeting **Morpho Blue** (`0x34CD04070dD72b14E241112F6d83812Df5Af7fCD`).
+
+| Field | Value |
+|---|---|
+| **ArcMorphoLiquidator** | `0x6a78a01c8574b8B39C0160e4f58477E3f8Df4bD0` |
+| owner | Safe 2/2 `0x0FBFAF7069B45Dd9c16AdD8a04Bf556046EA7e93` |
+| keeper (hot key, executes) | `0x327fF705C1De5Ffd071bDF7E43069398507E50bC` |
+| morpho | `0x34CD04070dD72b14E241112F6d83812Df5Af7fCD` |
+| swapRouter | `0x53BF6B0684Ec7eF91e1387Da3D1a1769bC5A6F77` |
+| **maxFlashAmount (cap)** | **5 USDC** (set via Safe tx: `0x378af58b5b1e220bf02b8b3bd62dff926eaaaad75d617015c1ff1e2875d15bc0`) |
+
+**Market targeted (USDC/cirBTC):** `marketId 0xc2db905f174e5defcce01d321b09f15f78856a36a21b90cc7e1abbc29225815d` ·
+collateral **cirBTC `0x171A4217b86A807A64eB94757Db6849fb4bDbAA0`** · oracle `0x2AA87fF48933Ce6aBA240BEE916Fc2e6Ec1e51Ab` ·
+IRM `0xF02615d094Fc02fC031C35fe705e175aA4653f20` · **LLTV 0.86** · swap fee tier 3000 (cirBTC/USDC v3 pool exists).
+
+**Bot:** `mev-morpho` on PM2 (VPS `/var/www/arc-keeper`), **LIVE** with keeper B, cap `MAX_DEBT_USDC=5`
+(will only liquidate positions with debt ≤ 5 USDC). Telegram alerts via `ops/launchpad-alerts.env`.
+
 
 
 
