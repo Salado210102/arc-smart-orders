@@ -13,7 +13,7 @@ contract DeployMorphoLiquidator is Script {
         address usdc = vm.envAddress("USDC");
         address router = vm.envAddress("SWAP_ROUTER");
         address owner = vm.envAddress("OWNER");
-        address keeper = vm.envAddress("KEEPER");
+        address keeperHot = vm.envAddress("KEEPER");
         uint256 maxFlashUsdc = vm.envOr("MAX_FLASH_USDC", uint256(5));
 
         require(morpho.code.length > 0, "MORPHO has no code");
@@ -21,16 +21,28 @@ contract DeployMorphoLiquidator is Script {
         require(owner.code.length > 0, "OWNER must be a contract (Safe)");
 
         vm.startBroadcast();
-        ArcMorphoLiquidator k = new ArcMorphoLiquidator(morpho, usdc, router, owner, keeper);
-        if (maxFlashUsdc > 0) k.setMaxFlashAmount(maxFlashUsdc * 1e6); // USDC 6 dec
+        ArcMorphoLiquidator keeper = new ArcMorphoLiquidator(morpho, usdc, router, owner, keeperHot);
         vm.stopBroadcast();
 
-        console2.log("ArcMorphoLiquidator:", address(k));
+        console2.log("ArcMorphoLiquidator:", address(keeper));
         console2.log("morpho          :", morpho);
         console2.log("usdc            :", usdc);
         console2.log("swapRouter      :", router);
         console2.log("owner (Safe)    :", owner);
-        console2.log("keeper          :", keeper);
-        console2.log("maxFlashAmount  :", k.maxFlashAmount());
+        console2.log("keeper          :", keeperHot);
+        if (maxFlashUsdc > 0) {
+            uint256 cap = maxFlashUsdc * 1e6; // USDC 6 dec
+            if (owner.code.length == 0) {
+                // owner is an EOA (deployer) -> set the cap directly
+                vm.startBroadcast();
+                keeper.setMaxFlashAmount(cap);
+                vm.stopBroadcast();
+                console2.log("maxFlashAmount  :", keeper.maxFlashAmount());
+            } else {
+                // owner is a contract (Safe) -> the Safe must execute setMaxFlashAmount(cap)
+                console2.log("owner is a contract (Safe): execute this via the Safe:");
+                console2.logBytes(abi.encodeWithSignature("setMaxFlashAmount(uint256)", cap));
+            }
+        }
     }
 }
