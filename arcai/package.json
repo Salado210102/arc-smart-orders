@@ -6,10 +6,17 @@
   "main": "src/index.ts",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/structural.test.ts"
+    "test": "node --test",
+    "data": "node src/data/main.ts"
+  },
+  "dependencies": {
+    "pg": "^8.13.0",
+    "viem": "^2.30.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "pg-mem": "^3.0.14",
     "typescript": "^5.9.0"
   }
 }
