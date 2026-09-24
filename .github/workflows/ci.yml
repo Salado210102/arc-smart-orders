@@ -70,3 +70,18 @@ jobs:
         run: python sdk/python/tests/test_signing.py
       - name: GEX backtest
         run: python scripts/backtest_gex_signals.py --steps 300 --seed 7
+
+  arcai:
+    name: arcai (typecheck + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck --workspace @arc-smart-orders/arcai
+      - name: Tests
+        run: npm run test --workspace @arc-smart-orders/arcai
