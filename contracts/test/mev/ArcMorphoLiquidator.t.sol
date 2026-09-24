@@ -131,8 +131,7 @@ contract ArcMorphoLiquidatorTest is Test {
         });
     }
 
-    function test_morpho_liquidation_profitable() public {
-        morpho.setLiquidation(ONE_USDC, 105_000_000); // repay 1 USDC, seize 1.05e8 collateral
+    function test_morpho_liquidation_profitable() public {        morpho.setLiquidation(ONE_USDC, 105_000_000); // repay 1 USDC, seize 1.05e8 collateral
         router.setOut(1_020_000); // 1.02 USDC out
 
         vm.prank(owner);
@@ -159,6 +158,14 @@ contract ArcMorphoLiquidatorTest is Test {
     function test_callback_only_morpho() public {
         vm.expectRevert(ArcMorphoLiquidator.NotMorpho.selector);
         keeper.onMorphoFlashLoan(1, "");
+    }
+
+    function test_flash_cap() public {
+        vm.prank(owner);
+        keeper.setMaxFlashAmount(ONE_USDC / 2); // 0.5 USDC pilot cap
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(ArcMorphoLiquidator.FlashCapExceeded.selector, ONE_USDC, ONE_USDC / 2));
+        keeper.executeLiquidation(_params(10_000), ONE_USDC);
     }
 
     function test_only_owner() public {

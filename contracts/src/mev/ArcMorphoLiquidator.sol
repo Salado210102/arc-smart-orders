@@ -67,6 +67,9 @@ contract ArcMorphoLiquidator is IMorphoFlashLoanCallback {
     address public usdc;
     ISwapRouterV3M public swapRouter;
 
+    /// @notice Hard cap on the flash amount per liquidation (0 = uncapped). Set small for a pilot.
+    uint256 public maxFlashAmount;
+
     uint256 public lastProfit; // set in the callback (returned by executeLiquidation, for eth_call sims)
     bool private _locked;
 
@@ -92,6 +95,7 @@ contract ArcMorphoLiquidator is IMorphoFlashLoanCallback {
         uint256 profit
     );
     event ConfigUpdated(address morpho, address usdc, address swapRouter);
+    event FlashCapUpdated(uint256 cap);
     event ProfitSent(address indexed to, uint256 amount);
     event OwnershipTransferred(address indexed from, address indexed to);
     event EmergencyWithdraw(address indexed token, address indexed to, uint256 amount);
@@ -102,6 +106,7 @@ contract ArcMorphoLiquidator is IMorphoFlashLoanCallback {
     error NothingToLiquidate();
     error NothingSeized();
     error InsufficientProfit(uint256 received, uint256 required);
+    error FlashCapExceeded(uint256 amount, uint256 cap);
     error Reentrancy();
     error CallFailed();
 
@@ -135,6 +140,12 @@ contract ArcMorphoLiquidator is IMorphoFlashLoanCallback {
         emit ConfigUpdated(morpho_, usdc_, swapRouter_);
     }
 
+    /// @notice Set the per-liquidation flash cap (0 = uncapped). Use a small value for a pilot.
+    function setMaxFlashAmount(uint256 cap) external onlyOwner {
+        maxFlashAmount = cap;
+        emit FlashCapUpdated(cap);
+    }
+
     function transferOwnership(address to) external onlyOwner {
         if (to == address(0)) revert ZeroAddr();
         emit OwnershipTransferred(owner, to);
@@ -154,6 +165,7 @@ contract ArcMorphoLiquidator is IMorphoFlashLoanCallback {
     function executeLiquidation(LiqParams calldata p, uint256 flashAmount) external onlyOwner returns (uint256 profit) {
         if (p.borrower == address(0) || flashAmount == 0) revert NothingToLiquidate();
         if (p.seizedAssets == 0 && p.repaidShares == 0) revert NothingToLiquidate();
+        if (maxFlashAmount != 0 && flashAmount > maxFlashAmount) revert FlashCapExceeded(flashAmount, maxFlashAmount);
         IMorpho.MarketParams memory mp = IMorpho.MarketParams({
             loanToken: usdc,
             collateralToken: p.collateralToken,

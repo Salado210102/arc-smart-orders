@@ -55,6 +55,7 @@ LLTV = float(os.getenv("LLTV", "0.86"))
 SWAP_FEE = int(os.getenv("SWAP_FEE", "500"))
 REPAY_PCT = float(os.getenv("REPAY_PCT", "50"))
 MIN_PROFIT = int(float(os.getenv("MIN_PROFIT_USDC", "0.05")) * 1e6)
+MAX_DEBT = int(float(os.getenv("MAX_DEBT_USDC", "5")) * 1e6)  # pilot cap: only liquidate debts <= this
 HF_THRESHOLD = float(os.getenv("HF_THRESHOLD", "1.0"))
 POLL_SECONDS = int(os.getenv("POLL_SECONDS", "20"))
 DISCOVER = os.getenv("DISCOVER_BORROWERS", "1") == "1"
@@ -191,6 +192,9 @@ async def check(borrower: str) -> None:
         return
     hf_f = hf / 1e18
     if hf_f >= HF_THRESHOLD:
+        return
+    if borrow_assets > MAX_DEBT:
+        _log(f"{borrower}: debt {borrow_assets / 1e6:.4f} > pilot cap {MAX_DEBT / 1e6:.2f} USDC — skip")
         return
     if time.time() - _last.get(borrower.lower(), 0) < 900:
         return
