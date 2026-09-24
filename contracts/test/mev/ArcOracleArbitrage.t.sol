@@ -119,7 +119,7 @@ contract ArcOracleArbitrageTest is Test {
         assertEq(profit, 14_500, "net profit");
         assertEq(usdc.balanceOf(owner), 14_500, "profit -> owner (Safe)");
         assertEq(usdc.balanceOf(address(arb)), 0, "no funds stuck");
-        assertEq(usdc.balanceOf(address(pool)), 1_000_000_000, "flash loan repaid (pool whole)");
+        assertEq(usdc.balanceOf(address(pool)), 1_000_000_500, "flash loan repaid + 0.05% fee retained by the pool");
     }
 
     function test_revert_when_not_profitable() public {
