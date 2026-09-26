@@ -31,7 +31,7 @@ bytecode_hash = "none"   # deterministic bytecode (no metadata hash)
 ```bash
 cd arc-intel/executor
 forge build --sizes
-forge test              # 22 unit/invariant/fuzz pass; fork test skipped unless RUN_FORK=1
+forge test              # 24 unit/invariant/fuzz pass; fork test skipped unless RUN_FORK=1
 ```
 
 ## 2. Contract sizes (Spurious Dragon limit = 24,576 B runtime)
@@ -42,7 +42,9 @@ forge test              # 22 unit/invariant/fuzz pass; fork test skipped unless 
 
 ## 3. Test evidence
 
-- **22/22** passing (`test/ArcIntelExecutor.t.sol`), including:
+- **24/24** passing (`test/ArcIntelExecutor.t.sol`), including the two Slither-driven regressions
+  (`testUncheckedTransferRevertsWholeTx`, `testMaliciousHookCannotReenterOrManipulate`; see
+  [`..._SLITHER_TRIAGE.md`](ARC_AI_PHASE5_EXECUTOR_SLITHER_TRIAGE.md)) and:
   - fill + output to recipient (own and third party), **zero custody**;
   - witness binding; paused; pool not allowed/revoked; expired; nonce reuse;
   - token mismatch; `minOut` (exact + fuzz); partial fill with **dust refunded**;
@@ -90,7 +92,7 @@ forge test -vvv
 
 - [x] Deterministic compiler config
 - [x] `forge build --sizes` — well under the limit
-- [x] `forge test` — 22/22
+- [x] `forge test` — 24/24
 - [x] Fork harness vs real PoolManager (bug caught & fixed)
 - [x] **Real testnet E2E fill** (tx recorded above)
 - [x] Scope / threat model (`..._AUDIT_SCOPE.md`)

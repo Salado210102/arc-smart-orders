@@ -92,8 +92,8 @@ test-only, never deployed in production.
 57faad3bb1f5061a070b307858548b7cf26705995933cc680645c7ab80c4c642  arc-intel/executor/src/ArcIntelExecutor.sol
 de67db32e43b6fcb40b1b76ad45192d00e2258f83b472cd49bc4b6ad4ea720f3  arc-intel/executor/src/interfaces/IArcIntel.sol
 1518e2dad68bcabad4f0c036eac46642ac11f5a8e84c4f1f04b76f98977bb4f1  arc-intel/executor/foundry.toml
-16cbd6b5f1b1d8748dd6d3c0be92f7e65f185865f9c26b5a154ec91b98019501  arc-intel/executor/test/ArcIntelExecutor.t.sol
-e8bd7b8199d548c2e15958dd0b3e668e1d10dff2c497fb08cef3f55f73a9d37e  arc-intel/executor/test/mocks/Mocks.sol
+4e2f2b69b4c9419c609cc2a5fbb78170ad2b75f38922c15cd8914b19fa619256  arc-intel/executor/test/ArcIntelExecutor.t.sol   (* expanded post-tag, Slither regression)
+553e105c5344dece5747fe205ecc5367a46a7623e473596895aea931b720429c  arc-intel/executor/test/mocks/Mocks.sol      (* expanded post-tag, Slither regression)
 f7b8e0d9127614e346ec6b5740c3e965695d71d892bb4dbebf0924fda8241094  arc-intel/executor/test/ArcIntelFork.t.sol
 8af84068c0201237217b2a8f2dcb7cbd2b0c98f20cbb5b92b0155835225346a4  arc-intel/executor/src/testonly/TestERC20.sol
 1e4e930ed6200762f2585ca5cf4d12b937547373dd28a14fec7236a2cc675a9a  arc-intel/executor/src/testonly/PoolSeeder.sol
