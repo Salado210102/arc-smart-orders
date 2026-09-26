@@ -264,6 +264,96 @@ contract ArcIntelExecutorTest is Test {
         assertEq(usdc.balanceOf(user), 1e18);
     }
 
+    /// @dev Slither `unchecked-transfer`: a token that returns false on transfer() without reverting.
+    ///      Empirical proof of the fail-safe: v4 flash accounting makes the whole tx revert.
+    function testUncheckedTransferRevertsWholeTx() public {
+        FalseTransferERC20 fA = new FalseTransferERC20();
+        MockERC20 nB = new MockERC20("NB");
+        (address c0, address c1) = address(fA) < address(nB) ? (address(fA), address(nB)) : (address(nB), address(fA));
+        bool z4o = (c0 == address(fA));
+
+        MockPoolManager pm2 = new MockPoolManager();
+        pm2.setRate(1e18);
+        pm2.setStrictSettle(true); // emulate v4: settle() reverts if nothing was paid
+
+        IPoolManager.PoolKey memory k = IPoolManager.PoolKey(c0, c1, 3000, 60, address(0));
+        bytes32[] memory pools = new bytes32[](1);
+        pools[0] = keccak256(abi.encode(k));
+        ArcIntelExecutor ex = new ArcIntelExecutor(address(pm2), safe, pools);
+        vm.etch(ex.PERMIT2(), address(permit2).code);
+
+        fA.mint(user, 1e18);
+        nB.mint(address(pm2), 1e18);
+
+        IPermit2.PermitTransferFrom memory permit = IPermit2.PermitTransferFrom({
+            permitted: IPermit2.TokenPermissions({token: address(fA), amount: 1e18}),
+            nonce: 1,
+            deadline: block.timestamp + 100
+        });
+        ArcIntelExecutor.Order memory o = ArcIntelExecutor.Order({
+            key: k,
+            zeroForOne: z4o,
+            minOut: 0,
+            recipient: user,
+            orderNonce: 1,
+            deadline: block.timestamp + 100
+        });
+
+        vm.expectRevert(MockPoolManager.CurrencyNotSettled.selector);
+        ex.execute(permit, user, o, "");
+
+        assertEq(fA.balanceOf(user), 1e18, "pull + settle reverted atomically");
+        assertFalse(ex.orderNonceUsed(user, 1), "nonce not consumed on revert");
+    }
+
+    /// @dev Slither `reentrancy-balance`: a malicious hook that tries to re-enter `execute` and to
+    ///      move the recipient's output. Both must be blocked; the measured amountOut is untouched.
+    function testMaliciousHookCannotReenterOrManipulate() public {
+        MockERC20 inT = new MockERC20("IN");
+        StrictERC20 outT = new StrictERC20("OUT"); // enforces allowance on transferFrom
+        (address c0, address c1) =
+            address(inT) < address(outT) ? (address(inT), address(outT)) : (address(outT), address(inT));
+        bool z4o = (c0 == address(inT));
+
+        MockPoolManager pm3 = new MockPoolManager();
+        pm3.setRate(1e18);
+        IPoolManager.PoolKey memory k = IPoolManager.PoolKey(c0, c1, 3000, 60, address(0));
+        bytes32[] memory pools = new bytes32[](1);
+        pools[0] = keccak256(abi.encode(k));
+        ArcIntelExecutor ex = new ArcIntelExecutor(address(pm3), safe, pools);
+        vm.etch(ex.PERMIT2(), address(permit2).code);
+
+        inT.mint(user, 1e18);
+        outT.mint(address(pm3), 1e18); // pool output
+        outT.mint(user, 5e18); // pre-existing balance the hook will try to touch
+
+        MaliciousHook hook = new MaliciousHook(address(ex), address(outT), user);
+        pm3.setSwapHook(address(hook));
+
+        IPermit2.PermitTransferFrom memory permit = IPermit2.PermitTransferFrom({
+            permitted: IPermit2.TokenPermissions({token: address(inT), amount: 1e18}),
+            nonce: 1,
+            deadline: block.timestamp + 100
+        });
+        ArcIntelExecutor.Order memory o = ArcIntelExecutor.Order({
+            key: k,
+            zeroForOne: z4o,
+            minOut: 1e18,
+            recipient: user,
+            orderNonce: 1,
+            deadline: block.timestamp + 100
+        });
+
+        uint256 before = outT.balanceOf(user);
+        ex.execute(permit, user, o, "");
+        uint256 got = outT.balanceOf(user) - before;
+
+        assertTrue(hook.reentryBlocked(), "nested execute must be blocked by nonReentrant");
+        assertTrue(hook.stealFailed(), "hook must not be able to move the recipient's tokens");
+        assertEq(got, 1e18, "amountOut is exactly the pool output (no manipulation)");
+        assertEq(outT.balanceOf(user), 6e18, "pre-existing balance untouched");
+    }
+
     function testPriceLimitBoundsAndAmount() public {
         pm.setRate(1e18);
         exec.execute(_permit(address(tok), 1e18), user, _order(1e18, 1, block.timestamp + 100), "");
