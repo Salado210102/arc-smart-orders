@@ -53,9 +53,11 @@ forge test              # 24 unit/invariant/fuzz pass; fork test skipped unless 
   - **atomicity: nonce NOT consumed when the swap reverts** (hostile/reverting pool).
 - **Stateful invariants** (`test/ArcIntelExecutor.invariants.t.sol`; see
   [`..._INVARIANTS.md`](ARC_AI_PHASE5_EXECUTOR_INVARIANTS.md)): **5000 runs × depth 100 = 500,000 calls,
-  0 reverts, 5/5 hold** — no double fill, no custody, value conservation, `pause` absolute, fail-closed
-  allowlist. (Two initial failures were harness artifacts — fuzzer calling `mint`/`setRate` directly —
-  root-caused and fixed by restricting the fuzz targets.)
+  0 reverts, 6/6 hold** — no double fill, no custody, value conservation, `pause` absolute, fail-closed
+  allowlist, **no unexpected success**. The handler **actively attempts must-fail actions** (expired
+  deadline, `minOut` too high, execute while paused, pool not allowed) and asserts they revert
+  (~62k attempts of each per campaign). (Two initial failures were harness artifacts — fuzzer calling
+  `mint`/`setRate` directly — root-caused and fixed by restricting the fuzz targets.)
 - **Fork harness** (`test/ArcIntelFork.t.sol`, `RUN_FORK=1`) against the **real** PoolManager + a real
   Argus hook on an Arc-mainnet fork: validated the v4 ABI and **caught a real bug** — `BalanceDelta`
   packs **amount0 in the upper 128 bits** — which was fixed before audit (see SPEC §8.1).

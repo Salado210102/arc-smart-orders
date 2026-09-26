@@ -5,11 +5,16 @@
 
 ## Harness
 
-- `test/ArcIntelExecutor.invariants.t.sol` — a `Handler` exposing four fuzzed entrypoints
-  (`executeSellA`, `executeSellB`, `setPaused`, `setPoolAllowed`) plus cumulative counters.
+- `test/ArcIntelExecutor.invariants.t.sol` — a `Handler` exposing eight fuzzed entrypoints:
+  happy-path (`executeValidA/B`) **plus four must-fail actions** (`executeExpired`,
+  `executeMinOutTooHigh`, `executeWhilePaused`, `executeDisallowed`) and the state toggles
+  (`setPaused`, `setPoolAllowed`).
 - The campaign fuzzes **only** the handler; tokens, pool manager and executor are `excludeContract`ed
   so the fuzzer cannot mint tokens or change the pool rate (harness-only actions).
 - Rate is fixed **1:1** and the fuzzer cannot change it → conservation is well-defined.
+
+The must-fail actions are **attempted, not avoided**: each `execute*` explicitly expects a revert and
+increments a per-category counter; a success is recorded as `unexpectedSuccess` (which must stay 0).
 
 ## Invariants
 
@@ -20,6 +25,7 @@
 | 3 | `invariant_noValueCreated` | Σ received by recipients ≤ Σ pulled via Permit2 (no tokens from nothing). |
 | 4 | `invariant_pauseAbsolute` | While paused, **no** fill succeeds, under any input. |
 | 5 | `invariant_emptyAllowlistNoFill` | With the pool not allowlisted, **no** fill succeeds (fail-closed). |
+| 6 | `invariant_noUnexpectedSuccess` | No must-fail action (expired / minOut-too-high / paused / disallowed) ever succeeds. |
 
 ## Result
 
@@ -28,12 +34,20 @@ ArcIntelExecutorInvariants invariants (runs: 5000, calls: 500000, reverts: 0)
 [PASS] invariant_emptyAllowlistNoFill
 [PASS] invariant_noCustody
 [PASS] invariant_noDoubleFill
+[PASS] invariant_noUnexpectedSuccess
 [PASS] invariant_noValueCreated
 [PASS] invariant_pauseAbsolute
 ```
 
-- **5000 runs × depth 100 = 500,000 calls, 0 handler reverts, 5/5 invariants hold** (~2m23s).
+- **5000 runs × depth 100 = 500,000 calls, 0 handler reverts, 6/6 invariants hold** (~2m37s).
+- **Active break coverage** (per run; totals across the campaign in the selector table ≈62k each):
+  `expiredTried ≈ 11`, `minOutTried ≈ 9`, `pausedTried ≈ 14`, `disallowedTried ≈ 15`, `validFills ≈ 3`
+  per run. So the campaign **did try** the edge cases — and the contract correctly rejected them.
 - Default (`forge test`, 256 runs) also green.
+
+> The must-fail semantics are *also* asserted deterministically by unit tests with `vm.expectRevert`
+> (`testRevertExpired`, `testRevertMinOutNotMet`, `testRevertWhenPaused`, `testRevertRevokedPool`),
+> so this invariant campaign adds stateful coverage on top of exact-revert assertions.
 
 Reproduce:
 ```bash

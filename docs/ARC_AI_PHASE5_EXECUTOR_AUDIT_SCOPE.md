@@ -51,8 +51,9 @@ test-only, never deployed in production.
       funds or alter a signed order.
 - [ ] **Atomicity:** repay/refund paths cannot leave funds in the executor.
 - [ ] **Stateful invariants** (`docs/ARC_AI_PHASE5_EXECUTOR_INVARIANTS.md`): one-fill-per-nonce,
-      no-custody, value conservation (received ≤ pulled), `pause` absolute, fail-closed allowlist —
-      5000 runs × depth 100, 0 failures.
+      no-custody, value conservation (received ≤ pulled), `pause` absolute, fail-closed allowlist,
+      **no unexpected success** — the handler actively attempts must-fail actions; 5000 runs × depth
+      100, 0 failures.
 
 ## 4. Attack vectors considered & mitigations
 
@@ -104,7 +105,7 @@ f7b8e0d9127614e346ec6b5740c3e965695d71d892bb4dbebf0924fda8241094  arc-intel/exec
 fbdcff78f5b162d58efab6f21271aaf2f7850161247bd1598b26f87cf01d10b5  docs/ARC_AI_PHASE5_MINIMAL_EXECUTOR_SPEC.md
 d03b11f38d58ccfa26cbea3a23feb4ac5b28f9cf14e18ee4970088ad7b1cb4ee  docs/ARC_AI_PHASE5_EXECUTION_DESIGN.md
 ecafbdf990136d02c78ca1f42e22be22f35c53c082260d731f329e0c81812ac8  docs/ARC_AI_PHASE5_V4_EXECUTOR_OPTIONS.md
-dbd19ccbb1d957032eb15e82f92bf06a3bfb858dc2a4d79a3b8779c459762e83  arc-intel/executor/test/ArcIntelExecutor.invariants.t.sol  (* added post-tag)
+8d5d0fbf8a81992ac1f7417c6943aaeac37bd19e830c4312931f65d1334813fe  arc-intel/executor/test/ArcIntelExecutor.invariants.t.sol  (* added post-tag)
 754f5e1076b130a7682bcaea1e015546c438085425ad4e1a7340174c4006dd67  arc-intel/executor/README.md                            (* added post-tag)
 d3ca058c19f0ccd4b6f30739b412c3375e3ef23016cac42cb7386fd890f44410  docs/ARC_AI_PHASE5_EXECUTOR_INVARIANTS.md                (* added post-tag)
 ```
