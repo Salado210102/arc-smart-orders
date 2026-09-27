@@ -9,8 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .alerts import Alert, is_significant_sell, pct_of_position, severity_for
-from .risk import rolling_zscore
+from .alerts import Alert, is_significant_sell, pct_of_position, severity_for, rolling_zscore
 
 SECONDS_PER_BLOCK = 0.52
 

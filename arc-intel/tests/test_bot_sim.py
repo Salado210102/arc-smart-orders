@@ -7,7 +7,7 @@ class SimTests(unittest.TestCase):
     def test_demo_flow_runs_and_contains_expected(self):
         lines = demo_flow()
         text = "\n".join(lines)
-        self.assertIn("why: dev_sell", text)
+        self.assertIn("sold 90%", text)
         self.assertIn("min_out=19.800", text)
         self.assertIn("2fa_required", text)
         self.assertIn("approved", text)

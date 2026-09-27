@@ -1,6 +1,6 @@
 import unittest
 
-from indexer.risk import anti_rug_report, build_alerts
+from indexer.alerts import dev_sell_alerts, volume_collapse_alerts, compound_alerts
 from bot.messages import format_alert
 from execution.intents import build_intent, min_out
 from execution.strategy import Position, ExitPlan, evaluate_exit
@@ -9,20 +9,14 @@ from security.permissions import create_approval, confirm, can_execute, mark_exe
 
 class IntegrationFlowTest(unittest.TestCase):
     def test_signal_to_execution_flow(self):
-        # 1) data -> anti-rug report -> alert with context
-        legs = [{"wallet": "0xsmart", "token": "0xt", "block": i * 1000, "side": "buy",
-                 "stable_value": 10.0} for i in range(13)]
-        legs.append({"wallet": "0xdev", "token": "0xt", "block": 5000, "side": "sell",
-                     "stable_value": 1.0})
-        rep = anti_rug_report(legs, creators_by_token={"0xt": "0xdev"},
-                              smart_wallets={"0xsmart"}, bucket_blocks=1000, z_threshold=-1.5)
-        alerts = build_alerts(rep, min_severity="medium")
-        self.assertTrue(alerts)
-        self.assertEqual(alerts[0]["severity"], "high")
-        msg = format_alert(alerts[0], score={"win_rate": 0.8, "trades": 18, "avg_mult": 2.0,
-                                             "entry_pct": 0.8, "confidence": "media"})
+        # 1) data -> live alert engine (indexer.alerts) -> alert message
+        rows = [{"token": "0xt", "wallet": "0xdev", "role": "creator", "block": 5000,
+                 "sell_qty": 90.0, "pos_before": 100.0, "usdc": 900.0}]
+        dev = dev_sell_alerts(rows, min_pct=0.5, min_usdc=100.0)
+        self.assertTrue(dev)
+        self.assertEqual(dev[0].severity, "high")
+        msg = format_alert(dev[0].__dict__)
         self.assertIn("why:", msg)
-        self.assertIn("win rate", msg)
 
         # 2) trade intent (non-custodial; no signing)
         intent = build_intent("0xuser", "0xt", "buy", 10.0, now=1000, limit_price=2.0,

@@ -36,7 +36,8 @@ class Handler(BaseHTTPRequestHandler):
         if u.path in ("/", "/index.html"):
             path = os.environ.get("ARC_INTEL_MINIAPP", "/root/arc-intel/miniapp/index.html")
             try:
-                body = open(path, "rb").read()
+                with open(path, "rb") as fh:
+                    body = fh.read()
             except OSError:
                 return self._send(404, {"error": "miniapp_missing"})
             self.send_response(200)

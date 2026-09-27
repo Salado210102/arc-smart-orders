@@ -12,9 +12,30 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
-from .risk import rolling_zscore
-
 SECONDS_PER_BLOCK = 0.52
+DEFAULT_LOOKBACK = 12
+
+
+def rolling_zscore(series: list, lookback: int = DEFAULT_LOOKBACK) -> list:
+    """Z-score of each bucket vs the previous `lookback` buckets (exclusive).
+
+    `series` is [(block, value), ...] sorted by block. Shared math used by the live
+    volume-collapse detection (this module and indexer/stream_alerts).
+    """
+    vals = [v for _, v in series]
+    out: list = []
+    for i, (b, v) in enumerate(series):
+        window = vals[max(0, i - lookback):i]
+        if len(window) < 3:
+            out.append((b, None))
+            continue
+        m = sum(window) / len(window)
+        var = sum((x - m) ** 2 for x in window) / len(window)
+        sd = var ** 0.5
+        out.append((b, 0.0 if sd == 0 else (v - m) / sd))
+    return out
+
+
 POSITION_MANAGER = "0x6049c9a0e26405c0985f9e3685c87d0ae917f82b"
 DEFAULT_RPC = "https://rpc.mainnet.arc.io"
 

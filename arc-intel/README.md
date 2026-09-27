@@ -1,63 +1,64 @@
-# ARC Intelligence — Phase 1: on-chain event indexer (read-only)
+# ARC AI — `arc-intel`
 
-Foundation module for the ARC Intelligence engine. **Read-only**: no signing, no transaction
-sending, no execution code path. Its only job is to capture and persist Arc mainnet swaps and
-launchpad events reliably and idempotently.
+Indexer on-chain de Arc + **bot de alertas de riesgo 24/7** + **executor no-custodial** (testnet).
+Read-only por diseño: **no** firma, **no** custodia, **no** mueve fondos de usuarios.
 
-## Status (honest)
+## Qué hace (estado real, no Fase 1)
 
-- Argus portal `0xb021be536808f551b31789422fd28a6c9c6e97da` **exists on Arc** and emits events
-  (verified on-chain). [MEDIDO]
-- **Bitquery source is scaffolded but DISABLED**: it requires `BITQUERY_OAUTH` and independent
-  confirmation that Bitquery indexes Arc. Neither could be verified here. [BLOQUEADO]
-- **Argus ABI**: event signatures taken from the **official repo** `arguspad/argus-world`
-  (`onchain/event-signatures.md`) and cross-checked with keccak256 (TokenCreated/PartsDeployed/CurveOpened).
-  Source = official GitHub repo, **not explorer-verified** (Arc Blockscout API is Cloudflare-blocked).
-  `TokenCreated` is decoded → `tokens` populated (name/symbol/creator/pool_id) on real data.
-  **No `DevBuy` event exists in Argus** → `dev_buys` is not populated (would require inference). [MEDIDO]
-- **Uniswap v4 (PoolManager `0x8366…0951`)**: Initialize/ModifyLiquidity/Swap/Donate confirmed via official
-  `Uniswap/v4-core` signatures + keccak256. `Initialize` → `pools_v4` (poolId→currency0/currency1); v4 `Swap`
-  → `swaps` (dex `uniswap_v4`, token resolved via `pools_v4`). In the validated range **v4 = 472 swaps vs
-  v3/v2 = 91 (~84% previously missed)**. [MEDIDO]
-- **`dev_buys_inferred`** is a VIEW over `swaps` (`wallet == tokens.creator` within a configurable window,
-  default 24h), `is_inferred=1`, separate from confirmed `dev_buys`. It is **0 on v4 launches** because the
-  launch Swap `sender` is the Argus Portal, not the creator (correct inference needs ERC-20 `Transfer(to==creator)`). [MEDIDO]
-- A working **RPC source** is included as a stopgap so the pipeline can be exercised end-to-end
-  on real Arc data now (swaps + raw launchpad events + token rows via pool `token0/token1`). [MEDIDO]
+- **Indexer v2/v3/v4 complete**: blocks `21,068,653 → 22,721,550` (~1.56M bloques), **~6.7M swaps**,
+  gaps = 0. Argus `TokenCreated` → `tokens` (nombre/símbolo/creator/pool_id). Uniswap **v4** PoolManager
+  `0x8366…0951` (Initialize/ModifyLiquidity/Swap/Donate). v3/v2 también capturados.
+- **Detección de riesgo (validada, NO predictiva)**: **dev-sell** (FP ~1%), **colapso de volumen**
+  (z-score), **alerta compuesta**. El **score de wallets se INVALIDÓ** en el walk-forward (Fase 2.2,
+  no le ganó al azar) → **descartado y eliminado del código**.
+- **Bot de Telegram 24/7** (beta cerrada, allowlist): `/check`, `/list`, `/subscribe*`, `/settings`,
+  `/wallet`, `/pending`, `/positions`, `/stats`, `/help`; menú inline estilo Maestro; **i18n EN/ES/中文**.
+  - `/check`: nombre, launchpad, **reputación del creador** (tokens creados / cuántos volcó), antigüedad,
+    actividad, **precio**, **market cap**, **volumen 24h**, estado y enlace al explorer.
+  - Operación **en papel [PAPER]**: **Buy** (importe), **vender 25/50/75/100 %**, **PnL** con refresco.
+  - **Kill-switch [PAPER]**: `Protect` → orden **armada** que **se dispara sola** ante un dev-sell.
+- **Executor no-custodial** (`executor/`, Solidity ≈218 LOC): `Permit2` + v4 PoolManager, `minOut`/`deadline`/
+  `nonce`, **sin custodia**. Probado **end-to-end en testnet**; **paquete de auditoría congelado**
+  (tag `arc-intel-executor-v1`) + invariantes y triage de Slither. **No desplegado en mainnet**.
 
-## Architecture (source-agnostic)
+## Módulos que EXISTEN pero **NO están conectados a producción**
+> Importante para no perderlo de vista. No se han "dado de alta" en el servicio.
 
+- `execution/strategy.py` — lógica de salida (TP/SL/trailing/scale-out). **Pura**, sin firma ni ejecución.
+- `execution/preorders.py` — construye el **payload EIP-712** y, solo con la **firma del usuario**,
+  `submit_execute(...)`. **Nunca** ejecuta sin firma (lanza `no_signature`).
+- `bot/sign_server.py` — endpoints `/order` y `/sign` (guarda la firma; **no** firma ni ejecuta) + sirve
+  la Mini App `miniapp/index.html` (WalletConnect).
+- `bot/sim.py` — simulador local (demo), no forma parte del servicio.
+
+Conexión real (testnet) pendiente de: **dominio + HTTPS**, **WalletConnect Project ID**, y un **relayer**
+con gas (`ARC_INTEL_EXECUTOR` / `ARC_RPC` / `ARC_INTEL_RELAYER_KEY`).
+
+## Mapa del código
 ```
-EventSource (RPC now / Bitquery when enabled)
-      ↓
-IndexerService  (poll loop, reconnect+backoff, cursor, health)
-      ↓
-EventProcessor  (normalize → rows; idempotent)
-      ↓
-Storage (SQLite repo; portable schema for Postgres later)
-```
-
-No secrets in code. Config via env: `ARC_RPC`, `INDEXER_DB`, `INDEXER_LOG`,
-`INDEXER_POLL_SECONDS`, `INDEXER_MAX_RANGE`, `BITQUERY_OAUTH`.
-
-### Tables
-`tokens`, `swaps`, `dev_buys`, `launchpad_events`, `wallets`, `health`, `meta`.
-Idempotency key = `(tx_hash, log_index)`.
-
-### Adding a launchpad
-Add `LaunchpadConfig(name, address, topic_map=<topic0→name>)` in `indexer/config.py`. No pipeline
-change (Flutchfun / NebulaPad / Lunya already anticipated).
-
-## Run
-
-```bash
-# from arc-intel/
-python -m indexer.run --start 22700000 --ticks 3 --range 200 --resolve-tokens --report
+indexer/   backfill, ingest, stream_alerts, alerts, creator_rep, pg_storage, pnl, scoring(histórico), …
+bot/       telegram (servicio 24/7), commands, i18n, messages, store, sender, tokenmeta, sign_server, sim
+execution/ intents, strategy, eip712, preorders        (los 3 últimos: NO conectados)
+security/  permissions        monetization/ fees
+executor/  ArcIntelExecutor.sol + tests + audit docs   (tag arc-intel-executor-v1)
+miniapp/   index.html (firma WalletConnect)
 ```
 
 ## Tests
-
-```bash
-cd arc-intel
-python -m unittest discover -s tests -t . -v
 ```
+cd arc-intel
+python3 -m unittest discover -s tests        # suite de Python
+cd executor && forge test                    # 27 tests + invariantes (Solidity)
+```
+
+## Documentación
+- `../docs/ARC_AI_DECISIONES_BOT.md` — registro de decisiones (producto, economía, Opción 2, ideas).
+- `../docs/ARC_AI_PHASE5_*` — executor: design, options, audit package, Slither triage, invariantes.
+- `README` histórico de Fase 1: `../docs/ARC_AI_DATA_ENGINE_M02.md` (y `M02B…M08`).
+
+## Honestidad
+- Las señales son **informativas** (no consejo financiero). Se muestran **ambas caras** (beneficio típico
+  **y** cola de riesgo).
+- El **score de wallets no predice** (Fase 2.2); cualquier resto de esa idea fue **eliminado**.
+- Todo lo de "operar" hoy es **[PAPER]**; la ejecución real (no-custodial, firmada) está en testnet y no
+  conectada al servicio.

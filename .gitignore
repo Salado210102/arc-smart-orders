@@ -28,3 +28,9 @@ __pycache__/
 build/
 
 
+
+# arc-intel local artifacts
+arc-intel/arc_indexer.db
+arc-intel/*.bat
+arc-intel/*.db
+arc-intel/*.db-*

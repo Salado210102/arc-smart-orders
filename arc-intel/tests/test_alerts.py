@@ -3,7 +3,7 @@ import unittest
 from indexer.alerts import (
     pct_of_position, is_significant_sell, severity_for, detect_compound,
     dev_sell_alerts, volume_collapse_alerts, compound_alerts, liquidity_removal_alerts,
-    is_thin_market, Alert,
+    is_thin_market, rolling_zscore, Alert,
 )
 
 
@@ -79,6 +79,16 @@ class AlertTests(unittest.TestCase):
         self.assertEqual(is_thin_market(5, 1, 200, no_trade_blocks=100), "single_wallet")
         # healthy
         self.assertIsNone(is_thin_market(5, 4, 200, no_trade_blocks=100))
+
+
+    def test_rolling_zscore_detects_collapse(self):
+        vals = [9, 10, 11, 10, 9, 10, 11, 10, 9, 10, 11, 10, 0]
+        series = [(i * 1000, float(v)) for i, v in enumerate(vals)]
+        z = rolling_zscore(series, lookback=12)
+        self.assertIsNone(z[0][1])          # not enough history
+        self.assertLess(z[-1][1], -3)       # the collapse
+        steady = [(i * 1000, 10.0 + (i % 2)) for i in range(13)]
+        self.assertIsNone(rolling_zscore(steady, 12)[0][1])
 
 
 if __name__ == "__main__":

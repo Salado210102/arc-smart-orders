@@ -1,7 +1,7 @@
 """Local bot simulator — runnable, no Telegram token, no network.
 
 Exercises the REAL modules end to end so you can test and find bugs:
-  risk (anti-rug) -> bot messages -> execution intent -> permissions -> exit strategy.
+  alerts (anti-rug) -> bot messages -> execution intent -> permissions -> exit strategy.
 
 Run:
     python -m bot.sim                # scripted demo (deterministic)
@@ -10,40 +10,43 @@ Run:
 from __future__ import annotations
 
 import argparse
+from collections import defaultdict
 
-from indexer.risk import anti_rug_report, build_alerts
+from indexer.alerts import dev_sell_alerts, volume_collapse_alerts, compound_alerts
 from bot.messages import format_alert, format_token_signal
 from execution.intents import build_intent, min_out, is_expired
 from execution.strategy import Position, ExitPlan, evaluate_exit
 from security.permissions import create_approval, cancel, confirm, can_execute, mark_executed
 
-SAMPLE_SCORE = {"wallet": "0xsmart", "win_rate": 0.73, "trades": 18, "avg_mult": 2.1,
-                "entry_pct": 0.8, "confidence": "media"}
 
-
-def _sample_legs():
-    legs = []
-    # noisy volume then a collapse, plus a creator sell and a smart wallet exit
+def _sample_alerts():
+    """A noisy-then-collapse token + a creator dump — derived into the live alert engine."""
     vals = [9, 10, 11, 10, 9, 10, 11, 10, 9, 10, 11, 10, 0]
-    for i, v in enumerate(vals):
-        legs.append({"wallet": "0xbuyer", "token": "0xtokdemo", "block": i * 1000,
-                     "side": "buy", "stable_value": float(v)})
+    legs = [{"wallet": "0xbuyer", "token": "0xtokdemo", "block": i * 1000, "side": "buy",
+             "stable_value": float(v)} for i, v in enumerate(vals)]
     legs.append({"wallet": "0xdev", "token": "0xtokdemo", "block": 5000, "side": "sell",
                  "stable_value": 1.0})
-    legs.append({"wallet": "0xsmart", "token": "0xtokdemo", "block": 12000, "side": "sell",
-                 "stable_value": 5.0})
-    return legs
+    # dev-sell rows (what indexer.alerts.load_creator_sells would return)
+    rows = [{"token": "0xtokdemo", "wallet": "0xdev", "role": "creator", "block": 5000,
+             "sell_qty": 90.0, "pos_before": 100.0, "usdc": 900.0}]
+    # volume series per token
+    buckets: dict[str, dict[int, float]] = defaultdict(lambda: defaultdict(float))
+    for l in legs:
+        buckets[l["token"]][(l["block"] // 1000) * 1000] += l["stable_value"]
+    series = {t: sorted(d.items()) for t, d in buckets.items()}
+    dev = dev_sell_alerts(rows, min_pct=0.5, min_usdc=100.0)
+    collapse = volume_collapse_alerts(series, z_threshold=-1.5)
+    comp = compound_alerts(dev, collapse, 6000)
+    return dev + collapse + comp
 
 
 def demo_flow(now: int = 1_000_000) -> list[str]:
     out: list[str] = []
-    rep = anti_rug_report(_sample_legs(), creators_by_token={"0xtokdemo": "0xdev"},
-                          smart_wallets={"0xsmart"}, bucket_blocks=1000, z_threshold=-1.5)
-    alerts = build_alerts(rep, min_severity="medium")
+    alerts = _sample_alerts()
     out.append("== alerts ==")
     for a in alerts:
-        out.append(format_alert(a, score=SAMPLE_SCORE))
-    out.append(format_token_signal("0xtokdemo", SAMPLE_SCORE, rep["0xtokdemo"]["flags"]))
+        out.append(format_alert(a.__dict__))
+    out.append(format_token_signal("0xtokdemo", None, ["dev_sell", "volume_collapse"]))
 
     out.append("== trade intent (non-custodial) ==")
     intent = build_intent("0xuser", "0xtokdemo", "buy", 10.0, now=now, limit_price=2.0,
@@ -127,18 +130,17 @@ def interactive(now: int = 1_000_000) -> None:
 
 
 def live_alerts(dsn: str, limit: int = 200000) -> list[dict]:
-    """Run Phase 3 on real indexed data (Postgres). VPS-only (needs psycopg2)."""
+    """Run the LIVE alert engine on real indexed data (Postgres). VPS-only."""
     from indexer.pg_storage import PostgresStorage
-    from indexer.pnl import collect_legs_pg
-    from indexer.scoring import load_insider_data_pg
-
+    from indexer.alerts import (load_creator_sells, load_volume_buckets)
     s = PostgresStorage(dsn)
-    legs = collect_legs_pg(s, limit)
-    creators, _dev = load_insider_data_pg(s)
-    smart = {r["wallet"] for r in s.load_wallet_scores(0.0, 8)}
+    rows = load_creator_sells(s)
+    dev = dev_sell_alerts(rows, 0.5, 100.0)
+    series = load_volume_buckets(s, 600)
     s.close()
-    rep = anti_rug_report(legs, creators_by_token=creators, smart_wallets=smart)
-    return build_alerts(rep, min_severity="medium")
+    collapse = volume_collapse_alerts(series, z_threshold=-2.0)
+    comp = compound_alerts(dev, collapse, 6000)
+    return [a.__dict__ for a in (dev + collapse + comp)]
 
 
 def main() -> None:
