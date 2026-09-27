@@ -67,6 +67,8 @@ Leyenda de estado: **[LIVE]** ya operativo · **[TESTNET]** probado en testnet, 
 | **Compra** (4 pasos) | pegar CA → ficha → monto/slippage → **firmar** | [TESTNET] |
 | **Venta por %** | 25 / 50 / 75 / 100 % sobre la posición real (`sell_quantity`) | [TESTNET] |
 | **Órdenes pre-firmadas** (Opción 2) | el usuario firma **una vez**; el **keeper** ejecuta sola — sin hot keys del usuario | [TESTNET] |
+| **Session keys** (Opción 3) | el usuario autoriza **una vez** una llave **acotada** (token/topes/expiry/revocable); **compras de un toque** sin popup | [PRONTO] |
+| **Pago/gas sin fricción** (base) | el **relayer** paga el gas (el usuario no necesita gas para operar) | [TESTNET] |
 | **Keeper permissionless** | envía órdenes firmadas; no puede robar ni alterar términos (la firma los liga) | [TESTNET] |
 | **Relayer (gas)** | wallet dedicada que envía las órdenes; dirección generada, **pendiente de fondear** con USDC testnet | [TESTNET] |
 | **Plan de salida** (TP / SL / trailing / scale-out) | motor `strategy.py`; `/plan` crea una venta condicional | [TESTNET] |
