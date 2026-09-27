@@ -316,6 +316,22 @@ def fire_preorders(store, alerts, transport, thr, price_fn) -> int:
             if store.get_position(po["chat"], token)["qty"] <= 0:
                 store.set_preorder_status(po["id"], "no_position")
                 continue
+            #  Real path (only when a signed order + relayer are configured); else [PAPER] fallback.
+            executor = os.environ.get("ARC_INTEL_EXECUTOR")
+            relayer = os.environ.get("ARC_INTEL_RELAYER_KEY")
+            if po.get("signature") and executor and relayer:
+                try:
+                    from execution.preorders import submit_execute
+                    txh = submit_execute(po, executor, os.environ.get("ARC_RPC",
+                                        "https://rpc.mainnet.arc.io"), relayer)
+                    store.set_preorder_status(po["id"], "executed")
+                    thr.wait(po["chat"])
+                    transport.send(po["chat"], f"\U0001F6E1\uFE0F PROTECTION #{po['id']} EXECUTED "
+                                               f"on-chain ({kind}): {txh}")
+                    fired += 1
+                    continue
+                except Exception:
+                    pass  # fall back to [PAPER]
             _paper_sell_pct(store, po["chat"], token, po["pct"] / 100.0, price_fn)
             store.set_preorder_status(po["id"], "executed")
             try:

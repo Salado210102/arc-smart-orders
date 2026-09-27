@@ -1,6 +1,7 @@
 """Subscription store for the alert bot (chat_id -> tokens/wallets/kinds)."""
 from __future__ import annotations
 
+import secrets
 import sqlite3
 import time
 
@@ -76,7 +77,12 @@ class SubscriptionStore:
             "CREATE TABLE IF NOT EXISTS preorders ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT, chat TEXT, user TEXT, token TEXT, pct REAL, "
             "floor_pct REAL, min_out REAL, deadline INTEGER, order_nonce INTEGER, status TEXT, "
-            "created_ts INTEGER)")
+            "created_ts INTEGER, signature TEXT, sign_token TEXT, sig_payload TEXT)")
+        for _col in ("signature TEXT", "sign_token TEXT", "sig_payload TEXT"):
+            try:
+                self.conn.execute(f"ALTER TABLE preorders ADD COLUMN {_col}")
+            except sqlite3.OperationalError:
+                pass
         self.conn.commit()
 
     def subscribe(self, chat_id, tokens=(), wallets=(), kinds=()) -> None:
@@ -356,14 +362,42 @@ class SubscriptionStore:
     # --- pre-signed protective orders ---
     def create_preorder(self, chat, user, token, pct, floor_pct, min_out, deadline,
                         order_nonce, status="armed", created_ts=None) -> int:
+        sign_token = secrets.token_urlsafe(16)
         cur = self.conn.execute(
             "INSERT INTO preorders(chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,"
-            "status,created_ts) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            "status,created_ts,sign_token) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
             (str(chat), str(user).lower(), str(token).lower(), float(pct), float(floor_pct),
              float(min_out), int(deadline), int(order_nonce), status,
-             int(created_ts if created_ts is not None else time.time())))
+             int(created_ts if created_ts is not None else time.time()), sign_token))
         self.conn.commit()
         return int(cur.lastrowid)
+
+    def _po_full(self, r) -> dict:
+        d = self._po_row(r[:11])
+        d.update({"signature": r[11], "sign_token": r[12], "sig_payload": r[13]})
+        return d
+
+    def get_preorder(self, pid) -> dict | None:
+        r = self.conn.execute(
+            "SELECT id,chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,status,created_ts,"
+            "signature,sign_token,sig_payload FROM preorders WHERE id=?", (int(pid),)).fetchone()
+        return self._po_full(r) if r else None
+
+    def get_preorder_by_sign_token(self, sign_token) -> dict | None:
+        r = self.conn.execute(
+            "SELECT id,chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,status,created_ts,"
+            "signature,sign_token,sig_payload FROM preorders WHERE sign_token=?",
+            (str(sign_token),)).fetchone()
+        return self._po_full(r) if r else None
+
+    def save_sig_payload(self, pid, payload_json: str) -> None:
+        self.conn.execute("UPDATE preorders SET sig_payload=? WHERE id=?", (payload_json, int(pid)))
+        self.conn.commit()
+
+    def attach_signature(self, pid, signature: str) -> None:
+        self.conn.execute("UPDATE preorders SET signature=?, status='signed' WHERE id=?",
+                          (signature, int(pid)))
+        self.conn.commit()
 
     def _po_row(self, r) -> dict:
         return {"id": r[0], "chat": r[1], "user": r[2], "token": r[3], "pct": r[4],
