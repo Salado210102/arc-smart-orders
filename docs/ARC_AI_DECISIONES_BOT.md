@@ -127,3 +127,33 @@
   **Documentación**. Comandos registrados EN/ES/ZH (botón “/” en web y móvil) y **teclado fijo eliminado**.
   Pendiente: URL de documentación propia, botones "pronto" (Signals/Copytrade/Bridge/Premium + TMA),
   trading real (mainnet + firma + auditoría).
+
+---
+
+## 11. Velocidad de ejecución — Opción 2 (órdenes pre-firmadas)
+**Decisión:** para ejecución rápida **no-custodial** se elige la **Opción 2 (órdenes pre-firmadas)**.
+La **Opción 3 (session keys / ERC-4337)** queda **diferida** (smart account + módulo de sesión +
+auditoría + hot key acotada; no es lo primero).
+
+- Usa el **contrato ya existente** (`ArcIntelExecutor`): el usuario firma **una vez por orden**; el
+  **keeper la ejecuta sola** cuando se cumple la condición.
+- Productos: **🛡️ Auto-protección (salir en dev-sell)** y **📉 órdenes límite / stop**.
+- **No-custodial puro:** la orden firmada solo puede vender TU token, con TU `minOut`, a TU dirección,
+  antes del `deadline`, una sola vez. No hay llave que robar.
+- **Ya existe:** contrato, detección de señales 24/7, tracking de posiciones + reconciliación,
+  keeper/loop, bot.
+- **Falta construir:** (1) **UX de firma** (deep link / WalletConnect) — lo principal; (2) almacén de
+  órdenes firmadas; (3) motor de disparo en el loop; (4) precio para `minOut`/triggers; (5) cancelación
+  (`cancelOrder` / `deadline`); (6) mainnet + auditoría; (7) infra de velocidad (RPC dedicado + keeper
+  caliente).
+- **Velocidad real = infra** (RPC / keeper / inclusión), no la firma.
+
+### 4 decisiones pendientes (cerrar mañana a primera hora)
+1. **Duración** de la orden (7 días / 30 días).
+2. **`minOut` en standby** (suelo p. ej. −30%, o control fino).
+3. **Cancelación** (solo expiración, o botón `cancelOrder` on-chain).
+4. **Alcance** (solo venta/proteger al inicio, o también compras límite).
+
+**Próximo paso (mañana):** empezar por la **UX de firma**, que desbloquea el resto.
+- **2026-09-27 (madrugada)** — Se elige la **Opción 2 (órdenes pre-firmadas)** para velocidad; Opción 3
+  (session keys) diferida. 4 decisiones pendientes (duración, `minOut` standby, cancelación, alcance).
