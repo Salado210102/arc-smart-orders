@@ -83,6 +83,13 @@
             <option value="3" selected>3%</option><option value="5">5%</option>
           </select>
         </div>
+        <div class="row" style="margin-top:8px;align-items:center">
+          <span class="mut" style="font-size:12px">TP %</span>
+          <input id="buytp" type="number" placeholder="ej 50" style="width:70px">
+          <span class="mut" style="font-size:12px">SL %</span>
+          <input id="buysl" type="number" placeholder="ej 20" style="width:70px">
+        </div>
+        <div class="mut" style="font-size:11px;margin-top:4px">Opcional: se configuran solos al comprar.</div>
         <button class="primary" id="buynow" style="margin-top:10px">Comprar</button>
         <div id="armout" class="mut" style="margin-top:8px"></div>
       </div>
@@ -361,9 +368,12 @@
           $("armout").textContent = "Comprando al instante…";
           const r = await api("/custody/buy", { method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ token: token.address, amount_usdc: amt, slippage: slip }) });
-          $("armout").innerHTML = (r.status === 200 && r.body && r.body.executing)
-            ? '<span class="ok">✅ Comprado al instante (el bot firmó).</span>'
-            : `<span class="bad">Error: ${esc((r.body && r.body.error) || r.status)}</span>`;
+          if (r.status === 200 && r.body && r.body.executing) {
+            const saved = await saveExitPlanFromBuy(token.address);
+            $("armout").innerHTML = '<span class="ok">✅ Comprado al instante.</span>' + (saved ? ' <span class="mut">(TP/SL guardados)</span>' : '');
+          } else {
+            $("armout").innerHTML = `<span class="bad">Error: ${esc((r.body && r.body.error) || r.status)}</span>`;
+          }
           return;
         }
         $("armout").textContent = "Creando orden…";
@@ -495,6 +505,15 @@
             loadCustody();
           };
         });
+      }
+
+      async function saveExitPlanFromBuy(tok) {
+        const tp = parseFloat($("buytp").value || "0") || 0;
+        const sl = parseFloat($("buysl").value || "0") || 0;
+        if (!tp && !sl) return false;
+        const r = await api("/exit_plan", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: tok, sl_pct: sl, tp_pct: tp }) });
+        return r.status === 200 && r.body && r.body.ok;
       }
 
       async function activateSessionThenBuy(tok, amt, slip) {
