@@ -157,6 +157,40 @@ class SignServerTests(unittest.TestCase):
         except urllib.error.HTTPError as e:
             self.assertEqual(e.code, 503)
 
+    def test_buy_order_requires_auth(self):
+        body = json.dumps({"token": "0x" + "1" * 40, "amount_usdc": 10}).encode()
+        req = urllib.request.Request(self._url("/buy_order"), data=body,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 401")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 401)
+
+    def test_buy_order_no_storage(self):
+        os.environ.pop("ARC_INTEL_DSN", None)
+        os.environ["ARC_INTEL_EXECUTOR"] = "0x" + "e" * 40
+        body = json.dumps({"token": "0x" + "1" * 40, "amount_usdc": 10}).encode()
+        req = urllib.request.Request(self._url("/buy_order"), data=body,
+                                     headers={"Content-Type": "application/json",
+                                              "X-Telegram-Init-Data": init_data(1)})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 503")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 503)
+
+    def test_buy_kind_excluded_from_fire_list(self):
+        s = SubscriptionStore(self.db)
+        other = "0x" + "b" * 40
+        sell = s.create_preorder(1, "0xuser", other, 50, 30, 0, 9, 11, kind="sell")
+        buy = s.create_preorder(1, "0xuser", other, 0, 2, 100, 9, 12, kind="buy")
+        ids = [p["id"] for p in s.preorders_for_token(other)]
+        self.assertEqual(ids, [sell])
+        self.assertEqual(s.get_preorder(buy)["kind"], "buy")
+        self.assertEqual(s.get_preorder(sell)["kind"], "sell")
+        s.close()
+
 
 if __name__ == "__main__":
     unittest.main()

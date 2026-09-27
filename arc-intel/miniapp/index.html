@@ -1,83 +1,268 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SNIPER IA · Sign</title>
+  <title>ARC AI · SNIPER IA</title>
   <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0b0e12;color:#eaeef3;
-         margin:0;padding:20px;max-width:560px}
-    h3{margin:4px 0 12px}
-    pre{background:#141a22;border-radius:10px;padding:12px;overflow:auto;font-size:12px}
-    button{width:100%;padding:16px;border:0;border-radius:12px;background:#2f7dff;color:#fff;font-size:16px;
-           font-weight:600;margin-top:12px}
-    button:disabled{opacity:.5}
-    .ok{color:#38d39f}
+    :root{--bg:#0b0e12;--card:#141a22;--fg:#eaeef3;--mut:#8b98a9;--acc:#2f7dff;--ok:#38d39f;--warn:#ffb020;--bad:#ff5c5c}
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--fg);
+         margin:0;padding:14px;max-width:560px;margin-inline:auto}
+    h3{margin:6px 0 10px}
+    .card{background:var(--card);border-radius:12px;padding:12px;margin-bottom:12px}
+    .mut{color:var(--mut);font-size:13px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    button{padding:12px;border:0;border-radius:10px;background:#20293a;color:var(--fg);font-size:14px;cursor:pointer}
+    button.primary{background:var(--acc);color:#fff;font-weight:600;width:100%}
+    button.ghost{background:#20293a}
+    button:disabled{opacity:.5;cursor:default}
+    input,select{padding:11px;border-radius:10px;border:1px solid #24303f;background:#0f141b;color:var(--fg);font-size:14px;width:100%}
+    nav{display:flex;gap:6px;margin-bottom:12px}
+    nav button{flex:1}
+    nav button.on{background:var(--acc);color:#fff}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .kv{display:flex;justify-content:space-between;gap:8px;padding:3px 0}
+    .kv b{text-align:right}
+    .badge{font-size:11px;padding:3px 8px;border-radius:20px;background:#20293a;color:var(--mut)}
+    .ok{color:var(--ok)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+    pre{background:#0f141b;border-radius:10px;padding:10px;overflow:auto;font-size:11px}
+    .hide{display:none}
   </style>
 </head>
 <body>
-  <h3>🛡️ SNIPER IA — Arm protection</h3>
-  <div id="info">Cargando…</div>
-  <pre id="details"></pre>
-  <button id="go" disabled>Conectar wallet y firmar</button>
-  <div id="out"></div>
+  <div class="row" style="justify-content:space-between">
+    <h3>🛡️ ARC AI · SNIPER IA</h3>
+    <span class="badge" id="netbadge">TESTNET</span>
+  </div>
+
+  <!-- ================= SIGN VIEW (?t=...) ================= -->
+  <div id="signview" class="hide">
+    <div class="card">
+      <h3 id="signtitle">Armar orden</h3>
+      <div id="signinfo" class="mut">Cargando…</div>
+      <pre id="signdetails" class="hide"></pre>
+      <button id="signgo" class="primary" disabled>Conectar wallet y firmar</button>
+      <div id="signout" class="mut"></div>
+    </div>
+    <button class="ghost" onclick="location.href='/'">← Volver</button>
+  </div>
+
+  <!-- ================= MAIN APP ================= -->
+  <div id="main" class="hide">
+    <nav>
+      <button id="tab-buy" class="on">Compra</button>
+      <button id="tab-pos">Posiciones</button>
+      <button id="tab-wal">Cartera</button>
+    </nav>
+
+    <section id="sec-buy">
+      <div class="card">
+        <div class="mut">Paso 1 · Pegar la CA del token</div>
+        <div class="row" style="margin-top:8px">
+          <input id="ca" placeholder="0x… (40 hex)" style="flex:1">
+          <button class="ghost" id="check">Consultar</button>
+        </div>
+        <div id="tokencard" class="hide" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card hide" id="step2">
+        <div class="mut">Paso 2 · Monto y slippage</div>
+        <div class="row" style="margin:8px 0">
+          <button class="ghost amt" data-a="10">$10</button>
+          <button class="ghost amt" data-a="20">$20</button>
+          <button class="ghost amt" data-a="50">$50</button>
+          <button class="ghost amt" data-a="100">$100</button>
+        </div>
+        <div class="row">
+          <input id="amount" type="number" placeholder="monto USDC" style="flex:1">
+          <select id="slippage">
+            <option value="0.5">0.5%</option><option value="1">1%</option>
+            <option value="3" selected>3%</option><option value="5">5%</option>
+          </select>
+        </div>
+        <button class="ghost" id="quote" style="margin-top:10px;width:100%">Cotizar</button>
+        <div id="quoter" class="hide" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card hide" id="step3">
+        <div class="mut">Paso 3 · Armar y firmar (no-custodial)</div>
+        <button class="primary" id="arm" style="margin-top:8px">Armar orden y firmar</button>
+        <div id="armout" class="mut" style="margin-top:8px"></div>
+      </div>
+    </section>
+
+    <section id="sec-pos" class="hide">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div class="mut">Tus posiciones (con PnL no realizado)</div>
+          <button class="ghost" id="posrefresh">↻</button>
+        </div>
+        <div id="poslist" style="margin-top:8px"></div>
+        <div id="possummary" class="mut" style="margin-top:8px"></div>
+      </div>
+    </section>
+
+    <section id="sec-wal" class="hide">
+      <div class="card">
+        <div class="mut">Wallet enlazada (watch-only) y tokens auto-seguidos</div>
+        <div id="walletinfo" style="margin-top:8px"></div>
+        <div class="mut" style="margin-top:8px">Para enlazar/cambiar wallet: comando <b>/link_wallet</b> en el bot.</div>
+      </div>
+    </section>
+
+    <div id="notice" class="mut"></div>
+  </div>
 
   <script type="module">
-    //  Config: set these when deploying behind the domain.
-    const PROJECT_ID = "54e0d6b14b92affd112ef43bc4546458"; // Reown/WalletConnect Cloud (project id)
-    const CHAIN_ID   = 5042002;                                 // Arc testnet (mainnet = 5042)
-    const API        = location.origin;                         // the sign server (same origin)
+    const tg = window.Telegram && window.Telegram.WebApp;
+    const INIT = (tg && tg.initData) || "";
+    const API = location.origin;
+    const PROJECT_ID = "54e0d6b14b92affd112ef43bc4546458";
+    const CHAIN_ID = 5042002; // Arc testnet
+    if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
 
-    const t = new URLSearchParams(location.search).get("t");
-    const info = document.getElementById("info");
-    const details = document.getElementById("details");
-    const out = document.getElementById("out");
-    const go = document.getElementById("go");
-    let payload = null;
-
-    async function load() {
-      if (!t) { info.textContent = "Falta el token (?t=…)"; return; }
-      const r = await fetch(`${API}/order?t=${encodeURIComponent(t)}`).then(x => x.json());
-      if (r.error) { info.textContent = "Orden no disponible: " + r.error; return; }
-      payload = r.payload;
-      info.textContent = "Vas a firmar una orden de PROTECCIÓN (no custodia: tú firmas, el bot nunca tiene tus llaves).";
-      details.textContent = JSON.stringify({
-        poolKey: payload.poolKey, zeroForOne: payload.zeroForOne, order: payload.order
-      }, null, 2);
-      go.disabled = false;
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    async function api(path, opts = {}) {
+      const headers = Object.assign({}, opts.headers || {});
+      if (INIT) headers["X-Telegram-Init-Data"] = INIT;
+      const r = await fetch(API + path, Object.assign({}, opts, { headers }));
+      let body = null; try { body = await r.json(); } catch (e) {}
+      return { status: r.status, body };
+    }
+    async function connectSign(payload) {
+      const { EthereumProvider } = await import("https://esm.sh/@walletconnect/ethereum-provider@2");
+      const provider = await EthereumProvider.init({ projectId: PROJECT_ID, chains: [CHAIN_ID],
+        optionalChains: [CHAIN_ID], showQrModal: true, methods: ["eth_signTypedData_v4"] });
+      await provider.connect();
+      const from = provider.accounts[0];
+      return provider.request({ method: "eth_signTypedData_v4",
+        params: [from, JSON.stringify(payload.typedData)] });
     }
 
-    go.onclick = async () => {
-      try {
-        out.textContent = "Conectando wallet…";
-        const { EthereumProvider } = await import("https://esm.sh/@walletconnect/ethereum-provider@2");
-        const provider = await EthereumProvider.init({
-          projectId: PROJECT_ID,
-          chains: [CHAIN_ID],
-          optionalChains: [CHAIN_ID],
-          showQrModal: true,
-          methods: ["eth_signTypedData_v4", "personal_sign"],
-        });
-        await provider.connect();
-        const from = provider.accounts[0];
-        out.textContent = "Firma en tu wallet…";
-        const sig = await provider.request({
-          method: "eth_signTypedData_v4",
-          params: [from, JSON.stringify(payload.typedData)],
-        });
-        const res = await fetch(`${API}/sign`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ t, signature: sig }),
-        }).then(x => x.json());
-        out.innerHTML = res.ok
-          ? '<span class="ok">✅ Protección armada. Vuelve a Telegram.</span>'
-          : "Error: " + JSON.stringify(res);
-      } catch (e) {
-        out.textContent = "Cancelado/error: " + (e && e.message ? e.message : e);
+    // ---------------- SIGN VIEW ----------------
+    const t = new URLSearchParams(location.search).get("t");
+    if (t) {
+      $("signview").classList.remove("hide");
+      const info = $("signinfo"), details = $("signdetails"), out = $("signout"), go = $("signgo");
+      let payload = null;
+      (async () => {
+        const { status, body } = await api(`/order?t=${encodeURIComponent(t)}`);
+        if (status !== 200 || !body || body.error) { info.textContent = "Orden no disponible: " + (body && body.error ? body.error : status); return; }
+        payload = body.payload;
+        const p = body.preorder || {};
+        info.innerHTML = `Orden <b>#${esc(p.id)}</b> · ${esc(p.token || "")}<br>` +
+          `<span class="mut">No-custodial: tú firmas; el bot nunca tiene tus llaves.</span>`;
+        details.textContent = JSON.stringify(payload.typedData && payload.typedData.message ? payload.typedData.message : payload, null, 2);
+        details.classList.remove("hide");
+        go.disabled = false;
+      })();
+      go.onclick = async () => {
+        try {
+          out.textContent = "Conectando wallet…"; go.disabled = true;
+          const sig = await connectSign(payload);
+          out.textContent = "Enviando firma…";
+          const { status, body } = await api("/sign", { method: "POST",
+            headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t, signature: sig }) });
+          out.innerHTML = (status === 200 && body && body.ok)
+            ? '<span class="ok">✅ Orden firmada. El keeper la ejecutará al cumplirse la condición.</span>'
+            : 'Error: ' + JSON.stringify(body || status);
+        } catch (e) { out.textContent = "Cancelado/error: " + (e && e.message ? e.message : e); go.disabled = false; }
+      };
+    } else {
+      // ---------------- MAIN APP ----------------
+      $("main").classList.remove("hide");
+      if (!INIT) $("notice").innerHTML = "Abre esta Mini App desde Telegram para operar (se necesita autenticación). ";
+      function tab(name) {
+        for (const k of ["buy", "pos", "wal"]) {
+          $("sec-" + k).classList.toggle("hide", k !== name);
+          $("tab-" + k).classList.toggle("on", k === name);
+        }
+        if (name === "pos") loadPositions();
+        if (name === "wal") loadWallet();
       }
-    };
+      $("tab-buy").onclick = () => tab("buy");
+      $("tab-pos").onclick = () => tab("pos");
+      $("tab-wal").onclick = () => tab("wal");
 
-    load();
+      let token = null;
+      $("ca").value = new URLSearchParams(location.search).get("token") || "";
+      $("check").onclick = async () => {
+        const addr = ($("ca").value || "").trim().toLowerCase();
+        $("tokencard").classList.remove("hide");
+        $("tokencard").innerHTML = '<span class="mut">Consultando…</span>';
+        const { status, body } = await api(`/token?address=${addr}`);
+        if (status !== 200 || !body || body.error) { $("tokencard").innerHTML = `<span class="bad">Error: ${esc((body&&body.error)||status)}</span>`; return; }
+        token = body;
+        const r = body.creator_rep || {};
+        const rep = (r.created != null) ? `creados ${r.created}` + (r.dumped ? ` · <span class="warn">volcados ${r.dumped}</span>` : "") : "—";
+        const thin = body.thin_market ? `<span class="warn">thin market (${esc(body.thin_market)})</span>` : `<span class="ok">actividad</span>`;
+        $("tokencard").innerHTML =
+          `<div class="kv"><span>${esc(body.symbol||"?")}</span><b>${esc(body.name||"")}</b></div>
+           <div class="kv"><span>Precio</span><b>${esc(body.price_text)}</b></div>
+           <div class="kv"><span>Market cap</span><b>${esc(body.market_cap_text)}</b></div>
+           <div class="kv"><span>Vol 24h</span><b>${esc(body.vol24_text)}</b></div>
+           <div class="kv"><span>Estado</span><b>${thin}</b></div>
+           <div class="kv"><span>Creador</span><b>${rep}</b></div>
+           <div class="mut" style="margin-top:6px">${esc(body.address)}</div>`;
+        $("step2").classList.remove("hide");
+      };
+      document.querySelectorAll(".amt").forEach(b => b.onclick = () => { $("amount").value = b.dataset.a; });
+      $("quote").onclick = async () => {
+        const amt = parseFloat($("amount").value || "0");
+        const slip = parseFloat($("slippage").value || "3");
+        $("quoter").classList.remove("hide"); $("quoter").innerHTML = '<span class="mut">Cotizando…</span>';
+        const { status, body } = await api(`/buy_quote?token=${token.address}&amount_usdc=${amt}&slippage=${slip}`);
+        if (status !== 200 || !body || body.error) { $("quoter").innerHTML = `<span class="bad">Error: ${esc((body&&body.error)||status)}</span>`; return; }
+        $("quoter").innerHTML =
+          `<div class="kv"><span>Recibes ~</span><b>${body.quote.expected_out.toLocaleString(undefined,{maximumFractionDigits:0})} ${esc(body.token.symbol||"")}</b></div>
+           <div class="kv"><span>Mínimo (slippage)</span><b>${body.quote.min_out.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div>
+           <div class="kv"><span>Fee</span><b>1%</b></div>`;
+        $("step3").classList.remove("hide");
+      };
+      $("arm").onclick = async () => {
+        const amt = parseFloat($("amount").value || "0");
+        const slip = parseFloat($("slippage").value || "3");
+        $("armout").textContent = "Creando orden…";
+        const { status, body } = await api("/buy_order", { method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: token.address, amount_usdc: amt, slippage: slip }) });
+        if (status === 200 && body && body.sign_url) {
+          location.href = body.sign_url;
+        } else {
+          $("armout").innerHTML = `<span class="bad">Error: ${esc((body&&body.error)||status)}</span>`;
+        }
+      };
+
+      async function loadPositions() {
+        $("poslist").innerHTML = '<span class="mut">Cargando…</span>';
+        const { status, body } = await api("/positions");
+        if (status !== 200 || !body) { $("poslist").innerHTML = `<span class="bad">Error: ${status}${status===401?" (abre en Telegram)":""}</span>`; return; }
+        if (!body.positions.length) { $("poslist").innerHTML = '<span class="mut">Sin posiciones.</span>'; $("possummary").textContent = ""; return; }
+        $("poslist").innerHTML = body.positions.map(p => {
+          const cls = p.unrealized_pct >= 0 ? "ok" : "bad";
+          const rec = p.reconciled === false ? ' <span class="warn">⚠︎ reconciliar</span>' : '';
+          return `<div class="card" style="padding:10px">
+            <div class="kv"><span>${esc(p.token.slice(0,10))}…</span><b class="${cls}">${(p.unrealized_pct*100).toFixed(1)}%</b></div>
+            <div class="kv mut"><span>cantidad</span><b>${p.qty.toLocaleString(undefined,{maximumFractionDigits:2})}</b></div>
+            <div class="kv mut"><span>coste medio</span><b>${p.avg_cost.toPrecision(4)}</b></div>
+            <div class="kv mut"><span>PnL no realizado</span><b>${p.unrealized.toFixed(2)} USDC</b>${rec}</div></div>`;
+        }).join("");
+        const s = body.summary;
+        $("possummary").innerHTML = `Total: valor <b>${s.value.toFixed(2)}</b> · coste <b>${s.cost.toFixed(2)}</b> · no realizado <b>${s.unrealized.toFixed(2)}</b> USDC · realizado <b>${s.realized.toFixed(2)}</b>`;
+      }
+      async function loadWallet() {
+        $("walletinfo").innerHTML = '<span class="mut">Cargando…</span>';
+        const { status, body } = await api("/wallet");
+        if (status !== 200 || !body) { $("walletinfo").innerHTML = `<span class="bad">Error: ${status}${status===401?" (abre en Telegram)":""}</span>`; return; }
+        $("walletinfo").innerHTML =
+          `<div class="kv"><span>Enlazada</span><b>${esc(body.linked_wallet || "—")}</b></div>
+           <div class="kv"><span>Auto-seguidos</span><b>${body.count}</b></div>` +
+          (body.auto_subs.length ? `<div class="mut" style="margin-top:6px">${body.auto_subs.map(esc).join("<br>")}</div>` : "");
+      }
+      if ($("ca").value) $("check").click();
+    }
   </script>
 </body>
 </html>

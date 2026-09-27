@@ -159,6 +159,17 @@
   (token *Tower*): $10 → 2,434,291 tokens, `minOut` 2,385,606 con 2%; payload con executor testnet
   (`0x89dF…35E8`, chainId 5042002), `zeroForOne:true`, `typedData` correcto. Suite **254 passed**.
   Pendiente C2: **persistir la orden** (compra) + keeper, y la **UI** de los 4 pasos.
+- **2026-09-27 (Parte C, entregable 4 — C2 completo: persistencia + UI)** — `store.preorders` ahora
+  tiene columna **`kind`** (`'sell'` por defecto; migración no destructiva). Las órdenes de **compra**
+  se guardan con `kind='buy'` y **no** se disparan solas (`preorders_for_token` filtra `kind='sell'`,
+  así Protect sigue igual). Nuevo endpoint **`POST /buy_order`** (auth) que persiste la orden y
+  devuelve `sign_token`/`sign_url`; la firma usa el **mismo** flujo `GET /order` + `POST /sign`.
+  Reescrita **`miniapp/index.html`**: pestañas **Compra** (4 pasos: CA → ficha → monto/slippage →
+  cotizar → armar y firmar), **Posiciones** (PnL no realizado + resumen) y **Cartera** (wallet
+  watch-only + auto-seguidos), con `initData` de Telegram y firma WalletConnect. **Prueba E2E por
+  HTTPS público**: `POST /buy_order` → `persisted:true`; `GET /order` → payload; `POST /sign` → ok;
+  fila verificada `kind='buy', status='signed', user=<wallet>`; limpieza hecha. Suite **257 passed**
+  (1 fallo ambiental local). Pendiente: **keeper** de compra (relayer con gas) y `/alerts`.
 
 ---
 

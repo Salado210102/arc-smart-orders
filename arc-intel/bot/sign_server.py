@@ -62,6 +62,73 @@ class Handler(BaseHTTPRequestHandler):
         u = data.get("user")
         return u.get("id") if isinstance(u, dict) else None
 
+    def _buy(self, uid, addr, amount_usdc, slippage, persist):
+        """Buy quote (and, if persist, a stored buy order) -> (http_code, body)."""
+        if not ADDR_RE.match(addr or ""):
+            return 400, {"error": "bad_address"}
+        try:
+            amount_usdc = float(amount_usdc)
+            slippage = float(slippage)
+        except (TypeError, ValueError):
+            return 400, {"error": "bad_amount"}
+        if amount_usdc <= 0 or slippage < 0:
+            return 400, {"error": "bad_amount"}
+        executor = os.environ.get("ARC_INTEL_EXECUTOR")
+        if not executor:
+            return 503, {"error": "no_executor"}
+        st = _storage()
+        if st is None:
+            return 503, {"error": "no_storage"}
+        from . import tokenmeta
+        from .miniapp_data import load_pool, load_token_card
+        from execution.quotes import buy_quote, build_buy_payload
+        from execution.eip712 import new_nonce
+        stable = os.environ.get("ARC_INTEL_STABLE", "0x3600000000000000000000000000000000000000")
+        pool = load_pool(st, addr)
+        if not pool:
+            return 404, {"error": "no_pool"}
+        card = load_token_card(st, addr)
+        amount_in_base = int(round(amount_usdc * (10 ** 6)))
+        try:
+            quote = buy_quote(amount_in_base=amount_in_base, token_price=card["price"],
+                              token_decimals=tokenmeta.rpc_decimals(addr), slippage_pct=slippage)
+        except ValueError as e:
+            return 400, {"error": str(e)}
+        store = SubscriptionStore(DB)
+        try:
+            recipient = store.get_linked_wallet(uid)
+        finally:
+            store.close()
+        resp = {"preview": not persist, "persisted": persist, "token": card, "pool": pool,
+                "quote": quote, "slippage_pct": slippage, "recipient": recipient or None,
+                "payload": None}
+        if not recipient:
+            resp["hint"] = "link_wallet"
+            return 200, resp
+        import time as _t
+        chain_id = int(os.environ.get("ARC_INTEL_CHAIN_ID", "5042"))
+        deadline = int(_t.time()) + int(os.environ.get("ARC_INTEL_ORDER_TTL", "1800"))
+        order_nonce = new_nonce()
+        permit_nonce = new_nonce()
+        resp["payload"] = build_buy_payload(
+            chain_id=chain_id, executor=executor, pool=pool, stable=stable,
+            amount_in_base=amount_in_base, min_out_base=quote["min_out_base"],
+            recipient=recipient, order_nonce=order_nonce, permit_nonce=permit_nonce,
+            deadline=deadline)
+        if persist:
+            store = SubscriptionStore(DB)
+            try:
+                pid = store.create_preorder(uid, recipient, addr, 0.0, slippage,
+                                            quote["min_out_base"], deadline, order_nonce,
+                                            status="armed", kind="buy")
+                store.save_sig_payload(pid, json.dumps(resp["payload"]))
+                po = store.get_preorder(pid)
+            finally:
+                store.close()
+            resp.update({"id": pid, "sign_token": po["sign_token"],
+                         "sign_url": f"/?t={po['sign_token']}"})
+        return 200, resp
+
     def do_OPTIONS(self):  # CORS preflight
         self._send(204, {})
 
@@ -121,56 +188,10 @@ class Handler(BaseHTTPRequestHandler):
             if uid is None:
                 return self._send(401, {"error": "unauthorized"})
             q = parse_qs(u.query)
-            addr = (q.get("token") or [""])[0]
-            if not ADDR_RE.match(addr or ""):
-                return self._send(400, {"error": "bad_address"})
-            try:
-                amount_usdc = float((q.get("amount_usdc") or ["0"])[0])
-                slippage = float((q.get("slippage") or ["1"])[0])
-            except ValueError:
-                return self._send(400, {"error": "bad_amount"})
-            st = _storage()
-            if st is None:
-                return self._send(503, {"error": "no_storage"})
-            from . import tokenmeta
-            from .miniapp_data import load_pool, load_token_card
-            from execution.quotes import buy_quote, build_buy_payload
-            from execution.eip712 import new_nonce
-            stable = os.environ.get("ARC_INTEL_STABLE", "0x3600000000000000000000000000000000000000")
-            pool = load_pool(st, addr)
-            if not pool:
-                return self._send(404, {"error": "no_pool"})
-            card = load_token_card(st, addr)
-            dec = tokenmeta.rpc_decimals(addr)
-            amount_in_base = int(round(amount_usdc * (10 ** 6)))
-            try:
-                quote = buy_quote(amount_in_base=amount_in_base, token_price=card["price"],
-                                  token_decimals=dec, slippage_pct=slippage)
-            except ValueError as e:
-                return self._send(400, {"error": str(e)})
-            resp = {"preview": True, "persisted": False, "token": card, "pool": pool,
-                    "quote": quote, "slippage_pct": slippage, "payload": None,
-                    "recipient": None}
-            executor = os.environ.get("ARC_INTEL_EXECUTOR")
-            store = SubscriptionStore(DB)
-            try:
-                recipient = store.get_linked_wallet(uid)
-            finally:
-                store.close()
-            if executor and recipient:
-                import time as _t
-                chain_id = int(os.environ.get("ARC_INTEL_CHAIN_ID", "5042"))
-                resp["recipient"] = recipient
-                resp["payload"] = build_buy_payload(
-                    chain_id=chain_id, executor=executor, pool=pool, stable=stable,
-                    amount_in_base=amount_in_base, min_out_base=quote["min_out_base"],
-                    recipient=recipient, order_nonce=new_nonce(), permit_nonce=new_nonce(),
-                    deadline=int(_t.time()) + 1800)
-            elif not executor:
-                resp["hint"] = "no_executor"
-            else:
-                resp["hint"] = "link_wallet"
-            return self._send(200, resp)
+            code, resp = self._buy(uid, (q.get("token") or [""])[0],
+                                   (q.get("amount_usdc") or ["0"])[0],
+                                   (q.get("slippage") or ["1"])[0], persist=False)
+            return self._send(code, resp)
         if u.path != "/order":
             return self._send(404, {"error": "not_found"})
         tok = (parse_qs(u.query).get("t") or [""])[0]
@@ -190,6 +211,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         u = urlparse(self.path)
+        if u.path == "/buy_order":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send(400, {"error": "bad_json"})
+            code, resp = self._buy(uid, data.get("token") or "", data.get("amount_usdc") or 0,
+                                   data.get("slippage", 1), persist=True)
+            return self._send(code, resp)
         if u.path != "/sign":
             return self._send(404, {"error": "not_found"})
         n = int(self.headers.get("Content-Length") or 0)

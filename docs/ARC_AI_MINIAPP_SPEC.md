@@ -286,10 +286,12 @@ firma rechazada → volver a Paso 3 sin perder datos; `deadline` vencido → rec
 | GET | `/positions` | **sí** | posiciones + PnL no realizado + resumen | `miniapp_api.position_views`, `positions.reconcile` |
 | GET | `/wallet` | **sí** | wallet enlazada + auto-subs | `miniapp_api.wallet_view` |
 | GET | `/buy_quote?token=&amount_usdc=&slippage=` | **sí** | quote de compra + payload firmable (preview) | `execution.quotes`, `preorders.build_sign_payload` |
+| POST | `/buy_order` | **sí** | crea y **persiste** una orden de compra; devuelve `sign_token`/`sign_url` | `store.create_preorder(kind='buy')`, `execution.quotes` |
 
-> `/buy_quote` devuelve `{token, pool, quote, payload}` con `preview:true, persisted:false`:
-> es una **vista previa** (payload con nonces efímeros). La **creación real de la orden** (persistir
-> + keeper) es el siguiente paso de C2.
+> `/buy_quote` devuelve `{token, pool, quote, payload}` con `preview:true, persisted:false` (vista
+> previa). `POST /buy_order` persiste la orden (`kind='buy'`, estado `armed`) y devuelve un
+> `sign_token`; el flujo de firma es el **mismo** (`GET /order` + `POST /sign`). Las órdenes `buy`
+> **no** se disparan solas: `preorders_for_token` solo devuelve `kind='sell'` (Protect).
 
 **Propuestos [FALTA]:**
 
@@ -339,9 +341,12 @@ por IP y CSP.
 
 ## 9. Orden de construcción (Parte C — por aprobar, no construir aún)
 
-1. **Contrato de datos + endpoints de lectura** (`/token`, `/positions`, `/alerts`, `/wallet`):
-   solo backend + tests. Sin UI.
-2. **C2 Compra** (flujo de 4 pasos) reutilizando `build_sign_payload` + WalletConnect.
+1. **Contrato de datos + endpoints de lectura** (`/token`, `/positions`, `/wallet`): ✅ hecho
+   (`/alerts` pendiente).
+2. **C2 Compra** (flujo de 4 pasos): ✅ **backend** (`/buy_quote`, `/buy_order` con `kind='buy'`
+   persistido) + ✅ **UI** (`miniapp/index.html`: pestañas Compra/Posiciones/Cartera, firma con
+   WalletConnect). ⏳ falta el **keeper** que envíe la orden de compra firmada on-chain (necesita
+   relayer con gas).
 3. **C3/C4 Posiciones + Venta** (`list_positions`, `sell_quantity`).
 4. **C5 Plan de salida** (TP/SL/trailing) sobre `ExitPlan` + pre-órdenes; con el aviso del límite de
    SL (keeper).

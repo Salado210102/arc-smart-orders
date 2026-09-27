@@ -77,7 +77,8 @@ class SubscriptionStore:
             "CREATE TABLE IF NOT EXISTS preorders ("
             "id INTEGER PRIMARY KEY AUTOINCREMENT, chat TEXT, user TEXT, token TEXT, pct REAL, "
             "floor_pct REAL, min_out REAL, deadline INTEGER, order_nonce INTEGER, status TEXT, "
-            "created_ts INTEGER, signature TEXT, sign_token TEXT, sig_payload TEXT)")
+            "created_ts INTEGER, signature TEXT, sign_token TEXT, sig_payload TEXT, "
+            "kind TEXT DEFAULT 'sell')")
         # wallet tracking: read-only address link + which subs were auto-generated from it
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS wallet_links ("
@@ -85,7 +86,8 @@ class SubscriptionStore:
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS auto_subs ("
             "chat_id TEXT, token TEXT, PRIMARY KEY (chat_id, token))")
-        for _col in ("signature TEXT", "sign_token TEXT", "sig_payload TEXT"):
+        for _col in ("signature TEXT", "sign_token TEXT", "sig_payload TEXT",
+                     "kind TEXT DEFAULT 'sell'"):
             try:
                 self.conn.execute(f"ALTER TABLE preorders ADD COLUMN {_col}")
             except sqlite3.OperationalError:
@@ -368,32 +370,34 @@ class SubscriptionStore:
 
     # --- pre-signed protective orders ---
     def create_preorder(self, chat, user, token, pct, floor_pct, min_out, deadline,
-                        order_nonce, status="armed", created_ts=None) -> int:
+                        order_nonce, status="armed", created_ts=None, kind="sell") -> int:
         sign_token = secrets.token_urlsafe(16)
         cur = self.conn.execute(
             "INSERT INTO preorders(chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,"
-            "status,created_ts,sign_token) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            "status,created_ts,sign_token,kind) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
             (str(chat), str(user).lower(), str(token).lower(), float(pct), float(floor_pct),
              float(min_out), int(deadline), int(order_nonce), status,
-             int(created_ts if created_ts is not None else time.time()), sign_token))
+             int(created_ts if created_ts is not None else time.time()), sign_token, str(kind)))
         self.conn.commit()
         return int(cur.lastrowid)
 
     def _po_full(self, r) -> dict:
         d = self._po_row(r[:11])
         d.update({"signature": r[11], "sign_token": r[12], "sig_payload": r[13]})
+        if len(r) > 14:
+            d["kind"] = r[14]
         return d
 
     def get_preorder(self, pid) -> dict | None:
         r = self.conn.execute(
             "SELECT id,chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,status,created_ts,"
-            "signature,sign_token,sig_payload FROM preorders WHERE id=?", (int(pid),)).fetchone()
+            "signature,sign_token,sig_payload,kind FROM preorders WHERE id=?", (int(pid),)).fetchone()
         return self._po_full(r) if r else None
 
     def get_preorder_by_sign_token(self, sign_token) -> dict | None:
         r = self.conn.execute(
             "SELECT id,chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,status,created_ts,"
-            "signature,sign_token,sig_payload FROM preorders WHERE sign_token=?",
+            "signature,sign_token,sig_payload,kind FROM preorders WHERE sign_token=?",
             (str(sign_token),)).fetchone()
         return self._po_full(r) if r else None
 
@@ -415,7 +419,7 @@ class SubscriptionStore:
         q = ("SELECT id,chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,status,created_ts "
              "FROM preorders WHERE token=?")
         if active_only:
-            q += " AND status='armed'"
+            q += " AND status='armed' AND coalesce(kind,'sell')='sell'"
         return [self._po_row(r) for r in self.conn.execute(q, (str(token).lower(),)).fetchall()]
 
     def list_preorders(self, chat, active_only=True) -> list:
