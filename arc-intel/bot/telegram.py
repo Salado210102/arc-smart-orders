@@ -472,7 +472,7 @@ def check_token(storage, token: str) -> str:
     try:
         from indexer.safety import safety_score, holders_top10_pct
         dex = tokenmeta.dex_info(token)
-        top10 = holders_top10_pct(storage, token, tokenmeta.rpc_total_supply(token))
+        top10 = holders_top10_pct(storage, token, supply_h)
         sf = safety_score(risk=rk, creator_rep=rep, liquidity_usd=(dex.get("liquidity_usd") or 0),
                           age_blocks=age, thin_market=thin, holders_top10_pct=top10)
         em = {"SAFE": "\U0001F7E2", "WARN": "\U0001F7E0", "DANGER": "\U0001F534"}.get(sf["verdict"], "\u26AA")
@@ -756,6 +756,14 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
             except Exception:
                 pass
             alerts = apply_collapse_cooldown(alerts, store, int(time.time()), collapse_cooldown)
+            # Auto-Protect: sell held tokens automatically on a risk signal.
+            try:
+                from execution.autoprotect import on_alerts
+                ap = on_alerts(store, storage, alerts, logger=logger)
+                if ap:
+                    logger({"cycle": k, "autoprotect_sold": ap})
+            except Exception:
+                pass
             now_ts = int(time.time())
             for a in alerts:
                 a.context["symbol"] = symbols.get(a.token, "")

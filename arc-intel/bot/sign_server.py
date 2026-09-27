@@ -725,9 +725,10 @@ class Handler(BaseHTTPRequestHandler):
             store = SubscriptionStore(DB)
             try:
                 lang = store.get_state(f"lang:{uid}", "")
+                ap = store.get_state(f"autoprotect:{uid}", "1")
             finally:
                 store.close()
-            return self._send(200, {"lang": lang})
+            return self._send(200, {"lang": lang, "autoprotect": ap == "1"})
         if u.path == "/custody":
             uid = self._auth_user()
             if uid is None:
@@ -834,6 +835,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "bad_json"})
             code, resp = self._sell(uid, data)
             return self._send(code, resp)
+        if u.path == "/autoprotect":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send(400, {"error": "bad_json"})
+            on = "1" if data.get("on") else "0"
+            store = SubscriptionStore(DB)
+            try:
+                store.set_state(f"autoprotect:{uid}", on)
+            finally:
+                store.close()
+            return self._send(200, {"ok": True, "autoprotect": on == "1"})
         if u.path == "/exit_plan":
             uid = self._auth_user()
             if uid is None:

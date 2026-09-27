@@ -134,6 +134,12 @@
           <div id="custsellout" class="mut" style="margin-top:6px"></div>
         </div>
       </div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div class="mut">🛡️ <b>Auto-Protect</b> — <span data-i18n="autoprotect_hint">vende sola si hay riesgo (dev-sell / liquidez)</span></div>
+          <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="apchk"><span class="mut" style="font-size:12px">ON</span></label>
+        </div>
+      </div>
     </section>
 
     <section id="sec-alr" class="hide">
@@ -175,6 +181,7 @@
         wal_hint: "Para enlazar/cambiar wallet: comando /link_wallet en el bot.",
         cust_title: "👛 Mi wallet del bot (custodia) — deposita y tradea al instante",
         withdraw: "Retirar", cust_sell: "Vender token de tu wallet del bot:",
+        autoprotect_hint: "vende sola si hay riesgo (dev-sell / liquidez)",
         alr_title: "Alertas de tus tokens", price: "Precio", mcap: "Market cap", liq: "Liquidez",
         vol: "Vol 24h", txns: "Txns 24h", holders: "Holders (wallets)", status: "Estado",
         creator: "Creador", contract: "Contrato", entry: "Entrada", pnl: "PnL", value: "valor",
@@ -187,6 +194,7 @@
         wal_hint: "To link/change wallet: /link_wallet command in the bot.",
         cust_title: "👛 My bot wallet (custody) — deposit and trade instantly",
         withdraw: "Withdraw", cust_sell: "Sell a token from your bot wallet:",
+        autoprotect_hint: "sells automatically on risk (dev-sell / liquidity)",
         alr_title: "Alerts for your tokens", price: "Price", mcap: "Market cap", liq: "Liquidity",
         vol: "Vol 24h", txns: "Txns 24h", holders: "Holders (wallets)", status: "Status",
         creator: "Creator", contract: "Contract", entry: "Entry", pnl: "PnL", value: "Value",
@@ -196,7 +204,8 @@
         amount: "金额 USDC", buy: "买入", tp_hint: "可选：买入时自动设置。",
         pos_title: "你的持仓（未实现盈亏）", wal_title: "已关联钱包和自动跟单代币",
         wal_hint: "关联/更换钱包：使用 /link_wallet。", cust_title: "👛 我的机器人钱包（托管）— 存入即可交易",
-        withdraw: "提取", cust_sell: "卖出机器人钱包中的代币：", alr_title: "你的代币提醒",
+        withdraw: "提取", cust_sell: "卖出机器人钱包中的代币：",
+        autoprotect_hint: "出现风险时自动卖出（dev-sell / 流动性）", alr_title: "你的代币提醒",
         price: "价格", mcap: "市值", liq: "流动性", vol: "24h 量", txns: "24h 交易", holders: "持有者",
         status: "状态", creator: "创建者", contract: "合约", entry: "成本", pnl: "盈亏", value: "价值",
         sell: "卖出", buy_more: "买入", save: "保存" }
@@ -287,8 +296,13 @@
       $("main").classList.remove("hide");
       //  Use the language saved in the bot (overrides Telegram's), then re-render labels.
       api("/me").then(r => {
-        if (r.status === 200 && r.body && r.body.lang && TR[r.body.lang]) { LANG = r.body.lang; applyI18n(); }
+        if (r.status === 200 && r.body) {
+          if (r.body.lang && TR[r.body.lang]) { LANG = r.body.lang; applyI18n(); }
+          if (typeof r.body.autoprotect === "boolean" && $("apchk")) $("apchk").checked = r.body.autoprotect;
+        }
       }).catch(() => {});
+      if ($("apchk")) $("apchk").onchange = () => api("/autoprotect", { method: "POST",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on: $("apchk").checked }) });
       if (!INIT) $("notice").innerHTML = "Abre esta Mini App desde Telegram para operar (se necesita autenticación). ";
       let POS_TIMER = null;
       function tab(name) {

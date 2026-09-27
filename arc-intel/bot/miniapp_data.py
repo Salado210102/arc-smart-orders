@@ -85,7 +85,7 @@ def load_token_card(storage, token, head_block=None) -> dict:
     top10 = None
     try:
         from indexer.safety import holders_top10_pct
-        top10 = holders_top10_pct(storage, token, supply)
+        top10 = holders_top10_pct(storage, token, supply_h)
     except Exception:
         top10 = None
     from indexer.safety import safety_score

@@ -37,7 +37,14 @@
 predecir pumps. Coincide con el paper (*Catching the Rug*) y con los scanners líderes.
 
 **Orden sugerido:** 
-1. **P0 — Safety Score (0–100)** + **holder concentration/clusters** + **Auto-Protect**.
+1. **P0 — Safety Score (0–100)** ✅ + **holder concentration** ✅ (aprox. desde `legs`) + **Auto-Protect** ✅.
+   - Safety Score: `indexer/safety.py` (agrega contrato+creador+liquidez+edad+thin+concentración);
+     visible en `/check` y en la Mini App.
+   - Holder concentration: top-10 por posiciones netas de `legs` (sin depender de `token_transfers`,
+     que está vacía).
+   - Auto-Protect: `execution/autoprotect.py` — al detectar **riesgo** en un token que tienes, **vende
+     sola** con la wallet del bot; toggle en la Mini App (`/autoprotect`; por defecto **ON**).
+   - Caveat: el **RPC 429** limita `total_supply`/precios → el score queda incompleto a veces.
 2. **P1 — LP lock badge**, **ejecución de TP/SL/Trailing**, **copy-trade**.
 3. **P2 — sniping con filtros**, multi-wallet, referidos, RPC.
 

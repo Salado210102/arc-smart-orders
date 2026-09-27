@@ -77,26 +77,25 @@ def safety_score(*, risk: dict | None = None, creator_rep: dict | None = None,
     return {"score": score, "verdict": verdict, "factors": factors}
 
 
-def holders_top10_pct(storage, token: str, total_supply: float) -> float | None:
-    """Top-10 holders share of supply (%) from token_transfers. Best-effort (None on failure)."""
+def holders_top10_pct(storage, token: str, supply_h: float) -> float | None:
+    """Top-10 holders share of supply (%) approximated from `legs` net positions.
+
+    Net position per wallet = sum(buy qty) - sum(sell qty). Best-effort (None on failure or if
+    the supply is unknown). Uses the token index on `legs` (fast per single token).
+    """
     token = (token or "").lower()
-    if not total_supply or total_supply <= 0:
+    if not supply_h or supply_h <= 0:
         return None
+    net = ("sum(CASE WHEN side='buy' THEN token_qty ELSE -token_qty END)")
     conn = storage.pool.getconn()
     try:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT sum(d) FROM ("
-                "  SELECT to_addr AS a, sum((value)::numeric) AS d FROM token_transfers "
-                "   WHERE lower(token)=%s GROUP BY 1"
-                "  UNION ALL"
-                "  SELECT from_addr AS a, -sum((value)::numeric) AS d FROM token_transfers "
-                "   WHERE lower(token)=%s GROUP BY 1) x GROUP BY a HAVING sum(d) > 0 "
-                "ORDER BY 2 DESC LIMIT 10", (token, token))
-            rows = [float(r[0] or 0) for r in cur.fetchall()]
+            cur.execute(f"SELECT wallet, {net} AS n FROM legs WHERE token=%s "
+                        f"GROUP BY wallet HAVING {net} > 0 ORDER BY n DESC LIMIT 10", (token,))
+            rows = [float(r[1] or 0) for r in cur.fetchall()]
         if not rows:
             return None
-        return sum(rows) / float(total_supply) * 100.0
+        return min(100.0, sum(rows) / float(supply_h) * 100.0)
     except Exception:
         return None
     finally:
