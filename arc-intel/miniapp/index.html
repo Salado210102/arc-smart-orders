@@ -147,14 +147,30 @@
       let body = null; try { body = await r.json(); } catch (e) {}
       return { status: r.status, body };
     }
-    async function connectSign(payload) {
+    let _signer = null;
+    async function getSigner() {
+      if (_signer) return _signer;
+      // 1) Injected wallet (open the Mini App inside a wallet browser -> instant, no QR).
+      if (window.ethereum) {
+        const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
+        _signer = { kind: "injected", address: accs[0],
+          sign: (td, from) => window.ethereum.request(
+            { method: "eth_signTypedData_v4", params: [from, JSON.stringify(td)] }) };
+        return _signer;
+      }
+      // 2) WalletConnect, reusing the persisted session: connect once, then silent (no QR).
       const { EthereumProvider } = await import("https://esm.sh/@walletconnect/ethereum-provider@2");
-      const provider = await EthereumProvider.init({ projectId: PROJECT_ID, chains: [CHAIN_ID],
+      const wc = await EthereumProvider.init({ projectId: PROJECT_ID, chains: [CHAIN_ID],
         optionalChains: [CHAIN_ID], showQrModal: true, methods: ["eth_signTypedData_v4"] });
-      await provider.connect();
-      const from = provider.accounts[0];
-      return provider.request({ method: "eth_signTypedData_v4",
-        params: [from, JSON.stringify(payload.typedData)] });
+      if (!(wc.accounts && wc.accounts.length)) await wc.connect();  // QR only the first time
+      _signer = { kind: "walletconnect", address: (wc.accounts || [])[0],
+        sign: (td, from) => wc.request(
+          { method: "eth_signTypedData_v4", params: [from, JSON.stringify(td)] }) };
+      return _signer;
+    }
+    async function connectSign(payload) {
+      const s = await getSigner();
+      return s.sign(payload.typedData, s.address);
     }
 
     // ---------------- SIGN VIEW ----------------
