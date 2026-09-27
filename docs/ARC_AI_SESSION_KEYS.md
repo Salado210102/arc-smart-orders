@@ -111,7 +111,15 @@ Reusa lo que ya tenemos (Permit2 + v4, no-custodia) y añade sesiones:
    (requiere la **v2 desplegada** por el Safe).
 4. **UI**: onboarding "activar trading 1-toque" (envía las 3 txs de setup), estado de sesión, revocar. ⏳
 5. **Auditoría** (punto 3) del contrato v2.
-6. **E2E testnet** → mainnet.
+6. **E2E testnet** → mainnet ✅ (v2 desplegada).
+
+### Despliegue testnet (2026-09-27)
+- **`ArcIntelExecutorV2` = `0xb6393A1b2d98A2851236E31E4a67cE8d56653B56`** (chainId 5042002)
+- `owner` = Safe `0xe911D6F5f3a7D2f06dcD32006318ED5EF95986b7` · `paused` = false
+- `poolManager` = `0x8366a39CC670B4001A1121B8F6A443A643e40951`
+- Sin pools pre-permitidos: el Safe allowlistea con `setAllowedPool(poolId, true)`.
+- Los servicios (`arc-intel-sign`, `arc-intel-alerts`) apuntan a la v2.
+- v1 (`0x89dF…35E8`) sigue desplegada pero en desuso.
 
 ---
 
