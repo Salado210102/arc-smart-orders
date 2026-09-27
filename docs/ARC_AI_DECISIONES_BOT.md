@@ -227,6 +227,12 @@
   **Incidencia de seguridad:** el primer `cast wallet new` **imprimió la clave privada** en el log; el
   wallet estaba **sin fondos** (sin pérdida) → se **descartó** y se regeneró **sin imprimir**. **Nunca
   fondear** la dirección descartada `0xe31A75…507D`.
+- **2026-09-27 (relayer ACTIVADO + allowlist)** — Relayer `0x5ce3F7…A98f` **fondeado** (60 USDC de
+  gas en Arc testnet); añadido `EnvironmentFile=-/root/arc-intel/relayer.env` a los dos servicios;
+  `ARC_INTEL_RELAYER_KEY` **cargado**. **Bloqueo detectado:** el executor tiene **allowlist por pool**
+  (fail-closed) y el pool de prueba **no** está permitido → `execute` revertiría (`PoolNotAllowed`).
+  Acción de owner (Safe `0xe911D6F5…86b7`): `setAllowedPool(poolId, true)` para cada pool que se vaya
+  a operar. Sin allowlist, la ejecución real no funciona aunque el relayer tenga gas.
 
 ---
 
