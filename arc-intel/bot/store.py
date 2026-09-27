@@ -85,8 +85,12 @@ class SubscriptionStore:
             "chat TEXT, token TEXT, added_ts INTEGER, PRIMARY KEY (chat, token))")
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS exit_plans ("
-            "chat TEXT, token TEXT, sl_pct REAL, tp_pct REAL, updated_ts INTEGER, "
+            "chat TEXT, token TEXT, sl_pct REAL, tp_pct REAL, trailing_pct REAL, updated_ts INTEGER, "
             "PRIMARY KEY (chat, token))")
+        try:
+            self.conn.execute("ALTER TABLE exit_plans ADD COLUMN trailing_pct REAL")
+        except sqlite3.OperationalError:
+            pass
         # custodial quick wallet (Modo Maestro/Banana): bot-held key per user (encrypted)
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS custody ("
@@ -362,22 +366,26 @@ class SubscriptionStore:
         return [r[0] for r in self.conn.execute(
             "SELECT token FROM holdings WHERE chat=? ORDER BY added_ts DESC", (str(chat),)).fetchall()]
 
-    def set_exit_plan(self, chat, token, sl_pct, tp_pct) -> None:
+    def set_exit_plan(self, chat, token, sl_pct, tp_pct, trailing_pct=0) -> None:
         self.conn.execute(
-            "INSERT INTO exit_plans(chat,token,sl_pct,tp_pct,updated_ts) VALUES(?,?,?,?,?) "
+            "INSERT INTO exit_plans(chat,token,sl_pct,tp_pct,trailing_pct,updated_ts) VALUES(?,?,?,?,?,?) "
             "ON CONFLICT(chat,token) DO UPDATE SET sl_pct=excluded.sl_pct, tp_pct=excluded.tp_pct, "
-            "updated_ts=excluded.updated_ts",
-            (str(chat), str(token).lower(), float(sl_pct or 0), float(tp_pct or 0), int(time.time())))
+            "trailing_pct=excluded.trailing_pct, updated_ts=excluded.updated_ts",
+            (str(chat), str(token).lower(), float(sl_pct or 0), float(tp_pct or 0),
+             float(trailing_pct or 0), int(time.time())))
         self.conn.commit()
 
     def get_exit_plan(self, chat, token) -> dict | None:
-        r = self.conn.execute("SELECT sl_pct,tp_pct FROM exit_plans WHERE chat=? AND token=?",
-                              (str(chat), str(token).lower())).fetchone()
-        return {"sl_pct": float(r[0] or 0), "tp_pct": float(r[1] or 0)} if r else None
+        r = self.conn.execute(
+            "SELECT sl_pct,tp_pct,trailing_pct FROM exit_plans WHERE chat=? AND token=?",
+            (str(chat), str(token).lower())).fetchone()
+        return ({"sl_pct": float(r[0] or 0), "tp_pct": float(r[1] or 0),
+                 "trailing_pct": float(r[2] or 0)} if r else None)
 
     def list_exit_plans(self, chat) -> dict:
-        return {t: {"sl_pct": float(sl or 0), "tp_pct": float(tp or 0)} for t, sl, tp in
-                self.conn.execute("SELECT token,sl_pct,tp_pct FROM exit_plans WHERE chat=?",
+        return {t: {"sl_pct": float(sl or 0), "tp_pct": float(tp or 0), "trailing_pct": float(tr or 0)}
+                for t, sl, tp, tr in
+                self.conn.execute("SELECT token,sl_pct,tp_pct,trailing_pct FROM exit_plans WHERE chat=?",
                                   (str(chat),)).fetchall()}
 
     # --- custodial quick wallet ---

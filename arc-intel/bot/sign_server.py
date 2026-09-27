@@ -454,9 +454,17 @@ class Handler(BaseHTTPRequestHandler):
             dec = tokenmeta.rpc_decimals(t)
             price = latest_price(st, t) if st is not None else 0.0
             qty = raw / (10 ** dec)
-            plan = plans.get(t) or {"sl_pct": 0, "tp_pct": 0}
+            plan = plans.get(t) or {"sl_pct": 0, "tp_pct": 0, "trailing_pct": 0}
+            try:
+                dex = tokenmeta.dex_info(t)
+            except Exception:
+                dex = {}
+            if not price and dex.get("price_usd"):
+                price = float(dex["price_usd"])
             out.append({"token": t, "qty": qty, "price": price, "value": qty * price,
-                        "sl_pct": plan["sl_pct"], "tp_pct": plan["tp_pct"]})
+                        "symbol": dex.get("symbol", ""), "dex": dex,
+                        "sl_pct": plan["sl_pct"], "tp_pct": plan["tp_pct"],
+                        "trailing_pct": plan.get("trailing_pct", 0)})
         return 200, {"positions": out, "address": c["address"]}
 
     def _custody_sell(self, uid, data):
@@ -805,16 +813,17 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 sl = float(data.get("sl_pct") or 0)
                 tp = float(data.get("tp_pct") or 0)
+                tr = float(data.get("trailing_pct") or 0)
             except (TypeError, ValueError):
                 return self._send(400, {"error": "bad_amount"})
-            if not (0 <= sl <= 99) or not (0 <= tp <= 10000):
+            if not (0 <= sl <= 99) or not (0 <= tp <= 10000) or not (0 <= tr <= 99):
                 return self._send(400, {"error": "bad_pct"})
             store = SubscriptionStore(DB)
             try:
-                store.set_exit_plan(uid, tok, sl, tp)
+                store.set_exit_plan(uid, tok, sl, tp, tr)
             finally:
                 store.close()
-            return self._send(200, {"ok": True, "sl_pct": sl, "tp_pct": tp})
+            return self._send(200, {"ok": True, "sl_pct": sl, "tp_pct": tp, "trailing_pct": tr})
         if u.path in ("/custody/create", "/custody/withdraw", "/custody/buy", "/custody/sell"):
             uid = self._auth_user()
             if uid is None:

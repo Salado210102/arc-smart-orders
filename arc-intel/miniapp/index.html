@@ -88,6 +88,8 @@
           <input id="buytp" type="number" placeholder="ej 50" style="width:70px">
           <span class="mut" style="font-size:12px">SL %</span>
           <input id="buysl" type="number" placeholder="ej 20" style="width:70px">
+          <span class="mut" style="font-size:12px">Trail %</span>
+          <input id="buytr" type="number" placeholder="15" style="width:64px">
         </div>
         <div class="mut" style="font-size:11px;margin-top:4px">Opcional: se configuran solos al comprar.</div>
         <button class="primary" id="buynow" style="margin-top:10px">Comprar</button>
@@ -409,41 +411,71 @@
         const { status, body } = await api("/portfolio");
         if (status !== 200 || !body) { $("poslist").innerHTML = `<span class="bad">Error: ${status}${status === 401 ? " (abre en Telegram)" : ""}</span>`; return; }
         if (!body.positions.length) { $("poslist").innerHTML = '<span class="mut">Sin posiciones. Compra un token en la pestaña Compra.</span>'; $("possummary").textContent = ""; return; }
+        const money = x => (x == null || x === "") ? "—" : "$" + Number(x).toLocaleString(undefined, { maximumFractionDigits: 0 });
         $("poslist").innerHTML = body.positions.map(p => {
-          const t = p.token;
-          return `<div class="card" style="padding:10px">
-            <div class="kv"><span><code>${esc(t.slice(0, 10))}…</code></span><b>${p.qty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</b></div>
-            <div class="kv mut"><span>valor</span><b>${p.value ? "$" + p.value.toFixed(2) : "—"}</b></div>
+          const t = p.token || "";
+          const d = p.dex || {};
+          const V = d.volume || {}, T = (d.txns || {}).h24 || {};
+          const logo = d.logo || "";
+          const sym = p.symbol || (t.slice(0, 8) + "…");
+          return `<div class="card" style="padding:10px" data-tok="${esc(t)}">
+            <div class="row" style="gap:10px;align-items:center">
+              ${logo ? `<img src="${esc(logo)}" style="width:40px;height:40px;border-radius:10px" onerror="this.style.display='none'">` : ""}
+              <div><b>${esc(sym)}</b><div class="mut" style="font-size:12px">${p.qty.toLocaleString(undefined, { maximumFractionDigits: 2 })} · ${p.value ? "$" + p.value.toFixed(2) : "—"}</div></div>
+            </div>
+            <div class="kv mut"><span>Precio</span><b>${d.price_usd ? "$" + Number(d.price_usd).toPrecision(4) : "—"}</b></div>
+            <div class="kv mut"><span>Market cap</span><b>${money(d.market_cap)}</b></div>
+            <div class="kv mut"><span>Liquidez</span><b>${money(d.liquidity_usd)}</b></div>
+            <div class="kv mut"><span>Vol 24h</span><b>${money(V.h24)}</b></div>
+            <div class="kv mut"><span>Txns 24h</span><b>${T.buys != null ? T.buys + " ↑ / " + T.sells + " ↓" : "—"}</b></div>
             <div class="row" style="margin-top:6px;align-items:center">
-              <span class="mut" style="font-size:12px">SL %</span>
-              <input class="sl" type="number" value="${p.sl_pct || ""}" placeholder="20" style="width:64px">
-              <span class="mut" style="font-size:12px">TP %</span>
-              <input class="tp" type="number" value="${p.tp_pct || ""}" placeholder="50" style="width:64px">
-              <button class="ghost saveplan" data-t="${esc(t)}">Guardar</button>
+              <span class="mut" style="font-size:12px">SL %</span><input class="sl" type="number" value="${p.sl_pct || ""}" placeholder="20" style="width:54px">
+              <span class="mut" style="font-size:12px">TP %</span><input class="tp" type="number" value="${p.tp_pct || ""}" placeholder="50" style="width:54px">
+              <span class="mut" style="font-size:12px">Trail %</span><input class="tr" type="number" value="${p.trailing_pct || ""}" placeholder="15" style="width:54px">
+              <button class="ghost saveplan">Guardar</button>
             </div>
             <div class="row" style="margin-top:6px">
-              ${[25, 50, 75, 100].map(x => `<button class="ghost sellpct" data-t="${esc(t)}" data-p="${x}">vender ${x}%</button>`).join("")}
-            </div></div>`;
+              ${[25, 50, 75, 100].map(x => `<button class="ghost sellpct" data-p="${x}">vender ${x}%</button>`).join("")}
+            </div>
+            <div class="row" style="margin-top:6px">
+              <input class="buyamt" type="number" placeholder="monto USDC" style="flex:1">
+              <button class="ghost buyrmore">Comprar</button>
+            </div>
+            ${d.embed ? `<iframe src="${esc(d.embed)}" style="width:100%;height:300px;border:0;border-radius:10px;margin-top:8px" loading="lazy"></iframe>` : ""}
+          </div>`;
         }).join("");
-        document.querySelectorAll(".saveplan").forEach(b => {
+        document.querySelectorAll("#poslist .saveplan").forEach(b => {
           b.onclick = async () => {
-            const card = b.closest(".card");
+            const card = b.closest(".card"); const t = card.dataset.tok;
             const sl = parseFloat(card.querySelector(".sl").value || "0") || 0;
             const tp = parseFloat(card.querySelector(".tp").value || "0") || 0;
+            const tr = parseFloat(card.querySelector(".tr").value || "0") || 0;
             b.textContent = "…";
             const r = await api("/exit_plan", { method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ token: b.dataset.t, sl_pct: sl, tp_pct: tp }) });
+              body: JSON.stringify({ token: t, sl_pct: sl, tp_pct: tp, trailing_pct: tr }) });
             b.textContent = (r.status === 200 && r.body && r.body.ok) ? "✅" : "err";
           };
         });
-        document.querySelectorAll(".sellpct").forEach(b => {
+        document.querySelectorAll("#poslist .sellpct").forEach(b => {
           b.onclick = async () => {
-            const tok = b.dataset.t, pct = parseFloat(b.dataset.p);
+            const card = b.closest(".card"); const tok = card.dataset.tok, pct = parseFloat(b.dataset.p);
             b.disabled = true; b.textContent = "…";
             const r = await api("/custody/sell", { method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ token: tok, pct }) });
             if (r.status === 200 && r.body && r.body.executing) { b.innerHTML = '<span class="ok">✅</span>'; setTimeout(loadPositions, 1500); }
             else { b.textContent = "err"; }
+          };
+        });
+        document.querySelectorAll("#poslist .buyrmore").forEach(b => {
+          b.onclick = async () => {
+            const card = b.closest(".card"); const tok = card.dataset.tok;
+            const amt = parseFloat(card.querySelector(".buyamt").value || "0");
+            if (!amt) { b.textContent = "monto?"; return; }
+            b.textContent = "…";
+            const r = await api("/custody/buy", { method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token: tok, amount_usdc: amt, slippage: 3 }) });
+            b.textContent = (r.status === 200 && r.body && r.body.executing) ? "✅" : "err";
+            if (r.status === 200 && r.body && r.body.executing) setTimeout(loadPositions, 1500);
           };
         });
         $("possummary").textContent = "";
@@ -510,9 +542,10 @@
       async function saveExitPlanFromBuy(tok) {
         const tp = parseFloat($("buytp").value || "0") || 0;
         const sl = parseFloat($("buysl").value || "0") || 0;
-        if (!tp && !sl) return false;
+        const tr = parseFloat($("buytr").value || "0") || 0;
+        if (!tp && !sl && !tr) return false;
         const r = await api("/exit_plan", { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: tok, sl_pct: sl, tp_pct: tp }) });
+          body: JSON.stringify({ token: tok, sl_pct: sl, tp_pct: tp, trailing_pct: tr }) });
         return r.status === 200 && r.body && r.body.ok;
       }
 
