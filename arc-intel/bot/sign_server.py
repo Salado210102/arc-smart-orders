@@ -427,6 +427,12 @@ class Handler(BaseHTTPRequestHandler):
         store2 = SubscriptionStore(DB)
         try:
             store2.add_holding(uid, tok)
+            try:
+                store2.record_fill(f"{(txh or '')}:buy", uid, tok, "buy",
+                                   float(quote.get("expected_out") or 0),
+                                   float(data.get("amount_usdc") or 0))
+            except Exception:
+                pass
         finally:
             store2.close()
         return 200, {"executing": True, "tx": txh, "quote": quote}
@@ -443,6 +449,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             holds = store.list_holdings(uid)
             plans = store.list_exit_plans(uid)
+            pos_map = {t: store.get_position(uid, t) for t in holds}
         finally:
             store.close()
         st = _storage()
@@ -452,16 +459,18 @@ class Handler(BaseHTTPRequestHandler):
             if raw <= 0:
                 continue
             dec = tokenmeta.rpc_decimals(t)
-            price = latest_price(st, t) if st is not None else 0.0
             qty = raw / (10 ** dec)
             plan = plans.get(t) or {"sl_pct": 0, "tp_pct": 0, "trailing_pct": 0}
             try:
                 dex = tokenmeta.dex_info(t)
             except Exception:
                 dex = {}
-            if not price and dex.get("price_usd"):
-                price = float(dex["price_usd"])
+            price = float(dex.get("price_usd") or 0) or (latest_price(st, t) if st is not None else 0.0)
+            avg = float(pos_map.get(t, {}).get("avg_cost") or 0.0)
+            unrealized = (price - avg) * qty if avg > 0 else 0.0
+            pct = (price / avg - 1.0) if (avg > 0 and price > 0) else 0.0
             out.append({"token": t, "qty": qty, "price": price, "value": qty * price,
+                        "avg_cost": avg, "unrealized": unrealized, "unrealized_pct": pct,
                         "symbol": dex.get("symbol", ""), "dex": dex,
                         "sl_pct": plan["sl_pct"], "tp_pct": plan["tp_pct"],
                         "trailing_pct": plan.get("trailing_pct", 0)})
@@ -518,6 +527,14 @@ class Handler(BaseHTTPRequestHandler):
                          order_nonce=new_nonce(), deadline=int(time.time()) + 600)
         except Exception as e:
             return 502, {"error": "swap_failed", "detail": str(e)[:160]}
+        store2 = SubscriptionStore(DB)
+        try:
+            qty_tok = amount_in / (10 ** dec)
+            store2.record_fill(f"{(txh or '')}:sell", uid, tok, "sell", qty_tok, qty_tok * price)
+        except Exception:
+            pass
+        finally:
+            store2.close()
         return 200, {"executing": True, "tx": txh, "quote": quote}
 
     def _kick_session_keeper(self):

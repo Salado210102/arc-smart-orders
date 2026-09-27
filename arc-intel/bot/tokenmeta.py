@@ -201,7 +201,7 @@ def fetch(token: str) -> dict:
 
 
 _DEXINFO_CACHE: dict = {}
-_DEXINFO_TTL = 60
+_DEXINFO_TTL = 15
 
 
 def dex_info(token: str) -> dict:
