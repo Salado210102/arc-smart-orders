@@ -38,10 +38,10 @@ Read-only por diseño: **no** firma, **no** custodia, **no** mueve fondos de usu
   detrás de Caddy (HTTPS), con **CORS restringido** al dominio real.
 - `bot/sim.py` — simulador local (demo), no forma parte del servicio.
 
-**Infra de firma (testnet):** HTTPS operativo (`arc-sign.2.29.24.106.sslip.io`, cert Let's Encrypt,
-prueba E2E de `/order` y `/sign` OK) y bloque `app.basepump.dev` listo en Caddy (se activa con el
-registro DNS A en Porkbun). WalletConnect Project ID configurado. Pendiente único para ejecución real:
-**relayer** con gas (`ARC_INTEL_EXECUTOR` / `ARC_RPC` / `ARC_INTEL_RELAYER_KEY`).
+**Infra de firma (testnet):** **`https://app.basepump.dev` ACTIVO** (DNS A + cert Let's Encrypt de
+Caddy, verificado; la Mini App se sirve ahí) además del endpoint temporal `sslip.io`. **Relayer
+fondeado** y cargado en los servicios. Pendiente para ejecución real: **allowlist de pools** en el
+owner del executor (`setAllowedPool(poolId,true)`).
 Spec de la Mini App: `../docs/ARC_AI_MINIAPP_SPEC.md`.
 
 ## Mapa del código

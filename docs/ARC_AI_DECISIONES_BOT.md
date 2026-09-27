@@ -233,6 +233,10 @@
   (fail-closed) y el pool de prueba **no** está permitido → `execute` revertiría (`PoolNotAllowed`).
   Acción de owner (Safe `0xe911D6F5…86b7`): `setAllowedPool(poolId, true)` para cada pool que se vaya
   a operar. Sin allowlist, la ejecución real no funciona aunque el relayer tenga gas.
+- **2026-09-27 (dominio ACTIVO)** — Registro **A `app` → 2.29.24.106** creado en **Porkbun**;
+  `systemctl reload caddy` forzó la emisión → **cert Let's Encrypt** (`CN=app.basepump.dev`).
+  Verificado: `/health` 200, Mini App servida, `api.basepump.dev` intacto. URL de la TMA:
+  `https://app.basepump.dev/` (pendiente: añadir a Reown allowed domains y al menú del bot).
 
 ---
 
