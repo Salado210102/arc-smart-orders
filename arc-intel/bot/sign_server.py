@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, urlparse
 from .store import SubscriptionStore
 
 DB = os.environ.get("ARC_INTEL_DB", "/root/arc-intel/bot_subs.db")
+ALLOWED_ORIGIN = os.environ.get("ARC_INTEL_ALLOWED_ORIGIN", "https://app.basepump.dev")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -22,7 +23,8 @@ class Handler(BaseHTTPRequestHandler):
         body = json.dumps(obj).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+        self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
         self.end_headers()
@@ -42,7 +44,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, {"error": "miniapp_missing"})
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+            self.send_header("Vary", "Origin")
             self.end_headers()
             self.wfile.write(body)
             return
@@ -94,8 +97,9 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     port = int(os.environ.get("ARC_INTEL_SIGN_PORT", "8790"))
-    srv = ThreadingHTTPServer(("0.0.0.0", port), Handler)
-    print(f"sign server on :{port}", flush=True)
+    host = os.environ.get("ARC_INTEL_SIGN_HOST", "127.0.0.1")
+    srv = ThreadingHTTPServer((host, port), Handler)
+    print(f"sign server on {host}:{port}", flush=True)
     srv.serve_forever()
 
 

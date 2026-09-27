@@ -135,6 +135,15 @@
   dispatch existentes. El **kill-switch `Protect` NO** se dispara con un spike (solo con riesgo:
   dev_sell / compound / volume_collapse). Tests: +3 nuevos (61 en módulos tocados; total 220, con 1 fallo
   **ambiental** de la Mini App en local, no regresión).
+- **2026-09-27 (infra Mini App)** — DESPLEGADO: `arc-intel-sign.service` (systemd) corre
+  `python -m bot.sign_server` en **`127.0.0.1:8790`** (solo local) detrás de **Caddy** con HTTPS.
+  **CORS restringido** (ya no `*`; `ARC_INTEL_ALLOWED_ORIGIN=https://app.basepump.dev`). Se añadió un
+  bloque de Caddy **aditivo** para `app.basepump.dev` (BasePump intacto) y un endpoint público temporal
+  `arc-sign.2.29.24.106.sslip.io` (cert Let's Encrypt). **Prueba E2E real por HTTPS: PASS** (miniapp 200,
+  `/order` 200, `/sign` 200 con firma guardada, desconocido 404, CORS correcto). DNS `basepump.dev` está
+  en **Porkbun** (`*.basepump.dev` → parking) → queda **pendiente** el registro A `app` → `2.29.24.106`.
+  Creado el **spec funcional completo** de la Mini App: `docs/ARC_AI_MINIAPP_SPEC.md` (Parte B; sin
+  construir UI todavía).
 
 ---
 

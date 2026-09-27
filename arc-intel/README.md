@@ -30,11 +30,15 @@ Read-only por diseño: **no** firma, **no** custodia, **no** mueve fondos de usu
 - `execution/preorders.py` — construye el **payload EIP-712** y, solo con la **firma del usuario**,
   `submit_execute(...)`. **Nunca** ejecuta sin firma (lanza `no_signature`).
 - `bot/sign_server.py` — endpoints `/order` y `/sign` (guarda la firma; **no** firma ni ejecuta) + sirve
-  la Mini App `miniapp/index.html` (WalletConnect).
+  la Mini App `miniapp/index.html` (WalletConnect). **Desplegado** como `arc-intel-sign.service`
+  detrás de Caddy (HTTPS), con **CORS restringido** al dominio real.
 - `bot/sim.py` — simulador local (demo), no forma parte del servicio.
 
-Conexión real (testnet) pendiente de: **dominio + HTTPS**, **WalletConnect Project ID**, y un **relayer**
-con gas (`ARC_INTEL_EXECUTOR` / `ARC_RPC` / `ARC_INTEL_RELAYER_KEY`).
+**Infra de firma (testnet):** HTTPS operativo (`arc-sign.2.29.24.106.sslip.io`, cert Let's Encrypt,
+prueba E2E de `/order` y `/sign` OK) y bloque `app.basepump.dev` listo en Caddy (se activa con el
+registro DNS A en Porkbun). WalletConnect Project ID configurado. Pendiente único para ejecución real:
+**relayer** con gas (`ARC_INTEL_EXECUTOR` / `ARC_RPC` / `ARC_INTEL_RELAYER_KEY`).
+Spec de la Mini App: `../docs/ARC_AI_MINIAPP_SPEC.md`.
 
 ## Mapa del código
 ```
