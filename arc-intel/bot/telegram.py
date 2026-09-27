@@ -140,6 +140,23 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         return False
 
 
+def _inline_keyboard(inline) -> list:
+    """Build a Telegram inline_keyboard from rows of {text,data|url|web_app} buttons."""
+    rows = inline if inline and isinstance(inline[0], list) else [inline]
+    kb = []
+    for row in rows:
+        r = []
+        for b in row:
+            if b.get("url"):
+                r.append({"text": b["text"], "url": b["url"]})
+            elif b.get("web_app"):
+                r.append({"text": b["text"], "web_app": {"url": b["web_app"]}})
+            else:
+                r.append({"text": b["text"], "callback_data": b.get("data")})
+        kb.append(r)
+    return kb
+
+
 class ConsoleTransport:
     send_html = False
 
@@ -189,17 +206,7 @@ class TelegramTransport:
             payload["reply_markup"] = {
                 "keyboard": keyboard, "resize_keyboard": True, "is_persistent": True}
         elif inline:
-            rows = inline if isinstance(inline[0], list) else [inline]
-            kb = []
-            for row in rows:
-                r = []
-                for b in row:
-                    if b.get("url"):
-                        r.append({"text": b["text"], "url": b["url"]})
-                    else:
-                        r.append({"text": b["text"], "callback_data": b.get("data")})
-                kb.append(r)
-            payload["reply_markup"] = {"inline_keyboard": kb}
+            payload["reply_markup"] = {"inline_keyboard": _inline_keyboard(inline)}
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
         req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                      headers={"Content-Type": "application/json"})
@@ -212,15 +219,7 @@ class TelegramTransport:
         if parse_mode:
             payload["parse_mode"] = parse_mode
         if inline:
-            rows = inline if isinstance(inline[0], list) else [inline]
-            kb = []
-            for row in rows:
-                r = []
-                for b in row:
-                    r.append({"text": b["text"], "url": b["url"]} if b.get("url")
-                             else {"text": b["text"], "callback_data": b.get("data")})
-                kb.append(r)
-            payload["reply_markup"] = {"inline_keyboard": kb}
+            payload["reply_markup"] = {"inline_keyboard": _inline_keyboard(inline)}
         url = f"https://api.telegram.org/bot{self.token}/sendPhoto"
         req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                      headers={"Content-Type": "application/json"})
@@ -234,15 +233,7 @@ class TelegramTransport:
         if parse_mode:
             payload["parse_mode"] = parse_mode
         if inline:
-            rows = inline if isinstance(inline[0], list) else [inline]
-            kb = []
-            for row in rows:
-                r = []
-                for b in row:
-                    r.append({"text": b["text"], "url": b["url"]} if b.get("url")
-                             else {"text": b["text"], "callback_data": b.get("data")})
-                kb.append(r)
-            payload["reply_markup"] = {"inline_keyboard": kb}
+            payload["reply_markup"] = {"inline_keyboard": _inline_keyboard(inline)}
         url = f"https://api.telegram.org/bot{self.token}/editMessageText"
         req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                      headers={"Content-Type": "application/json"})

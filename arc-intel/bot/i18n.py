@@ -14,6 +14,7 @@ DOCS_URL = os.environ.get("ARC_INTEL_DOCS_URL",
                           "https://github.com/Salado210102/arc-smart-orders/tree/main/docs")
 REPO_URL = os.environ.get("ARC_INTEL_REPO_URL",
                           "https://github.com/Salado210102/arc-smart-orders")
+MINIAPP_URL = os.environ.get("ARC_INTEL_MINIAPP_URL", "https://app.basepump.dev/")
 
 _WELCOME = {
     "en": ("\u2728 <b>Welcome to SNIPER IA</b>, your on-chain safety assistant for Arc!\n\n"
@@ -75,6 +76,8 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "language_set": {"en": "Language set to English.", "es": "Idioma cambiado a Español.",
                      "zh": "语言已设置为中文。"},
+    "btn_app": {"en": "\U0001F680 Open app", "es": "\U0001F680 Abrir app",
+                "zh": "\U0001F680 \u6253\u5f00\u5e94\u7528"},
     "btn_alerts": {"en": "\U0001F514 My alerts", "es": "\U0001F514 Mis alertas", "zh": "\U0001F514 我的提醒"},
     "btn_check": {"en": "\U0001F50E Check token", "es": "\U0001F50E Consultar token", "zh": "\U0001F50E 查询代币"},
     "btn_stats": {"en": "\U0001F4CA Stats", "es": "\U0001F4CA Estadísticas", "zh": "\U0001F4CA 统计"},
@@ -198,6 +201,7 @@ def menu_buttons(lang: str = DEFAULT) -> list:
         return {"text": t(key, lang), "data": data}
 
     return [
+        [{"text": t("btn_app", lang), "web_app": MINIAPP_URL}],
         [b("btn_alerts", "cmd:/list"), b("btn_check", "cmd:/check")],
         [b("btn_stats", "cmd:/stats"), b("btn_pending", "cmd:/pending")],
         [b("btn_positions", "cmd:/positions"), b("btn_settings", "cmd:/settings")],

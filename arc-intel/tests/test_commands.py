@@ -143,9 +143,10 @@ class CommandTests(unittest.TestCase):
         r = command_reply_rich("/start", 1, self.store, self.exists, self.check, 1000)
         self.assertIsInstance(r, dict)
         self.assertTrue(r["inline"])
-        # Maestro-style grid: 8 rows, first rows with 2 buttons each
-        self.assertEqual(len(r["inline"]), 8)
-        self.assertEqual(len(r["inline"][0]), 2)
+        # Maestro-style grid: 9 rows; row 0 is the Mini App button (web_app)
+        self.assertEqual(len(r["inline"]), 9)
+        self.assertIn("web_app", r["inline"][0][0])
+        self.assertEqual(len(r["inline"][1]), 2)
         self.assertIn("SNIPER IA", r["text"])
 
     def test_wallet_panel_non_custodial(self):

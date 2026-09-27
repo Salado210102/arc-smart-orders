@@ -53,6 +53,7 @@ Leyenda de estado: **[LIVE]** ya operativo · **[TESTNET]** probado en testnet, 
 | `/positions` | posiciones con PnL | [LIVE] |
 | `/pending`, `/approve`, `/cancel` | propuestas **[PAPER]** | [LIVE] |
 | Menú inline (estilo Maestro) | navegación por botones | [LIVE] |
+| **Botón 🚀 Abrir app** | botón `web_app` en `/start` que abre la Mini App (`https://app.basepump.dev/`) | [LIVE] |
 | **Idiomas EN / ES / 中文** | persistente por usuario | [LIVE] |
 | Alertas **con logo** del token | imagen del token en la alerta | [LIVE] |
 | **Protect** (kill-switch) | orden **armada** que se dispara sola ante dev-sell/compound | [PAPER] |
