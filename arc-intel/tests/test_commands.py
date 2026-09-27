@@ -180,6 +180,22 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(self.store.get_wallet(1), ADDR)
         self.assertEqual(str(self.store.get_state("awaiting_wallet:1")), "0")
 
+    def test_link_wallet_command(self):
+        r = self.reply(f"/link_wallet {ADDR}")
+        self.assertIn("linked", r.lower())
+        self.assertEqual(self.store.get_linked_wallet(1), ADDR)
+        self.assertEqual(self.store.get_wallet(1), ADDR)
+
+    def test_link_wallet_invalid_address(self):
+        self.assertIn("Invalid", self.reply("/link_wallet 0x123"))
+
+    def test_unlink_wallet_command(self):
+        self.reply(f"/link_wallet {ADDR}")
+        self.store.add_auto_sub(1, ADDR, now_block=0)
+        r = self.reply("/unlink_wallet")
+        self.assertIn("unlinked", r.lower())
+        self.assertEqual(self.store.get_linked_wallet(1), "")
+
     def test_wallet_disconnect(self):
         self.store.set_wallet(1, ADDR)
         _handle_callback("disconnect", 1, self.store, self.exists, self.check, 1000)

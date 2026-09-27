@@ -103,6 +103,23 @@ def erc20_balance(addr: str, token: str = USDC, decimals: int = 6) -> float:
         return 0.0
 
 
+def erc20_balance_raw(holder: str, token: str):
+    """Raw ERC-20 balanceOf(holder) for `token`: int, or None if the RPC call failed.
+
+    The `None` vs `0` distinction matters: a transient RPC failure must NOT be read as "sold".
+    """
+    data = "0x70a08231" + holder.lower().replace("0x", "").rjust(64, "0")
+    r = _rpc("eth_call", [{"to": token, "data": data}, "latest"])
+    if r is None:
+        return None
+    if r == "0x":
+        return 0
+    try:
+        return int(r, 16)
+    except ValueError:
+        return None
+
+
 def rpc_symbol(token: str) -> str:
     """On-chain ERC20 symbol() via Arc RPC (cached). '' on failure."""
     t = (token or "").lower()

@@ -132,7 +132,7 @@ def _route(text: str, chat_id, store) -> str:
     raw = (text or "").strip()
     if _valid_addr(raw) and str(store.get_state(f"awaiting_wallet:{chat_id}", "0")) == "1":
         store.set_state(f"awaiting_wallet:{chat_id}", "0")
-        return "/connect " + raw
+        return "/link_wallet " + raw
     return _normalize(raw)
 
 
@@ -165,7 +165,7 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
             card["parse_mode"] = "HTML"
             return card
         return {"text": reply, "parse_mode": "HTML"}
-    if cmd in ("/list", "/stats", "/wallet", "/connect"):
+    if cmd in ("/list", "/stats", "/wallet", "/connect", "/link_wallet", "/unlink_wallet"):
         return {"text": reply, "parse_mode": "HTML"}
     return reply
 
@@ -400,6 +400,17 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
             return i18n.t("connect_prompt", lang)
         store.set_wallet(chat_id, arg)
         return i18n.t("connect_ok", lang).format(addr=arg)
+    if cmd == "/link_wallet":
+        if not _valid_addr(arg):
+            return i18n.t("link_bad", lang)
+        store.link_wallet(chat_id, arg)
+        store.set_wallet(chat_id, arg)
+        store.ensure_subscriber(chat_id, since_block=now_block)
+        store.set_state(f"awaiting_wallet:{chat_id}", "0")
+        return i18n.t("link_ok", lang).format(addr=arg)
+    if cmd == "/unlink_wallet":
+        n = store.unlink_wallet(chat_id)
+        return i18n.t("unlink_ok", lang).format(n=n)
     if cmd == "/allow":
         if not _is_admin(store, chat_id):
             return "Not authorized."
@@ -517,7 +528,9 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
         if not ok:
             return f"Cannot subscribe: {reason} (max {store.MAX_TOKENS} tokens per user)."
         if reason == "already":
+            store.promote_to_manual(chat_id, arg)
             return f"Already subscribed to {arg}."
+        store.promote_to_manual(chat_id, arg)
         return f"Subscribed to {arg}. You'll get future alerts only."
     if cmd == "/unsubscribe":
         if not _valid_addr(arg):

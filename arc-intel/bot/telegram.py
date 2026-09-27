@@ -93,6 +93,8 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "pending", "description": "Pending proposals"},
         {"command": "positions", "description": "Paper positions"},
         {"command": "wallet", "description": "Connect wallet"},
+        {"command": "link_wallet", "description": "Link wallet (auto-track)"},
+        {"command": "unlink_wallet", "description": "Unlink wallet"},
         {"command": "settings", "description": "Alert settings"},
         {"command": "language", "description": "Language"},
         {"command": "disclaimer", "description": "Disclaimer"},
@@ -106,6 +108,8 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "pending", "description": "Pendientes"},
         {"command": "positions", "description": "Posiciones"},
         {"command": "wallet", "description": "Conectar cartera"},
+        {"command": "link_wallet", "description": "Vincular cartera (auto)"},
+        {"command": "unlink_wallet", "description": "Desvincular cartera"},
         {"command": "settings", "description": "Ajustes"},
         {"command": "language", "description": "Idioma"},
         {"command": "disclaimer", "description": "Aviso legal"},
@@ -119,6 +123,8 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "pending", "description": "\u5f85\u5904\u7406"},
         {"command": "positions", "description": "\u6301\u4ed3"},
         {"command": "wallet", "description": "\u8fde\u63a5\u94b1\u5305"},
+        {"command": "link_wallet", "description": "\u5173\u8054\u94b1\u5305\uff08\u81ea\u52a8\uff09"},
+        {"command": "unlink_wallet", "description": "\u53d6\u6d88\u5173\u8054\u94b1\u5305"},
         {"command": "settings", "description": "\u8bbe\u7f6e"},
         {"command": "language", "description": "\u8bed\u8a00"},
         {"command": "disclaimer", "description": "\u514d\u8d23\u58f0\u660e"},
@@ -691,6 +697,13 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
                 fired = fire_preorders(store, alerts, transport, thr, price_fn)
                 if fired:
                     logger({"cycle": k, "preorders_fired": fired})
+            except Exception:
+                pass
+            try:
+                from .wallet_track import scan_wallets
+                scan = scan_wallets(storage, store, head=cursor)
+                if scan["new_subs"] or scan["dropped_subs"]:
+                    logger({"cycle": k, "wallet_track": scan})
             except Exception:
                 pass
             batch = store.dequeue(2000)

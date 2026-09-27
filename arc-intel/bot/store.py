@@ -78,6 +78,13 @@ class SubscriptionStore:
             "id INTEGER PRIMARY KEY AUTOINCREMENT, chat TEXT, user TEXT, token TEXT, pct REAL, "
             "floor_pct REAL, min_out REAL, deadline INTEGER, order_nonce INTEGER, status TEXT, "
             "created_ts INTEGER, signature TEXT, sign_token TEXT, sig_payload TEXT)")
+        # wallet tracking: read-only address link + which subs were auto-generated from it
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS wallet_links ("
+            "chat_id TEXT PRIMARY KEY, address TEXT, created_ts INTEGER)")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS auto_subs ("
+            "chat_id TEXT, token TEXT, PRIMARY KEY (chat_id, token))")
         for _col in ("signature TEXT", "sign_token TEXT", "sig_payload TEXT"):
             try:
                 self.conn.execute(f"ALTER TABLE preorders ADD COLUMN {_col}")
@@ -422,6 +429,72 @@ class SubscriptionStore:
     def set_preorder_status(self, pid, status) -> None:
         self.conn.execute("UPDATE preorders SET status=? WHERE id=?", (status, int(pid)))
         self.conn.commit()
+
+    # --- wallet tracking (read-only public address) ---
+    def link_wallet(self, chat_id, address: str) -> None:
+        self.conn.execute(
+            "INSERT INTO wallet_links(chat_id,address,created_ts) VALUES(?,?,?) "
+            "ON CONFLICT(chat_id) DO UPDATE SET address=excluded.address, created_ts=excluded.created_ts",
+            (str(chat_id), str(address).lower(), int(time.time())))
+        self.conn.commit()
+
+    def get_linked_wallet(self, chat_id) -> str:
+        r = self.conn.execute("SELECT address FROM wallet_links WHERE chat_id=?",
+                              (str(chat_id),)).fetchone()
+        return r[0] if r else ""
+
+    def list_linked_wallets(self) -> list:
+        return [(r[0], r[1]) for r in self.conn.execute(
+            "SELECT chat_id, address FROM wallet_links").fetchall()]
+
+    def _auto_subs(self, chat_id) -> list:
+        return [r[0] for r in self.conn.execute(
+            "SELECT token FROM auto_subs WHERE chat_id=?", (str(chat_id),)).fetchall()]
+
+    def is_auto_sub(self, chat_id, token) -> bool:
+        cur = self.conn.execute("SELECT 1 FROM auto_subs WHERE chat_id=? AND token=?",
+                                (str(chat_id), str(token).lower()))
+        return cur.fetchone() is not None
+
+    def add_auto_sub(self, chat_id, token, now_block: int = 0) -> bool:
+        """Auto-subscribe (future alerts only). Only NEW subs are marked as auto; an existing
+        (manual) subscription is left untouched."""
+        token = str(token).lower()
+        ok, reason = self.add_token(chat_id, token, now_block=now_block)
+        if reason == "added":
+            self.conn.execute("INSERT OR IGNORE INTO auto_subs(chat_id,token) VALUES(?,?)",
+                              (str(chat_id), token))
+            self.conn.commit()
+            return True
+        return False
+
+    def remove_auto_sub(self, chat_id, token) -> bool:
+        """Remove a subscription ONLY if it was auto-generated (manual stays)."""
+        token = str(token).lower()
+        if not self.is_auto_sub(chat_id, token):
+            return False
+        self.remove_token(chat_id, token)
+        self.conn.execute("DELETE FROM auto_subs WHERE chat_id=? AND token=?", (str(chat_id), token))
+        self.conn.commit()
+        return True
+
+    def promote_to_manual(self, chat_id, token) -> None:
+        """A manual /subscribe on an auto token makes it manual (won't be auto-removed)."""
+        self.conn.execute("DELETE FROM auto_subs WHERE chat_id=? AND token=?",
+                          (str(chat_id), str(token).lower()))
+        self.conn.commit()
+
+    def unlink_wallet(self, chat_id) -> int:
+        """Delete the link + all its auto-generated subs (manual subs stay). Returns count removed."""
+        removed = 0
+        for tok in self._auto_subs(chat_id):
+            self.remove_token(chat_id, tok)
+            removed += 1
+        self.conn.execute("DELETE FROM auto_subs WHERE chat_id=?", (str(chat_id),))
+        self.conn.execute("DELETE FROM wallet_links WHERE chat_id=?", (str(chat_id),))
+        self.conn.execute("UPDATE subscribers SET wallets='' WHERE chat_id=?", (str(chat_id),))
+        self.conn.commit()
+        return removed
 
     def close(self) -> None:
         self.conn.close()

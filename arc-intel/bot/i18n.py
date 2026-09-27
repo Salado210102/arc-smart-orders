@@ -102,6 +102,23 @@ TEXTS: dict[str, dict[str, str]] = {
         "es": "Envía tu dirección de cartera para conectarla (solo lectura, sin claves):\n/connect 0x\u2026",
         "zh": "发送你的钱包地址以连接（只读，无私钥）：\n/connect 0x\u2026",
     },
+    "link_ok": {
+        "en": "\u2705 Wallet linked (read-only): <code>{addr}</code>\nI'll auto-follow the tokens in "
+              "this wallet (future alerts only). Use /unlink_wallet to remove it.",
+        "es": "\u2705 Cartera vinculada (solo lectura): <code>{addr}</code>\nVigilaré automáticamente "
+              "los tokens de esta cartera (solo alertas futuras). Usa /unlink_wallet para quitarla.",
+        "zh": "\u2705 已关联钱包（只读）：<code>{addr}</code>\n我会自动关注该钱包中的代币（仅未来提醒）。使用 /unlink_wallet 取消。",
+    },
+    "link_bad": {
+        "en": "Invalid address. Usage: /link_wallet 0x + 40 hex.",
+        "es": "Dirección inválida. Uso: /link_wallet 0x + 40 hex.",
+        "zh": "地址无效。用法：/link_wallet 0x + 40 位十六进制。",
+    },
+    "unlink_ok": {
+        "en": "\U0001F5D1\uFE0F Wallet unlinked. Removed {n} auto-subscription(s). Manual subscriptions stay.",
+        "es": "\U0001F5D1\uFE0F Cartera desvinculada. Eliminadas {n} suscripción(es) automáticas. Las manuales se mantienen.",
+        "zh": "\U0001F5D1\uFE0F 已取消关联。移除了 {n} 个自动订阅。手动订阅保留。",
+    },
     "connect_paste": {
         "en": "\U0001F517 <b>Paste your wallet address</b> in the message bar and hit send "
               "(watch-only, no keys).",
