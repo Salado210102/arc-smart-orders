@@ -330,3 +330,10 @@ auditoría + hot key acotada; no es lo primero).
   **venta 25/50/75/100%** con 1 clic ([PAPER], botón 🔄 para refrescar precio). Añadida sección
   **12 · Ideas diferenciales** (seguridad on-chain, Arc-nativo, honestidad) y **recomendaciones** para
   las 4 decisiones de la Opción 2.
+- **2026-09-27 (alerts: por qué no llegaban)** — El bot **sí** generaba señales
+  (`large_sell`/`volume_spike`/`volume_collapse`, `lag:0`) pero los suscriptores con **kinds antiguos**
+  (`dev_sell,compound,volume_collapse`) **no recibían** los tipos nuevos
+  (`volume_spike`/`large_sell`/`liquidity_removal`). **Fix**: kinds vacío = **todos** los tipos
+  actuales (`_enabled_kinds` default). Verificado con `dispatch` real → **2 entregadas**. **Al comprar**
+  (wallet del bot) → `record_fill` → `add_auto_sub` → el token queda **auto-vigilado** y el usuario
+  recibe sus anomalías.
