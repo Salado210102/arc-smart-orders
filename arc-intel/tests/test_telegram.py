@@ -40,6 +40,7 @@ class TelegramTests(unittest.TestCase):
 
     def test_dispatch_and_dedupe(self):
         self.store.subscribe(chat_id=1, tokens=("0xt",), kinds=("dev_sell",))
+        self.store.add_holding(1, "0xt")
         alerts = [{"token": "0xt", "kind": "dev_sell", "severity": "high", "block": 10,
                    "message": "hello"}]
         t = FakeTransport()
@@ -57,6 +58,8 @@ class TelegramTests(unittest.TestCase):
     def test_per_chat_cap(self):
         self.store.subscribe(chat_id=1, tokens=("0xt",), kinds=("dev_sell",))
         self.store.subscribe(chat_id=2, tokens=("0xt",), kinds=("dev_sell",))
+        self.store.add_holding(1, "0xt")
+        self.store.add_holding(2, "0xt")
         alerts = [{"token": "0xt", "kind": "dev_sell", "block": i, "severity": "high",
                    "message": "m"} for i in range(5)]
         n = dispatch(alerts, self.store, FakeTransport(), per_chat_cap=2)
@@ -64,6 +67,7 @@ class TelegramTests(unittest.TestCase):
 
     def test_since_block_skips_old_alerts(self):
         self.store.subscribe(chat_id=1, tokens=("0xt",), kinds=("dev_sell",))
+        self.store.add_holding(1, "0xt")
         self.store.conn.execute("UPDATE subscribers SET since_block=100 WHERE chat_id='1'")
         self.store.conn.commit()
         alerts = [{"token": "0xt", "kind": "dev_sell", "block": 50, "severity": "high", "message": "old"},
@@ -75,6 +79,7 @@ class TelegramTests(unittest.TestCase):
 
     def test_dispatch_uses_rich_html_for_html_transport(self):
         self.store.subscribe(chat_id=1, tokens=("0xt",), kinds=("dev_sell",))
+        self.store.add_holding(1, "0xt")
 
         class HtmlTransport:
             send_html = True
@@ -167,6 +172,7 @@ class TelegramTests(unittest.TestCase):
 
     def test_alert_loop_logs_per_cycle(self):
         self.store.subscribe(chat_id=1, tokens=("0xt",), kinds=("dev_sell",))
+        self.store.add_holding(1, "0xt")
         logs = []
         alerts = [{"token": "0xt", "kind": "dev_sell", "severity": "high", "block": 5,
                    "message": "x"}]

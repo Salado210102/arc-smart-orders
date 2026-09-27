@@ -685,14 +685,27 @@ class Handler(BaseHTTPRequestHandler):
             uid = self._auth_user()
             if uid is None:
                 return self._send(401, {"error": "unauthorized"})
+            from .telegram import RISK_KINDS
             store = SubscriptionStore(DB)
             try:
-                # Only alerts for tokens the user holds in the bot wallet (cartera).
-                toks = store.list_holdings(uid)
-                al = store.recent_alerts(tokens=toks, limit=50) if toks else []
+                row = store.get(uid)
+                toks = sorted(row["tokens"]) if row else []
+                holds = store.list_holdings(uid)
+                subs = store.recent_alerts(tokens=toks, limit=40) if toks else []
+                risk = store.recent_alerts(tokens=holds, kinds=list(RISK_KINDS), limit=30) if holds else []
             finally:
                 store.close()
-            return self._send(200, {"alerts": al})
+            others = [a for a in subs if a.get("kind") not in RISK_KINDS
+                      and a.get("kind") not in ("volume_collapse", "thin_market")]
+            seen = set()
+            merged = []
+            for a in sorted(risk + others, key=lambda x: x.get("block", 0), reverse=True):
+                key = (a.get("token"), a.get("kind"), a.get("block"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                merged.append(a)
+            return self._send(200, {"alerts": merged[:50]})
         if u.path == "/series":
             uid = self._auth_user()
             if uid is None:

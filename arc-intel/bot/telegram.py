@@ -24,6 +24,7 @@ from .store import SubscriptionStore
 from .throttle import Throttle
 
 PUSH_EXCLUDED_KINDS = {"thin_market", "volume_collapse"}  # not pushed (collapse feeds 'compound')
+RISK_KINDS = {"dev_sell", "compound", "liquidity_removal", "large_sell"}  # only if the user HOLDS it
 
 _IMG_CACHE: dict[str, str] = {}
 
@@ -262,12 +263,15 @@ def dispatch(alerts: list, store: SubscriptionStore, transport, throttle=None,
     for s in store.list():
         chat = s["chat_id"]
         since = int(s.get("since_block", 0) or 0)
+        holds = set(store.list_holdings(chat)) if hasattr(store, "list_holdings") else set()
         sent = 0
         for a in alerts:
             if sent >= per_chat_cap:
                 break
             if a.get("kind") in PUSH_EXCLUDED_KINDS:
                 continue
+            if a.get("kind") in RISK_KINDS and a.get("token") not in holds:
+                continue  # risk alerts only for tokens the user holds
             if int(a.get("block") or 0) <= since:
                 continue
             if not matches(s, a):
