@@ -105,9 +105,11 @@ Reusa lo que ya tenemos (Permit2 + v4, no-custodia) y añade sesiones:
    - Scope on-chain: pool + tokenIn + `maxPerOrder` + `maxTotal` + `minOutFloor` + `expiry` +
      `recipient == user` + nonce single-use; pull vía **Permit2 `transferFrom`** (allowance, sin firma).
    - EIP-712 propio (`DOMAIN_SEPARATOR`), baja-s, recover.
-3. **Backend**: generación y **cifrado** de session keys, gestión de scope, y `keeper` usando la
-   sesión (sin firma por orden).
-4. **UI**: onboarding "activar trading 1-toque", estado de sesión, revocar.
+3. **Backend**: generación + **cifrado** (Fernet) + scope + endpoints
+   (`/session/authorize`, `/session/revoke`, `/sessions`) ✅; firma EIP-712 de la `SessionOrder` ✅
+   (recupera la session key). **Pendiente:** el `keeper` que envíe `executeWithSession`
+   (requiere la **v2 desplegada** por el Safe).
+4. **UI**: onboarding "activar trading 1-toque" (envía las 3 txs de setup), estado de sesión, revocar. ⏳
 5. **Auditoría** (punto 3) del contrato v2.
 6. **E2E testnet** → mainnet.
 

@@ -157,6 +157,33 @@ class SignServerTests(unittest.TestCase):
         except urllib.error.HTTPError as e:
             self.assertEqual(e.code, 503)
 
+    def test_sessions_requires_auth(self):
+        try:
+            urllib.request.urlopen(self._url("/sessions"))
+            self.fail("expected 401")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 401)
+
+    def test_session_authorize_requires_auth(self):
+        body = json.dumps({"token": "0x" + "1" * 40}).encode()
+        req = urllib.request.Request(self._url("/session/authorize"), data=body,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 401")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 401)
+
+    def test_session_revoke_requires_auth(self):
+        body = json.dumps({"session_key": "0x" + "b" * 40}).encode()
+        req = urllib.request.Request(self._url("/session/revoke"), data=body,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 401")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 401)
+
     def test_alerts_requires_auth(self):
         try:
             urllib.request.urlopen(self._url("/alerts"))

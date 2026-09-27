@@ -79,6 +79,12 @@ class SubscriptionStore:
             "floor_pct REAL, min_out REAL, deadline INTEGER, order_nonce INTEGER, status TEXT, "
             "created_ts INTEGER, signature TEXT, sign_token TEXT, sig_payload TEXT, "
             "kind TEXT DEFAULT 'sell')")
+        # session keys (Opción 3): scoped hot keys the user authorizes once
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS sessions ("
+            "chat TEXT, session_key TEXT, enc_secret TEXT, executor TEXT, pool_id TEXT, "
+            "token_in TEXT, max_per_order TEXT, max_total TEXT, min_out_floor TEXT, expiry INTEGER, "
+            "status TEXT, created_ts INTEGER, PRIMARY KEY (chat, session_key))")
         # persisted alerts (for the Mini App Alerts tab with charts)
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS alerts ("
@@ -328,6 +334,44 @@ class SubscriptionStore:
             (token, kind, int(now_ts)))
         self.conn.commit()
         return True
+
+    # --- session keys (Opción 3) ---
+    def save_session(self, chat, session_key, enc_secret, executor, pool_id, token_in,
+                     max_per_order, max_total, min_out_floor, expiry, status="active") -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO sessions(chat,session_key,enc_secret,executor,pool_id,token_in,"
+            "max_per_order,max_total,min_out_floor,expiry,status,created_ts) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+            (str(chat), str(session_key).lower(), enc_secret, str(executor).lower(),
+             str(pool_id).lower(), str(token_in).lower(), str(int(max_per_order)),
+             str(int(max_total)), str(int(min_out_floor)), int(expiry), status, int(time.time())))
+        self.conn.commit()
+
+    def get_session(self, chat, pool_id, token_in, status="active") -> dict | None:
+        r = self.conn.execute(
+            "SELECT chat,session_key,enc_secret,executor,pool_id,token_in,max_per_order,max_total,"
+            "min_out_floor,expiry,status FROM sessions "
+            "WHERE chat=? AND pool_id=? AND token_in=? AND status=? ORDER BY created_ts DESC LIMIT 1",
+            (str(chat), str(pool_id).lower(), str(token_in).lower(), status)).fetchone()
+        return self._sess_row(r) if r else None
+
+    def list_sessions(self, chat) -> list:
+        return [self._sess_row(r) for r in self.conn.execute(
+            "SELECT chat,session_key,enc_secret,executor,pool_id,token_in,max_per_order,max_total,"
+            "min_out_floor,expiry,status FROM sessions WHERE chat=? ORDER BY created_ts DESC",
+            (str(chat),)).fetchall()]
+
+    def _sess_row(self, r) -> dict:
+        return {"chat": r[0], "session_key": r[1], "enc_secret": r[2], "executor": r[3],
+                "pool_id": r[4], "token_in": r[5], "max_per_order": int(r[6] or 0),
+                "max_total": int(r[7] or 0), "min_out_floor": int(r[8] or 0), "expiry": int(r[9] or 0),
+                "status": r[10]}
+
+    def revoke_session(self, chat, session_key) -> bool:
+        cur = self.conn.execute("UPDATE sessions SET status='revoked' WHERE chat=? AND session_key=?",
+                                (str(chat), str(session_key).lower()))
+        self.conn.commit()
+        return cur.rowcount > 0
 
     # --- persisted alerts (idempotent by token+kind+block) ---
     def add_alert(self, alert, ts: int = 0) -> None:

@@ -63,6 +63,57 @@ class Handler(BaseHTTPRequestHandler):
         u = data.get("user")
         return u.get("id") if isinstance(u, dict) else None
 
+    def _session_authorize(self, uid, data):
+        """Generate a scoped session key + return the one-time setup txs for the wallet."""
+        import time
+        from execution import sessions as S
+        from execution.eip712 import PERMIT2
+        from .miniapp_data import load_pool
+        addr = (data.get("token") or "").lower()
+        if not ADDR_RE.match(addr):
+            return 400, {"error": "bad_address"}
+        executor = os.environ.get("ARC_INTEL_EXECUTOR")
+        if not executor:
+            return 503, {"error": "no_executor"}
+        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
+        if not enc:
+            return 503, {"error": "no_enc_key"}
+        st = _storage()
+        if st is None:
+            return 503, {"error": "no_storage"}
+        pool = load_pool(st, addr)
+        if not pool:
+            return 404, {"error": "no_pool"}
+        stable = os.environ.get("ARC_INTEL_STABLE", "0x3600000000000000000000000000000000000000")
+        try:
+            max_per_order = int(float(data.get("max_per_order") or 50) * 1e6)
+            max_total = int(float(data.get("max_total") or 200) * 1e6)
+            min_out_floor = int(data.get("min_out_floor") or 0)
+            ttl = int(data.get("ttl") or 24 * 3600)
+        except (TypeError, ValueError):
+            return 400, {"error": "bad_amount"}
+        expiry = int(time.time()) + ttl
+        pid = S.pool_id(pool)
+        key = S.new_session_key()
+        enc_secret = S.encrypt_secret(key["private_key"], enc)
+        store = SubscriptionStore(DB)
+        try:
+            store.save_session(uid, key["address"], enc_secret, executor, pid, stable,
+                               max_per_order, max_total, min_out_floor, expiry, status="active")
+        finally:
+            store.close()
+        txs = [
+            {"to": stable, "data": S.calldata_approve(PERMIT2, max_total), "desc": "Approve USDC to Permit2"},
+            {"to": PERMIT2, "data": S.calldata_permit2_approve(stable, executor, max_total, expiry),
+             "desc": "Permit2 approve to executor"},
+            {"to": executor, "data": S.calldata_authorize_session(key["address"], pid, stable,
+                                                                  max_per_order, max_total, min_out_floor, expiry),
+             "desc": "Authorize session"},
+        ]
+        return 200, {"session_key": key["address"], "pool_id": pid, "token_in": stable,
+                     "expiry": expiry, "max_per_order": max_per_order, "max_total": max_total,
+                     "min_out_floor": min_out_floor, "txs": txs}
+
     def _buy(self, uid, addr, amount_usdc, slippage, persist):
         """Buy quote (and, if persist, a stored buy order) -> (http_code, body)."""
         if not ADDR_RE.match(addr or ""):
@@ -288,6 +339,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, load_series(st, tok))
             except Exception:
                 return self._send(502, {"error": "series_failed"})
+        if u.path == "/sessions":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            store = SubscriptionStore(DB)
+            try:
+                out = [{"session_key": s["session_key"], "pool_id": s["pool_id"],
+                        "token_in": s["token_in"], "expiry": s["expiry"], "status": s["status"]}
+                       for s in store.list_sessions(uid)]
+            finally:
+                store.close()
+            return self._send(200, {"sessions": out})
         if u.path == "/buy_quote":
             uid = self._auth_user()
             if uid is None:
@@ -359,6 +422,36 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 store.close()
             return self._send(200 if ok else 404, {"ok": ok})
+        if u.path == "/session/authorize":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send(400, {"error": "bad_json"})
+            code, resp = self._session_authorize(uid, data)
+            return self._send(code, resp)
+        if u.path == "/session/revoke":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send(400, {"error": "bad_json"})
+            sk = data.get("session_key") or ""
+            store = SubscriptionStore(DB)
+            try:
+                ok = store.revoke_session(uid, sk) if sk else False
+            finally:
+                store.close()
+            from execution.sessions import calldata_revoke_session
+            executor = os.environ.get("ARC_INTEL_EXECUTOR", "")
+            return self._send(200 if ok else 404,
+                              {"ok": ok, "tx": {"to": executor, "data": calldata_revoke_session(sk)}})
         if u.path != "/sign":
             return self._send(404, {"error": "not_found"})
         n = int(self.headers.get("Content-Length") or 0)
