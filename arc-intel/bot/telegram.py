@@ -446,6 +446,17 @@ def check_token(storage, token: str) -> str:
     if last_blk:
         lines.append(f"\U0001F551 Last trade: block {int(last_blk)}")
     lines.append(f"\U0001F4CA Status: {status}")
+    try:
+        from indexer.token_risk import analyze_token
+        rk = analyze_token(token)
+        if rk.get("level") and rk["level"] != "unknown":
+            emoji = {"high": "\U0001F534", "medium": "\U0001F7E0", "low": "\U0001F7E2"}.get(rk["level"], "\u26AA")
+            flags = ", ".join(rk.get("reasons") or []) or "clean"
+            hp = " \u26A0\uFE0F honeypot machinery" if rk.get("honeypot_hint") else ""
+            lines.append(f"{emoji} Contract risk: <b>{rk['level']}</b> ({_h.escape(flags)}){hp} "
+                         f"<i>heuristic</i>")
+    except Exception:
+        pass
     lines.append(f'\U0001F517 <a href="https://explorer.arc.io/address/{_h.escape(token)}">view on explorer</a>')
     return "\n".join(lines)
 

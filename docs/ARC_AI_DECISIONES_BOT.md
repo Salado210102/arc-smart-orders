@@ -204,8 +204,17 @@
   (crea venta condicional EIP-712 por %) y **`POST /cancel`** (reposo del keeper; la cancelación
   on-chain la firma el usuario con `cancelOrder`). `quotes`: `sell_quote` + `build_sell_payload`.
   Creado **`docs/ARC_AI_FEATURES.md`**: catálogo COMPLETO de funcionalidades + hooks de marketing (EN)
-  + límites + disclaimers. Tests **281 passed** (1 fallo ambiental local). Pendiente real: relayer con
+  + límites   + disclaimers. Tests **281 passed** (1 fallo ambiental local). Pendiente real: relayer con
   gas (§7) y auditoría mainnet.
+- **2026-09-27 (escáner de contrato anti-rug)** — `indexer/token_risk.py`: **Keccak-256 en Python
+  puro** (sin dependencias; validado contra vectores conocidos) para selectores, + escaneo del
+  bytecode en busca de maquinaria de **honeypot (blacklist/trading-toggle), mint, pause, tax,
+  limits**; resuelve **proxies mínimos EIP-1167** (todos los tokens de Argus son clones → se escanea
+  la **implementación**) y detecta proxies **upgradeables** (EIP-1967) + **owner activo**. Se integra
+  en la ficha de token: `/check`, `GET /token` y la **Mini App** (compra). Honestidad: es
+  **heurística** (no prueba de venta); la simulación compra/venta queda para después. Verificado en
+  token real (BCAT): `level=medium`, `owner_active`, `minimal_proxy`. Tests **296 passed** (1 fallo
+  ambiental local). `ARC_AI_FEATURES.md` actualizado.
 
 ---
 

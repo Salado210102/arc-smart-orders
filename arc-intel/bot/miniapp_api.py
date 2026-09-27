@@ -47,7 +47,7 @@ def age_text(age_blocks) -> str:
 
 def build_token_card(*, address, symbol="", name="", launchpad="", creator="",
                      created_block=None, head_block=0, swaps=0, wallets=0, vol24=0.0,
-                     price=0.0, supply=0.0, thin_reason=None, creator_rep=None,
+                     price=0.0, supply=0.0, thin_reason=None, creator_rep=None, risk=None,
                      explorer_base: str = EXPLORER) -> dict:
     """Pure token card (mirrors the /check fields, as data instead of HTML)."""
     address = (address or "").lower()
@@ -76,6 +76,7 @@ def build_token_card(*, address, symbol="", name="", launchpad="", creator="",
         "thin_market": thin_reason,
         "status": f"thin market ({thin_reason})" if thin_reason else "has market activity",
         "creator_rep": creator_rep or {},
+        "risk": risk or {},
         "explorer": f"{explorer_base}{address}",
     }
 

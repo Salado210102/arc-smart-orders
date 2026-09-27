@@ -20,6 +20,7 @@ Leyenda de estado: **[LIVE]** ya operativo · **[TESTNET]** probado en testnet, 
 | Detectores de **launchpad** (Argus) | `TokenCreated` → token (nombre/símbolo/creator/pool) | [LIVE] |
 | **Metadata de token** | símbolo on-chain (`symbol()`), logo (IPFS Argus → DexScreener fallback) | [LIVE] |
 | **Reputación del creador** | nº de tokens creados, cuántos **volcó**, % de rug, valor | [LIVE] |
+| **Escáner de contrato** (heurística) | detecta maquinaria de **honeypot/mint/pause/blacklist/tax/limits** por selectores en el bytecode (resuelve **proxies EIP-1167**) + **owner activo** y proxy upgradeable | [LIVE] |
 | **Thin-market check** | sin trades / un solo wallet tras N bloques | [LIVE] |
 | **Ranking de launchpads** | volumen/actividad por launchpad | [LIVE] |
 
@@ -43,7 +44,7 @@ Leyenda de estado: **[LIVE]** ya operativo · **[TESTNET]** probado en testnet, 
 | Comando / función | Qué hace | Estado |
 |---|---|---|
 | `/start` + onboarding | alta, allowlist (beta cerrada), disclaimer | [LIVE] |
-| `/check <token>` | ficha: precio, **market cap**, **vol 24h**, **thin-market**, **reputación del creador**, launchpad, logo, explorer | [LIVE] |
+| `/check <token>` | ficha: precio, **market cap**, **vol 24h**, **thin-market**, **reputación del creador**, **riesgo de contrato** (heurística), launchpad, logo, explorer | [LIVE] |
 | `/subscribe`, `/subscribe_recent`, `/list` | seguir tokens / top recientes / tus suscripciones | [LIVE] |
 | `/wallet`, `/link_wallet`, `/unlink_wallet` | wallet **watch-only** (nunca llaves) + auto-seguimiento | [LIVE] |
 | `/settings` | interruptores por tipo: dev_sell / compound / volume_spike / liquidity_removal / large_sell | [LIVE] |
@@ -95,7 +96,8 @@ Leyenda de estado: **[LIVE]** ya operativo · **[TESTNET]** probado en testnet, 
 - **Mainnet**: el executor está en **testnet**; falta **auditoría + despliegue**.
 - **Relayer con gas**: la ejecución real necesita `ARC_INTEL_RELAYER_KEY` (aún no configurado).
 - **SL/trailing**: el **disparo es del keeper** (off-chain); no es un stop nativo on-chain.
-- **Honeypot / mint / pause / blacklist**: requieren decodificar el contrato del token ([PRONTO]).
+- **Honeypot / mint / pause / blacklist**: hay un **escáner heurístico** de contrato [LIVE]
+  (selectores + owner/proxy); la **prueba definitiva** (simular compra y venta) es [PRONTO].
 - **Liquidez USD**: hoy es estimación, no una cifra validada.
 - **Dominio de marca**: `app.basepump.dev` pendiente del registro DNS en Porkbun.
 

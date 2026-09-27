@@ -284,6 +284,7 @@
            <div class="kv"><span>Vol 24h</span><b>${esc(body.vol24_text)}</b></div>
            <div class="kv"><span>Estado</span><b>${thin}</b></div>
            <div class="kv"><span>Creador</span><b>${rep}</b></div>
+           ${body.risk && body.risk.level && body.risk.level !== "unknown" ? `<div class="kv"><span>Contrato (heurística)</span><b class="${body.risk.level === "high" ? "bad" : body.risk.level === "medium" ? "warn" : "ok"}">${esc(body.risk.level)}${body.risk.honeypot_hint ? " ⚠ honeypot?" : ""}</b></div>` : ""}
            <div class="mut" style="margin-top:6px">${esc(body.address)}</div>`;
         $("step2").classList.remove("hide");
       };
