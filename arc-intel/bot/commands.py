@@ -18,10 +18,10 @@ from . import i18n
 from .sender import DirectSender
 
 ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
-ALLOWED_KINDS = {"dev_sell", "volume_collapse", "compound", "volume_spike"}
-ALL_KINDS = ["dev_sell", "volume_collapse", "compound", "volume_spike"]
-KIND_LABELS = {"dev_sell": "Dev-sell", "volume_collapse": "Volume collapse",
-               "compound": "Compound risk", "volume_spike": "Volume spike"}
+ALLOWED_KINDS = {"dev_sell", "compound", "volume_spike"}
+ALL_KINDS = ["dev_sell", "compound", "volume_spike"]
+KIND_LABELS = {"dev_sell": "Dev-sell", "compound": "Compound risk",
+               "volume_spike": "Volume spike"}
 
 
 def _enabled_kinds(store, chat) -> set:
@@ -73,7 +73,7 @@ ONBOARDING = ("ARC AI — on-chain risk alerts for Arc.\n"
               "/pending             — your [PAPER] proposals\n"
               "/approve <id> [code]   /cancel <id>\n"
               "/stats               — signal value (with both faces)\n"
-              "/settings dev_sell,volume_collapse,compound,volume_spike\n\n"
+              "/settings dev_sell,compound,volume_spike\n\n"
               + DISCLAIMER)
 HELP = ONBOARDING
 
@@ -307,7 +307,7 @@ def fire_preorders(store, alerts, transport, thr, price_fn) -> int:
     for a in alerts:
         kind = getattr(a, "kind", None) or (a.get("kind") if isinstance(a, dict) else None)
         token = getattr(a, "token", None) or (a.get("token") if isinstance(a, dict) else None)
-        if kind not in ("dev_sell", "compound", "volume_collapse") or not token:
+        if kind not in ("dev_sell", "compound") or not token:
             continue
         for po in store.preorders_for_token(token):
             if po["id"] in seen:
@@ -427,7 +427,7 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
         from indexer.paper_eval import live_report
         rep = live_report(store, 45)
         lines = ["\U0001F4CA <b>Signal value</b> \u00B7 <i>[PAPER, simulated]</i>", ""]
-        for kind in ("dev_sell", "compound", "volume_collapse"):
+        for kind in ("dev_sell", "compound", "volume_spike"):
             d = rep.get(kind)
             h = (d or {}).get("horizons", {}).get("1h", {})
             n = int(h.get("n_real") or 0) if h else 0
@@ -572,10 +572,10 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
             return "Could not check that token right now."
     if cmd == "/settings":
         if not arg:
-            return "Usage: /settings dev_sell,volume_collapse,compound,volume_spike"
+            return "Usage: /settings dev_sell,compound,volume_spike"
         kinds = {k.strip() for k in arg.split(",") if k.strip()}
         if not kinds or not kinds <= ALLOWED_KINDS:
-            return "Allowed kinds: dev_sell, volume_collapse, compound, volume_spike"
+            return "Allowed kinds: dev_sell, compound, volume_spike"
         store.set_kinds(chat_id, kinds)
         return "Kinds set: " + ",".join(sorted(kinds))
     return "Unknown command. /help"

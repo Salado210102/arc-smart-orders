@@ -23,7 +23,7 @@ from .messages import format_alert, format_alert_rich
 from .store import SubscriptionStore
 from .throttle import Throttle
 
-PUSH_EXCLUDED_KINDS = {"thin_market"}  # thin_market is on-demand via /check, not pushed
+PUSH_EXCLUDED_KINDS = {"thin_market", "volume_collapse"}  # not pushed (collapse feeds 'compound')
 
 _IMG_CACHE: dict[str, str] = {}
 

@@ -345,6 +345,14 @@ class SubscriptionStore:
             "realized=excluded.realized, last_block=excluded.last_block",
             (str(user).lower(), str(token).lower(), pos.qty, pos.cost, pos.realized, pos.last_block))
         self.conn.commit()
+        # Watch the tokens the user holds: follow on an open position, unfollow when it closes.
+        try:
+            if pos.qty > 0:
+                self.add_auto_sub(user, token, now_block=int(block))
+            else:
+                self.remove_auto_sub(user, token)
+        except Exception:
+            pass
         return True
 
     def get_position(self, user, token) -> dict:

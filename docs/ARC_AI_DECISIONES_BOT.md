@@ -170,6 +170,14 @@
   HTTPS público**: `POST /buy_order` → `persisted:true`; `GET /order` → payload; `POST /sign` → ok;
   fila verificada `kind='buy', status='signed', user=<wallet>`; limpieza hecha. Suite **257 passed**
   (1 fallo ambiental local). Pendiente: **keeper** de compra (relayer con gas) y `/alerts`.
+- **2026-09-27 (alertas centradas en el usuario)** — Decisión de producto: las alertas genéricas de
+  mercado no aportan. Se **retira `volume_collapse` de la interfaz**: fuera de `/settings` y de
+  `/stats`; `PUSH_EXCLUDED_KINDS` la excluye de **todo** envío (sigue alimentando `compound` de forma
+  interna). Nuevo foco: el bot **vigila los tokens que el usuario tiene**. Al registrar un fill que
+  deja **posición > 0** se **auto-suscribe** el token y al **cerrar** la posición se deja de seguir
+  (`store.record_fill` → `add_auto_sub`/`remove_auto_sub`; patrón del wallet tracking). `Protect`
+  dispara con **dev_sell / compound** (sin collapse). Tests: +3 (auto-watch, parcial mantiene), +1
+  (dispatch no empuja collapse) y ajustes de settings → **260 passed**. Desplegado (servicios activos).
 
 ---
 

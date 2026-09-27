@@ -8,11 +8,15 @@ Read-only por diseño: **no** firma, **no** custodia, **no** mueve fondos de usu
 - **Indexer v2/v3/v4 complete**: blocks `21,068,653 → 22,721,550` (~1.56M bloques), **~6.7M swaps**,
   gaps = 0. Argus `TokenCreated` → `tokens` (nombre/símbolo/creator/pool_id). Uniswap **v4** PoolManager
   `0x8366…0951` (Initialize/ModifyLiquidity/Swap/Donate). v3/v2 también capturados.
-- **Detección de riesgo (validada, NO predictiva)**: **dev-sell** (FP ~1%), **colapso de volumen**
-  (z-score), **alerta compuesta**, **señal de volumen** (spike z≥+2.5 con suelo de $500 por bucket;
-  "dos caras": puede preceder un pump *o* un rug) y **confirmación por volumen** (un dev-sell con
-  volumen reciente alto sube de severidad). El **score de wallets se INVALIDÓ** en el walk-forward
+- **Detección de riesgo (validada, NO predictiva)**: **dev-sell** (FP ~1%), **alerta compuesta**
+  (dev-sell + colapso de volumen, *interno*) y **señal de volumen** (spike z≥+2.5 con suelo de $500
+  por bucket; "dos caras": puede preceder un pump *o* un rug), con **confirmación por volumen** (un
+  dev-sell con volumen reciente alto sube de severidad). El **colapso de volumen** ya **no se muestra**
+  al usuario (alimenta `compound` internamente). El **score de wallets se INVALIDÓ** en el walk-forward
   (Fase 2.2, no le ganó al azar) → **descartado y eliminado del código**.
+- **Alertas centradas en el usuario**: el bot **vigila automáticamente los tokens que el usuario
+  tiene** (posición > 0 → auto-seguir ese token; al cerrar la posición → dejar de seguir) y le avisa
+  de anomalías (dev-sell / compuesta / spike).
 - **Bot de Telegram 24/7** (beta cerrada, allowlist): `/check`, `/list`, `/subscribe*`, `/settings`,
   `/wallet`, `/pending`, `/positions`, `/stats`, `/help`; menú inline estilo Maestro; **i18n EN/ES/中文**.
   - `/check`: nombre, launchpad, **reputación del creador** (tokens creados / cuántos volcó), antigüedad,

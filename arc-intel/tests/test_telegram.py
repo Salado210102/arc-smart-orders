@@ -159,6 +159,12 @@ class TelegramTests(unittest.TestCase):
                    "message": "thin"}]
         self.assertEqual(dispatch(alerts, self.store, FakeTransport()), 0)
 
+    def test_dispatch_never_pushes_volume_collapse(self):
+        self.store.subscribe(chat_id=1, tokens=("0xt",), kinds=())
+        alerts = [{"token": "0xt", "kind": "volume_collapse", "severity": "high", "block": 1,
+                   "message": "collapse"}]
+        self.assertEqual(dispatch(alerts, self.store, FakeTransport()), 0)
+
     def test_alert_loop_logs_per_cycle(self):
         self.store.subscribe(chat_id=1, tokens=("0xt",), kinds=("dev_sell",))
         logs = []

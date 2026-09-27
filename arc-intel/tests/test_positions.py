@@ -92,6 +92,17 @@ class StorePositionTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["token"], TOK)
 
+    def test_record_fill_auto_watches_held_token(self):
+        self.store.record_fill("b1", 1, TOK, "buy", 100.0, 200.0)
+        self.assertTrue(self.store.is_auto_sub(1, TOK))
+        self.store.record_fill("s1", 1, TOK, "sell", 100.0, 250.0)   # full close
+        self.assertFalse(self.store.is_auto_sub(1, TOK))
+
+    def test_partial_sell_keeps_watching(self):
+        self.store.record_fill("b1", 1, TOK, "buy", 100.0, 200.0)
+        self.store.record_fill("s1", 1, TOK, "sell", 40.0, 120.0)    # partial
+        self.assertTrue(self.store.is_auto_sub(1, TOK))
+
 
 if __name__ == "__main__":
     unittest.main()
