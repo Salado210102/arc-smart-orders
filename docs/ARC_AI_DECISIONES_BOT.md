@@ -215,6 +215,11 @@
   **heurística** (no prueba de venta); la simulación compra/venta queda para después. Verificado en
   token real (BCAT): `level=medium`, `owner_active`, `minimal_proxy`. Tests **296 passed** (1 fallo
   ambiental local). `ARC_AI_FEATURES.md` actualizado.
+- **2026-09-27 (simulación de transferencia)** — Complemento anti-honeypot: `eth_call` de un
+  `transfer` **desde un holder con saldo** (creator + compradores recientes de `legs`) hacia el
+  PoolManager; un **revert** → `transfer_reverts` (nivel **high**, `honeypot_hint`). Si **ningún**
+  holder tiene saldo, `transfer_sim=null` (honesto: no se finge). Cacheado 1 h; acotado a 3 holders.
+  Verificado: la simulación ejecuta; en BCAT devolvió `null` (holders sin saldo). Tests **299 passed**.
 
 ---
 

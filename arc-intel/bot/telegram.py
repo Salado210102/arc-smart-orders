@@ -448,7 +448,8 @@ def check_token(storage, token: str) -> str:
     lines.append(f"\U0001F4CA Status: {status}")
     try:
         from indexer.token_risk import analyze_token
-        rk = analyze_token(token)
+        from .miniapp_data import holders_for
+        rk = analyze_token(token, holders=holders_for(storage, token))
         if rk.get("level") and rk["level"] != "unknown":
             emoji = {"high": "\U0001F534", "medium": "\U0001F7E0", "low": "\U0001F7E2"}.get(rk["level"], "\u26AA")
             flags = ", ".join(rk.get("reasons") or []) or "clean"

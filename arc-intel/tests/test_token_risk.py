@@ -95,6 +95,36 @@ class AnalyzeTests(unittest.TestCase):
         self.assertEqual(out["owner"], "0x" + "aa" * 20)
         self.assertTrue(out["heuristic"])
 
+    def test_transfer_sim_revert_is_honeypot(self):
+        code = "0x" + selector("transfer(address,uint256)")[2:]
+        bal = "0x" + format(100, "064x")
+        out = analyze_token("0x" + "a" * 40, get_code=lambda t: code,
+                            call=lambda t, d: bal, get_storage=lambda t, s: "0x",
+                            sim=lambda t, h: False, holders=["0x" + "b" * 40], use_cache=False)
+        self.assertEqual(out["level"], "high")
+        self.assertTrue(out["honeypot_hint"])
+        self.assertIn("transfer_reverts", out["reasons"])
+        self.assertFalse(out["transfer_sim"]["ok"])
+
+    def test_transfer_sim_ok_not_honeypot(self):
+        code = "0x" + selector("transfer(address,uint256)")[2:]
+        bal = "0x" + format(100, "064x")
+        out = analyze_token("0x" + "a" * 40, get_code=lambda t: code,
+                            call=lambda t, d: bal, get_storage=lambda t, s: "0x",
+                            sim=lambda t, h: True, holders=["0x" + "b" * 40], use_cache=False)
+        self.assertFalse(out["honeypot_hint"])
+        self.assertTrue(out["transfer_sim"]["ok"])
+
+    def test_transfer_sim_skips_holder_without_balance(self):
+        code = "0x" + selector("transfer(address,uint256)")[2:]
+        calls = []
+        out = analyze_token("0x" + "a" * 40, get_code=lambda t: code,
+                            call=lambda t, d: "0x", get_storage=lambda t, s: "0x",
+                            sim=lambda t, h: (calls.append(h) or True),
+                            holders=["0x" + "b" * 40], use_cache=False)
+        self.assertIsNone(out["transfer_sim"])
+        self.assertEqual(calls, [])
+
     def test_analyze_no_code(self):
         out = analyze_token("0x" + "b" * 40, get_code=lambda t: "0x",
                             call=lambda t, d: "0x", get_storage=lambda t, s: "0x",

@@ -21,6 +21,7 @@ Leyenda de estado: **[LIVE]** ya operativo · **[TESTNET]** probado en testnet, 
 | **Metadata de token** | símbolo on-chain (`symbol()`), logo (IPFS Argus → DexScreener fallback) | [LIVE] |
 | **Reputación del creador** | nº de tokens creados, cuántos **volcó**, % de rug, valor | [LIVE] |
 | **Escáner de contrato** (heurística) | detecta maquinaria de **honeypot/mint/pause/blacklist/tax/limits** por selectores en el bytecode (resuelve **proxies EIP-1167**) + **owner activo** y proxy upgradeable | [LIVE] |
+| **Simulación de transferencia** | `eth_call` de un `transfer` desde un holder **con saldo** al pool; si **revierte** → posible honeypot. Si no hay holder con saldo, se indica `null` (no se inventa el resultado) | [LIVE] |
 | **Thin-market check** | sin trades / un solo wallet tras N bloques | [LIVE] |
 | **Ranking de launchpads** | volumen/actividad por launchpad | [LIVE] |
 

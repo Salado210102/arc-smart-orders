@@ -75,7 +75,7 @@ def load_token_card(storage, token, head_block=None) -> dict:
     risk = {}
     try:
         from indexer.token_risk import analyze_token
-        risk = analyze_token(token)
+        risk = analyze_token(token, holders=holders_for(storage, token))
     except Exception:
         risk = {}
     return miniapp_api.build_token_card(
@@ -106,6 +106,25 @@ def load_series(storage, token, bucket_seconds: int = 600, max_buckets: int = 48
                 volume.append([int(b or 0), round(float(vol or 0.0), 2)])
                 price.append([int(b or 0), float(px or 0.0)])
             return {"bucket_blocks": bpb, "head": head, "price": price, "volume": volume}
+    finally:
+        storage.pool.putconn(conn)
+
+
+def holders_for(storage, token, limit: int = 4) -> list:
+    """Candidate holders for the transfer simulation: the creator + recent buyers."""
+    token = (token or "").lower()
+    conn = storage.pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            out = []
+            cur.execute("SELECT lower(creator) FROM tokens WHERE address=%s LIMIT 1", (token,))
+            r = cur.fetchone()
+            if r and r[0]:
+                out.append(r[0])
+            cur.execute("SELECT wallet FROM legs WHERE token=%s AND side='buy' "
+                        "GROUP BY wallet ORDER BY max(block) DESC LIMIT %s", (token, int(limit)))
+            out += [w for (w,) in cur.fetchall() if w]
+            return out
     finally:
         storage.pool.putconn(conn)
 

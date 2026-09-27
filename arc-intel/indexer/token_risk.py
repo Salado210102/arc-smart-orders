@@ -9,6 +9,7 @@ takes injectable RPC fetchers.
 """
 from __future__ import annotations
 
+import os
 import time
 
 # --- Keccak-256 (Ethereum) in pure Python (stdlib only) -----------------------------------------
@@ -87,6 +88,8 @@ RISKY = {
 
 EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
 ZERO_ADDR = "0x" + "0" * 40
+POOL_MANAGER = os.environ.get("ARC_POOL_MANAGER", "0x8366a39cc670b4001a1121b8f6a443a643e40951")
+BALANCE_OF = "0x70a08231"  # balanceOf(address)
 
 
 def scan_bytecode(code_hex: str) -> dict:
@@ -171,12 +174,48 @@ def _jsonrpc(rpc: str, method: str, params: list, retries: int = 2):
     return None
 
 
+def _hex_addr(a: str) -> str:
+    return (a or "").lower().replace("0x", "").rjust(64, "0")
+
+
+def _sim_transfer(rpc: str, token: str, holder: str, to: str, amount_raw: int = 1):
+    """eth_call a `transfer(to, amount)` FROM `holder`. True=ok, False=reverted, None=unknown."""
+    import json
+    import urllib.error
+    import urllib.request
+    data = "0x" + selector("transfer(address,uint256)")[2:] + _hex_addr(to) + format(int(amount_raw), "064x")
+    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_call",
+                       "params": [{"to": token, "from": holder, "data": data}, "latest"]}).encode()
+    req = urllib.request.Request(rpc, data=body, headers={"Content-Type": "application/json",
+                                                          "User-Agent": "sniper-ia/1.0"})
+    try:
+        resp = json.load(urllib.request.urlopen(req, timeout=8))
+    except urllib.error.HTTPError as e:
+        try:
+            resp = json.loads(e.read().decode())
+        except Exception:
+            return None
+    except Exception:
+        return None
+    if not isinstance(resp, dict):
+        return None
+    if resp.get("error"):
+        return False   # the token reverted the transfer (blocked/blacklist/paused)
+    r = resp.get("result")
+    if r is None or r == "0x":
+        return None
+    try:
+        return int(r, 16) != 0
+    except ValueError:
+        return None
+
+
 def _default_fetchers():
-    import os
     rpc = os.environ.get("ARC_RPC", DEFAULT_RPC)
     return (lambda tok: _jsonrpc(rpc, "eth_getCode", [tok, "latest"]),
             lambda tok, data: _jsonrpc(rpc, "eth_call", [{"to": tok, "data": data}, "latest"]),
-            lambda tok, slot: _jsonrpc(rpc, "eth_getStorageAt", [tok, slot, "latest"]))
+            lambda tok, slot: _jsonrpc(rpc, "eth_getStorageAt", [tok, slot, "latest"]),
+            lambda tok, holder: _sim_transfer(rpc, tok, holder, POOL_MANAGER))
 
 
 def _addr_from_word(res) -> str | None:
@@ -185,17 +224,38 @@ def _addr_from_word(res) -> str | None:
     return "0x" + res[-40:].lower()
 
 
-def analyze_token(token: str, *, get_code=None, call=None, get_storage=None,
-                  use_cache: bool = True) -> dict:
-    """Fetch bytecode (resolving minimal proxies) + owner + proxy slot; classify. Never raises."""
+def _holder_with_balance(call, token, holders):
+    """First holder (bounded to 3) with balanceOf > 0, or None."""
+    for h in (holders or [])[:3]:
+        try:
+            bal = call(token, BALANCE_OF + _hex_addr(h))
+        except Exception:
+            bal = None
+        try:
+            if bal and bal != "0x" and int(bal, 16) > 0:
+                return h
+        except ValueError:
+            continue
+    return None
+
+
+def analyze_token(token: str, *, get_code=None, call=None, get_storage=None, sim=None,
+                  holders=None, use_cache: bool = True) -> dict:
+    """Bytecode scan (resolving minimal proxies) + owner/proxy + **transfer simulation**.
+
+    If `holders` are given, it eth_calls a transfer FROM a holder that actually has balance
+    (to the PoolManager): a revert = the token currently blocks moving tokens out (honeypot-ish).
+    Never raises.
+    """
     token = (token or "").lower()
     if not token:
         return {"address": "", "level": "unknown", "reasons": [], "flags": {}, "owner": None}
     now = time.time()
+    cacheable = True
     if use_cache and token in _CACHE and now - _CACHE[token][0] < _TTL:
         return _CACHE[token][1]
     if get_code is None:
-        get_code, call, get_storage = _default_fetchers()
+        get_code, call, get_storage, sim = _default_fetchers()
     try:
         code = get_code(token)
     except Exception:
@@ -226,10 +286,28 @@ def analyze_token(token: str, *, get_code=None, call=None, get_storage=None,
             is_upgradeable = bool(s and s != "0x" and int(s, 16) != 0)
         except Exception:
             is_upgradeable = False
+    # Transfer simulation from a holder that actually holds (definitive-ish honeypot check).
+    transfer_sim = None
+    if holders and sim and (flags.get("has_code") or impl):
+        holder = _holder_with_balance(call, token, holders)
+        if holder:
+            try:
+                transfer_sim = {"holder": holder, "ok": sim(token, holder)}
+            except Exception:
+                transfer_sim = None
     cls = classify(flags, owner, is_upgradeable, proxy_kind)
+    level = cls["level"]
+    reasons = list(cls["reasons"])
+    hint = cls["honeypot_hint"]
+    if transfer_sim and transfer_sim.get("ok") is False:
+        level = "high"
+        if "transfer_reverts" not in reasons:
+            reasons.append("transfer_reverts")
+        hint = True
     out = {"address": token, "owner": owner, "impl": impl, "proxy_kind": proxy_kind,
            "flags": flags.get("found", {}), "categories": cls.get("categories", []),
-           "level": cls["level"], "reasons": cls["reasons"], "honeypot_hint": cls["honeypot_hint"],
-           "heuristic": True}
-    _CACHE[token] = (now, out)
+           "level": level, "reasons": reasons, "honeypot_hint": hint,
+           "transfer_sim": transfer_sim, "heuristic": True}
+    if cacheable:
+        _CACHE[token] = (now, out)
     return out
