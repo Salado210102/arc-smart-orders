@@ -119,6 +119,13 @@ Reusa lo que ya tenemos (Permit2 + v4, no-custodia) y añade sesiones:
 5. **Auditoría** (punto 3) del contrato v2.
 6. **E2E testnet** → mainnet ✅ (v2 desplegada).
 
+### Política de pools (v3) — sin allowlist por token
+`ArcIntelExecutorV3` añade **`setAllowedHook(hook, bool)`** y **`setAllowAllPools(bool)`**: el owner
+habilita **toda una launchpad** (por hook) o **todo** de una vez → **no hay que allowlistear token a
+token** (era inviable para sniper). `_checkPool` permite si `allowAllPools || allowedPools[poolId]
+|| allowedHooks[hook]`.
+- **`ArcIntelExecutorV3` = `0xC9E5d10086591b562061890515F140D256b9Afd2`** (desplegada; owner = Safe).
+
 ### Despliegue testnet (2026-09-27)
 - **`ArcIntelExecutorV2` = `0xb6393A1b2d98A2851236E31E4a67cE8d56653B56`** (chainId 5042002)
 - `owner` = Safe `0xe911D6F5f3a7D2f06dcD32006318ED5EF95986b7` · `paused` = false

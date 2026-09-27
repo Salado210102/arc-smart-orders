@@ -168,6 +168,8 @@ class Handler(BaseHTTPRequestHandler):
             return 409, {"error": "link_wallet"}
         if sess is None:
             return 409, {"error": "activate"}
+        if self._allowed(S.pool_id(pool), pool.get("hooks")) is False:
+            return 409, {"error": "pool_not_allowed", "pool_id": S.pool_id(pool), "executor": executor}
         if pos["qty"] <= 0:
             return 409, {"error": "no_position"}
         qty = pos["qty"] * pct / 100.0
@@ -261,6 +263,9 @@ class Handler(BaseHTTPRequestHandler):
                 finally:
                     s2.close()
                 if sess:
+                    if self._allowed(pid_pool, pool.get("hooks")) is False:
+                        return 409, {"error": "pool_not_allowed", "pool_id": pid_pool,
+                                     "executor": executor}
                     intent = {"mode": "session", "pool_id": pid_pool, "token_in": stable,
                               "key": {"currency0": pool["currency0"], "currency1": pool["currency1"],
                                       "fee": pool["fee"], "tick_spacing": pool["tick_spacing"],
@@ -291,6 +296,27 @@ class Handler(BaseHTTPRequestHandler):
             recipient=recipient, order_nonce=order_nonce, permit_nonce=permit_nonce,
             deadline=deadline)
         return 200, resp
+
+    def _allowed(self, pid, hook=None):
+        """True/False/None: allowAllPools OR allowedPools[pid] OR allowedHooks[hook]."""
+        from indexer.token_risk import selector, _jsonrpc
+        executor = os.environ.get("ARC_INTEL_EXECUTOR")
+        rpc = os.environ.get("ARC_RPC", "https://rpc.testnet.arc.io")
+
+        def eth(sig, arg=""):
+            res = _jsonrpc(rpc, "eth_call", [{"to": executor, "data": selector(sig) + arg}, "latest"])
+            try:
+                return bool(res and int(res, 16))
+            except (TypeError, ValueError):
+                return None
+        allp = eth("allowAllPools()")
+        if allp:
+            return True
+        if eth("allowedPools(bytes32)", (pid or "0x")[2:]):
+            return True
+        if hook and eth("allowedHooks(address)", (hook or "").lower().replace("0x", "").rjust(64, "0")):
+            return True
+        return None if allp is None else False
 
     def _kick_session_keeper(self):
         """Fire-and-forget: execute armed session buys with the user's session key."""
