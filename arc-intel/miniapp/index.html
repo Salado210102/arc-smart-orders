@@ -326,7 +326,7 @@
         const rep = (r.created != null) ? `creados ${r.created}` + (r.dumped ? ` · <span class="warn">volcados ${r.dumped}</span>` : "") : "—";
         const thin = body.thin_market ? `<span class="warn">thin (${esc(body.thin_market)})</span>` : `<span class="ok">actividad</span>`;
         const pc = d.price_change || {};
-        const chg = v => (v == null) ? "" : ` <span class="${v >= 0 ? "ok" : "bad"}">${v >= 0 ? "+" : ""}${Number(v).toFixed(1)}%</span>`;
+        const chg = v => (v == null) ? "" : ` <span class="${v >= 0 ? "ok" : "bad"}">${v >= 0 ? "🟢" : "🔴"} ${v >= 0 ? "+" : ""}${Number(v).toFixed(1)}%</span>`;
         const T = (d.txns || {}).h24 || {}, V = d.volume || {};
         const money = x => (x == null || x === "") ? "—" : "$" + Number(x).toLocaleString(undefined, { maximumFractionDigits: 0 });
         const links = [].concat((d.socials || []).map(s => ({ u: s.url, l: s.type })),
@@ -408,7 +408,7 @@
               ${logo ? `<img src="${esc(logo)}" style="width:40px;height:40px;border-radius:10px" onerror="this.style.display='none'">` : ""}
               <div><b>${esc(sym)}</b><div class="mut" style="font-size:12px">${p.qty.toLocaleString(undefined, { maximumFractionDigits: 2 })} · ${p.value ? "$" + p.value.toFixed(2) : "—"}</div></div>
             </div>
-            <div class="kv"><span>PnL</span><b class="${p.unrealized_pct >= 0 ? "ok" : "bad"}">${(p.unrealized_pct * 100).toFixed(1)}% · ${p.unrealized >= 0 ? "+" : "-"}$${Math.abs(p.unrealized || 0).toFixed(2)}</b></div>
+            <div class="kv"><span>PnL</span><b class="${p.unrealized_pct >= 0 ? "ok" : "bad"}">${p.unrealized_pct >= 0 ? "🟢" : "🔴"} ${(p.unrealized_pct * 100).toFixed(1)}% · ${p.unrealized >= 0 ? "+" : "-"}$${Math.abs(p.unrealized || 0).toFixed(2)}</b></div>
             <div class="kv mut"><span>Precio</span><b>${p.price ? "$" + Number(p.price).toPrecision(4) : "—"}</b></div>
             <div class="kv mut"><span>Entrada</span><b>${p.avg_cost ? "$" + Number(p.avg_cost).toPrecision(4) : "—"}</b></div>
             <div class="kv mut"><span>Market cap</span><b>${money(d.market_cap)}</b></div>

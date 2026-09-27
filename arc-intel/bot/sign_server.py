@@ -687,10 +687,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(401, {"error": "unauthorized"})
             store = SubscriptionStore(DB)
             try:
-                row = store.get(uid)
-                toks = sorted(row["tokens"]) if row else []
-                kinds = sorted(row["kinds"]) if row else []
-                al = store.recent_alerts(tokens=toks, kinds=kinds, limit=50) if toks else []
+                # Only alerts for tokens the user holds in the bot wallet (cartera).
+                toks = store.list_holdings(uid)
+                al = store.recent_alerts(tokens=toks, limit=50) if toks else []
             finally:
                 store.close()
             return self._send(200, {"alerts": al})

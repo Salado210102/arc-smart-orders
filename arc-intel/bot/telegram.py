@@ -288,7 +288,9 @@ def dispatch(alerts: list, store: SubscriptionStore, transport, throttle=None,
             inline = None
             if tk:
                 from .i18n import MINIAPP_URL
-                inline = [[{"text": "\U0001F7E2 Comprar", "web_app": f"{MINIAPP_URL}?token={tk}"}]]
+                danger = a.get("kind") in ("dev_sell", "compound", "liquidity_removal", "large_sell")
+                label = "\U0001F534 Vender" if danger else "\U0001F7E2 Comprar"
+                inline = [[{"text": label, "web_app": f"{MINIAPP_URL}?token={tk}"}]]
             if logo and hasattr(transport, "send_photo"):
                 try:
                     transport.send_photo(chat, logo, caption=text, parse_mode="HTML", inline=inline)
