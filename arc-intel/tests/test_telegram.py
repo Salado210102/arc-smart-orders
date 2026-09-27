@@ -164,11 +164,11 @@ class TelegramTests(unittest.TestCase):
                    "message": "spike"}]
         self.assertEqual(dispatch(alerts, self.store, FakeTransport()), 0)  # no measured edge
 
-    def test_discovery_is_public(self):
+    def test_discovery_not_pushed(self):
         self.store.subscribe(chat_id=1, tokens=("0xother",), kinds=())
         alerts = [{"token": "0xnew", "kind": "whale_buy", "severity": "high", "block": 5,
                    "message": "whale"}]
-        self.assertEqual(dispatch(alerts, self.store, FakeTransport()), 1)  # public buy feed
+        self.assertEqual(dispatch(alerts, self.store, FakeTransport()), 0)  # buy feed disabled
 
     def test_risk_alert_needs_holdings(self):
         self.store.subscribe(chat_id=1, tokens=("0xt",), kinds=())
