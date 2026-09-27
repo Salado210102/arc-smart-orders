@@ -549,6 +549,15 @@ class SubscriptionStore:
             (str(kind), int(now), int(limit))).fetchall()
         return [self._po_full(r) for r in rows]
 
+    def armed_orders(self, kind, now: int, limit: int = 50) -> list:
+        """Armed orders of `kind` (with sig_payload) not yet executed and not expired."""
+        rows = self.conn.execute(
+            "SELECT id,chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,status,created_ts,"
+            "signature,sign_token,sig_payload,kind FROM preorders "
+            "WHERE coalesce(kind,'sell')=? AND status='armed' AND deadline > ? ORDER BY id LIMIT ?",
+            (str(kind), int(now), int(limit))).fetchall()
+        return [self._po_full(r) for r in rows]
+
     def claim_order(self, pid) -> bool:
         """Atomically move 'signed' -> 'submitting' so two keepers can't submit the same order."""
         cur = self.conn.execute(

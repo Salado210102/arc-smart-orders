@@ -109,7 +109,10 @@ Reusa lo que ya tenemos (Permit2 + v4, no-custodia) y añade sesiones:
    (`/session/authorize`, `/session/revoke`, `/sessions`) ✅; firma EIP-712 de la `SessionOrder` ✅
    (recupera la session key). **Pendiente:** el `keeper` que envíe `executeWithSession`
    (requiere la **v2 desplegada** por el Safe).
-4. **UI**: onboarding "activar trading 1-toque" (envía las 3 txs de setup), estado de sesión, revocar. ⏳
+4. **UI**: onboarding "activar trading 1-toque" (envía las 3 txs de setup), estado de sesión, revocar. ✅
+   (`miniapp/index.html`: pestaña Cartera → "⚡ Trading 1-toque"; el firmante ahora envía txs).
+5. **Keeper de sesión**: `execution/session_keeper.py` firma `SessionOrder` con la session key y envía
+   `executeWithSession` (sin firma del usuario). ✅ (dormido hasta el allowlist del pool).
 5. **Auditoría** (punto 3) del contrato v2.
 6. **E2E testnet** → mainnet ✅ (v2 desplegada).
 
@@ -120,6 +123,10 @@ Reusa lo que ya tenemos (Permit2 + v4, no-custodia) y añade sesiones:
 - Sin pools pre-permitidos: el Safe allowlistea con `setAllowedPool(poolId, true)`.
 - Los servicios (`arc-intel-sign`, `arc-intel-alerts`) apuntan a la v2.
 - v1 (`0x89dF…35E8`) sigue desplegada pero en desuso.
+
+> ⚠️ **Requisito para ejecutar de verdad:** el Safe debe **allowlistear el pool** con
+> `setAllowedPool(poolId, true)` (la v2 se desplegó con allowlist vacía). Sin eso, `executeWithSession`
+> revierte (`PoolNotAllowed`) y la orden queda `armed`.
 
 ---
 

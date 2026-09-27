@@ -161,6 +161,43 @@ class Handler(BaseHTTPRequestHandler):
         chain_id = int(os.environ.get("ARC_INTEL_CHAIN_ID", "5042"))
         deadline = int(_t.time()) + int(os.environ.get("ARC_INTEL_ORDER_TTL", "1800"))
         order_nonce = new_nonce()
+
+        # Session (1-tap) path: if the user authorized a session for this pool, execute with the
+        # session key — no per-order user signature.
+        if persist:
+            try:
+                from execution import sessions as S
+                from execution.quotes import stable_side
+                z4o, _ = stable_side(pool, stable)
+                pid_pool = S.pool_id(pool)
+            except Exception:
+                pid_pool = None
+            if pid_pool:
+                s2 = SubscriptionStore(DB)
+                try:
+                    sess = s2.get_session(uid, pid_pool, stable)
+                finally:
+                    s2.close()
+                if sess:
+                    intent = {"mode": "session", "pool_id": pid_pool, "token_in": stable,
+                              "key": {"currency0": pool["currency0"], "currency1": pool["currency1"],
+                                      "fee": pool["fee"], "tick_spacing": pool["tick_spacing"],
+                                      "hooks": pool["hooks"]},
+                              "zero_for_one": z4o, "amount_in": amount_in_base,
+                              "min_out": quote["min_out_base"], "recipient": recipient}
+                    s3 = SubscriptionStore(DB)
+                    try:
+                        pid = s3.create_preorder(uid, recipient, addr, 0.0, slippage,
+                                                 quote["min_out_base"], deadline, order_nonce,
+                                                 status="armed", kind="buy")
+                        s3.save_sig_payload(pid, json.dumps(intent))
+                    finally:
+                        s3.close()
+                    self._kick_session_keeper()
+                    resp.update({"preview": False, "persisted": True, "id": pid, "executing": True,
+                                 "session_key": sess["session_key"]})
+                    return 200, resp
+
         permit_nonce = new_nonce()
         resp["payload"] = build_buy_payload(
             chain_id=chain_id, executor=executor, pool=pool, stable=stable,
@@ -180,6 +217,20 @@ class Handler(BaseHTTPRequestHandler):
             resp.update({"id": pid, "sign_token": po["sign_token"],
                          "sign_url": f"/?t={po['sign_token']}"})
         return 200, resp
+
+    def _kick_session_keeper(self):
+        """Fire-and-forget: execute armed session buys with the user's session key."""
+        def _run():
+            try:
+                from execution.session_keeper import run_session_keeper
+                s = SubscriptionStore(DB)
+                try:
+                    run_session_keeper(s)
+                finally:
+                    s.close()
+            except Exception:
+                pass
+        threading.Thread(target=_run, daemon=True).start()
 
     def _kick_keeper(self):
         """Fire-and-forget: submit any signed buy order now (only if a relayer is configured)."""

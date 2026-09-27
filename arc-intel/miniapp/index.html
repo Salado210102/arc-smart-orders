@@ -111,6 +111,16 @@
         <div id="walletinfo" style="margin-top:8px"></div>
         <div class="mut" style="margin-top:8px">Para enlazar/cambiar wallet: comando <b>/link_wallet</b> en el bot.</div>
       </div>
+      <div class="card">
+        <div class="mut">⚡ Trading 1-toque (session key) — autoriza una vez y compra sin firmar cada vez</div>
+        <div class="row" style="margin-top:8px">
+          <input id="sessca" placeholder="0x token CA" style="flex:1">
+          <button class="ghost" id="sessactivate">Activar</button>
+        </div>
+        <div class="mut" style="font-size:12px;margin-top:6px">Límites: $50 por operación · $200 total · 24 h · revocable</div>
+        <div id="sessout" class="mut" style="margin-top:8px"></div>
+        <div id="sesslist" style="margin-top:8px"></div>
+      </div>
     </section>
 
     <section id="sec-alr" class="hide">
@@ -155,7 +165,9 @@
         const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
         _signer = { kind: "injected", address: accs[0],
           sign: (td, from) => window.ethereum.request(
-            { method: "eth_signTypedData_v4", params: [from, JSON.stringify(td)] }) };
+            { method: "eth_signTypedData_v4", params: [from, JSON.stringify(td)] }),
+          sendTx: ({ to, data }) => window.ethereum.request(
+            { method: "eth_sendTransaction", params: [{ from: accs[0], to, data, value: "0x0" }] }) };
         return _signer;
       }
       // 2) WalletConnect, reusing the persisted session: connect once, then silent (no QR).
@@ -165,7 +177,10 @@
       if (!(wc.accounts && wc.accounts.length)) await wc.connect();  // QR only the first time
       _signer = { kind: "walletconnect", address: (wc.accounts || [])[0],
         sign: (td, from) => wc.request(
-          { method: "eth_signTypedData_v4", params: [from, JSON.stringify(td)] }) };
+          { method: "eth_signTypedData_v4", params: [from, JSON.stringify(td)] }),
+        sendTx: ({ to, data }) => wc.request(
+          { method: "eth_sendTransaction",
+            params: [{ from: (wc.accounts || [])[0], to, data, value: "0x0" }] }) };
       return _signer;
     }
     async function connectSign(payload) {
@@ -363,7 +378,50 @@
           `<div class="kv"><span>Enlazada</span><b>${esc(body.linked_wallet || "—")}</b></div>
            <div class="kv"><span>Auto-seguidos</span><b>${body.count}</b></div>` +
           (body.auto_subs.length ? `<div class="mut" style="margin-top:6px">${body.auto_subs.map(esc).join("<br>")}</div>` : "");
+        loadSessions().catch(() => {});
       }
+
+      async function loadSessions() {
+        const { status, body } = await api("/sessions");
+        if (status !== 200 || !body) { $("sesslist").innerHTML = ""; return; }
+        if (!body.sessions.length) { $("sesslist").innerHTML = '<span class="mut">Sin sesiones activas.</span>'; return; }
+        $("sesslist").innerHTML = body.sessions.map(s =>
+          `<div class="kv"><span>${esc(s.token_in.slice(0, 10))}… <span class="mut">${esc(s.status)}</span></span>` +
+          `<button class="ghost" data-sk="${esc(s.session_key)}">revocar</button></div>`).join("");
+        document.querySelectorAll("#sesslist [data-sk]").forEach(b => {
+          b.onclick = async () => {
+            const sk = b.dataset.sk;
+            const { body: r } = await api("/session/revoke", { method: "POST",
+              headers: { "Content-Type": "application/json" }, body: JSON.stringify({ session_key: sk }) });
+            try { const s = await getSigner(); await s.sendTx({ to: r.tx.to, data: r.tx.data }); } catch (e) {}
+            loadSessions();
+          };
+        });
+      }
+
+      $("sessactivate").onclick = async () => {
+        const tok = ($("sessca").value || "").trim().toLowerCase();
+        if (!/^0x[0-9a-f]{40}$/.test(tok)) { $("sessout").textContent = "CA inválida."; return; }
+        $("sessout").textContent = "Creando sesión…";
+        const { status, body } = await api("/session/authorize", { method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: tok, max_per_order: 50, max_total: 200, ttl: 86400 }) });
+        if (status !== 200 || !body || !body.txs) {
+          $("sessout").innerHTML = `<span class="bad">Error: ${esc((body && body.error) || status)}</span>`;
+          return;
+        }
+        try {
+          const s = await getSigner();
+          for (let i = 0; i < body.txs.length; i++) {
+            $("sessout").textContent = `Firma ${i + 1}/${body.txs.length}: ${body.txs[i].desc}…`;
+            await s.sendTx({ to: body.txs[i].to, data: body.txs[i].data });
+          }
+          $("sessout").innerHTML = `<span class="ok">✅ Sesión activa (${esc(body.session_key.slice(0, 10))}…). Ya puedes comprar en 1 toque.</span>`;
+          loadSessions();
+        } catch (e) {
+          $("sessout").textContent = "Cancelado/error: " + (e && e.message ? e.message : e);
+        }
+      };
       if ($("ca").value) $("check").click();
     }
   </script>

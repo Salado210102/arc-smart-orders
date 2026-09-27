@@ -758,6 +758,11 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
                 run_keeper(store, logger=logger, on_executed=_on_exec)
             except Exception:
                 pass
+            try:
+                from execution.session_keeper import run_session_keeper
+                run_session_keeper(store, logger=logger)
+            except Exception:
+                pass
             batch = store.dequeue(2000)
             n = dispatch(batch, store, transport, throttle=thr, logo_fn=logo_fn)
             from .approvals import propose as ap_propose
