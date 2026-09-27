@@ -190,6 +190,13 @@
   + `.bak`), y auto-sub de tokens **tenidos** que **supera** el tope manual (`MAX_TOKENS`). Señales
   nuevas visibles en `/settings`: `liquidity_removal`, `large_sell`. Tests **265 passed** (1 fallo
   ambiental local). Desplegado y verificado: bot sano, `lag:0`, log por ciclo.
+- **2026-09-27 (Parte C — pestaña Alertas con gráfico)** — **Opción A** implementada: las alertas se
+  **persisten** (`store.alerts`, único por token+kind+block) en cada vuelta, y nuevos endpoints
+  `GET /alerts` (auth; alertas de **tus tokens**) y `GET /series?token=` (auth; precio + volumen por
+  bucket). **UI**: nueva pestaña **Alertas** con la lista (kind tipado por color de severidad) y
+  **gráfico SVG** al tocar: **sparkline de precio + barras de volumen** con **línea de la alerta**.
+  E2E por HTTPS público OK (`/alerts` 401 sin auth / 200 con auth; `/series` con serie real). Tests
+  **269 passed** (1 fallo ambiental local).
 
 ---
 

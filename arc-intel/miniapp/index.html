@@ -54,6 +54,7 @@
       <button id="tab-buy" class="on">Compra</button>
       <button id="tab-pos">Posiciones</button>
       <button id="tab-wal">Cartera</button>
+      <button id="tab-alr">Alertas</button>
     </nav>
 
     <section id="sec-buy">
@@ -108,6 +109,20 @@
         <div class="mut">Wallet enlazada (watch-only) y tokens auto-seguidos</div>
         <div id="walletinfo" style="margin-top:8px"></div>
         <div class="mut" style="margin-top:8px">Para enlazar/cambiar wallet: comando <b>/link_wallet</b> en el bot.</div>
+      </div>
+    </section>
+
+    <section id="sec-alr" class="hide">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div class="mut">Alertas de tus tokens</div>
+          <button class="ghost" id="alrrefresh">↻</button>
+        </div>
+        <div id="alrlist" style="margin-top:8px"></div>
+      </div>
+      <div class="card hide" id="chartcard">
+        <div id="charttitle" class="mut"></div>
+        <div id="chart" style="margin-top:8px"></div>
       </div>
     </section>
 
@@ -175,16 +190,80 @@
       $("main").classList.remove("hide");
       if (!INIT) $("notice").innerHTML = "Abre esta Mini App desde Telegram para operar (se necesita autenticación). ";
       function tab(name) {
-        for (const k of ["buy", "pos", "wal"]) {
+        for (const k of ["buy", "pos", "wal", "alr"]) {
           $("sec-" + k).classList.toggle("hide", k !== name);
           $("tab-" + k).classList.toggle("on", k === name);
         }
         if (name === "pos") loadPositions();
         if (name === "wal") loadWallet();
+        if (name === "alr") loadAlerts();
       }
       $("tab-buy").onclick = () => tab("buy");
       $("tab-pos").onclick = () => tab("pos");
       $("tab-wal").onclick = () => tab("wal");
+      $("tab-alr").onclick = () => tab("alr");
+      $("alrrefresh").onclick = () => loadAlerts();
+
+      const KIND_LABEL = {dev_sell: "DEV-SELL", compound: "COMPOSITE", volume_spike: "VOL SPIKE",
+        liquidity_removal: "LP REMOVAL", large_sell: "LARGE SELL", thin_market: "THIN"};
+      const SEV_COLOR = {high: "#ff5c5c", medium: "#ffb020", low: "#8b98a9"};
+
+      async function loadAlerts() {
+        $("alrlist").innerHTML = '<span class="mut">Cargando…</span>';
+        const { status, body } = await api("/alerts");
+        if (status !== 200 || !body) {
+          $("alrlist").innerHTML = `<span class="bad">Error: ${status}${status === 401 ? " (abre en Telegram)" : ""}</span>`;
+          return;
+        }
+        if (!body.alerts.length) {
+          $("alrlist").innerHTML = '<span class="mut">Sin alertas. El bot vigila los tokens que compras.</span>';
+          return;
+        }
+        $("alrlist").innerHTML = body.alerts.map((a, i) => {
+          const col = SEV_COLOR[a.severity] || "#8b98a9";
+          const sym = (a.context && a.context.symbol) || a.token.slice(0, 10) + "…";
+          return `<div class="card" style="padding:10px;cursor:pointer" data-i="${i}">
+            <div class="kv"><span style="color:${col}">● ${esc(KIND_LABEL[a.kind] || a.kind)}</span><b>blk ${a.block}</b></div>
+            <div class="mut" style="font-size:12px">${esc(sym)}</div></div>`;
+        }).join("");
+        document.querySelectorAll("#alrlist [data-i]").forEach(el => {
+          el.onclick = () => showChart(body.alerts[+el.dataset.i]);
+        });
+      }
+
+      async function showChart(a) {
+        $("chartcard").classList.remove("hide");
+        $("charttitle").innerHTML = `${esc((a.context && a.context.symbol) || a.token.slice(0, 10))} · ${esc(KIND_LABEL[a.kind] || a.kind)} @ blk ${a.block}`;
+        $("chart").innerHTML = '<span class="mut">Cargando gráfico…</span>';
+        const { status, body } = await api(`/series?token=${a.token}`);
+        if (status !== 200 || !body) { $("chart").innerHTML = `<span class="bad">Error: ${status}</span>`; return; }
+        $("chart").innerHTML = renderChart(body, a.block);
+      }
+
+      function renderChart(s, alertBlock) {
+        const W = 320, H = 120, pad = 4;
+        const px = (s.price || []).filter(p => p[1] > 0);
+        const vol = s.volume || [];
+        if (!px.length) return '<span class="mut">Datos insuficientes para el gráfico.</span>';
+        const blocks = px.map(p => p[0]).concat(alertBlock ? [alertBlock] : []);
+        const x0 = Math.min(...blocks), x1 = Math.max(...blocks), span = (x1 - x0) || 1;
+        const pr = px.map(p => p[1]);
+        const pmin = Math.min(...pr), pmax = Math.max(...pr), pspan = (pmax - pmin) || 1;
+        const vmax = Math.max(1, ...vol.map(v => v[1]));
+        const X = b => pad + (W - 2 * pad) * ((b - x0) / span);
+        const Y = v => pad + H * 0.6 * (1 - ((v - pmin) / pspan));
+        const bars = vol.map(([b, v]) => {
+          const h = (H * 0.28) * (v / vmax);
+          return `<rect x="${(X(b) - 2).toFixed(1)}" y="${(H - h - 2).toFixed(1)}" width="4" height="${h.toFixed(1)}" fill="#243044"/>`;
+        }).join("");
+        const path = "M" + px.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(" L");
+        const ax = alertBlock
+          ? `<line x1="${X(alertBlock).toFixed(1)}" y1="0" x2="${X(alertBlock).toFixed(1)}" y2="${H}" stroke="#ff5c5c" stroke-dasharray="3 3"/>` +
+            `<text x="${X(alertBlock).toFixed(1)}" y="9" fill="#ff5c5c" font-size="8" text-anchor="middle">alert</text>`
+          : "";
+        return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="150" style="background:#0f141b;border-radius:10px">` +
+          `${bars}<path d="${path}" fill="none" stroke="#2f7dff" stroke-width="2"/>${ax}</svg>`;
+      }
 
       let token = null;
       $("ca").value = new URLSearchParams(location.search).get("token") || "";

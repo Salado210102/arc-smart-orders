@@ -79,6 +79,12 @@ class SubscriptionStore:
             "floor_pct REAL, min_out REAL, deadline INTEGER, order_nonce INTEGER, status TEXT, "
             "created_ts INTEGER, signature TEXT, sign_token TEXT, sig_payload TEXT, "
             "kind TEXT DEFAULT 'sell')")
+        # persisted alerts (for the Mini App Alerts tab with charts)
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS alerts ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, token TEXT, kind TEXT, severity TEXT, "
+            "block INTEGER, ts INTEGER, wallet TEXT, amount_usdc REAL, message TEXT, context TEXT, "
+            "UNIQUE(token, kind, block))")
         # wallet tracking: read-only address link + which subs were auto-generated from it
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS wallet_links ("
@@ -322,6 +328,37 @@ class SubscriptionStore:
             (token, kind, int(now_ts)))
         self.conn.commit()
         return True
+
+    # --- persisted alerts (idempotent by token+kind+block) ---
+    def add_alert(self, alert, ts: int = 0) -> None:
+        import json as _json
+        d = alert if isinstance(alert, dict) else getattr(alert, "__dict__", {})
+        self.conn.execute(
+            "INSERT OR IGNORE INTO alerts(token,kind,severity,block,ts,wallet,amount_usdc,"
+            "message,context) VALUES(?,?,?,?,?,?,?,?,?)",
+            ((d.get("token") or "").lower(), d.get("kind"), d.get("severity"),
+             int(d.get("block") or 0), int(ts or 0), (d.get("wallet") or ""), d.get("amount_usdc"),
+             d.get("message") or "", _json.dumps(d.get("context") or {})))
+        self.conn.commit()
+
+    def recent_alerts(self, tokens=None, kinds=None, limit: int = 50) -> list:
+        import json as _json
+        q = ("SELECT token,kind,severity,block,ts,wallet,amount_usdc,message,context "
+             "FROM alerts")
+        conds, params = [], []
+        if tokens:
+            conds.append("token IN (" + ",".join("?" * len(tokens)) + ")")
+            params += [str(t).lower() for t in tokens]
+        if kinds:
+            conds.append("kind IN (" + ",".join("?" * len(kinds)) + ")")
+            params += list(kinds)
+        if conds:
+            q += " WHERE " + " AND ".join(conds)
+        q += " ORDER BY block DESC LIMIT ?"
+        params.append(int(limit))
+        return [{"token": r[0], "kind": r[1], "severity": r[2], "block": int(r[3]),
+                 "ts": int(r[4] or 0), "wallet": r[5], "amount_usdc": r[6], "message": r[7],
+                 "context": _json.loads(r[8] or "{}")} for r in self.conn.execute(q, params).fetchall()]
 
     # --- real fills + positions (idempotent, average cost) ---
     def record_fill(self, fill_id, user, token, side, qty, usdc, block=0, ts=0) -> bool:

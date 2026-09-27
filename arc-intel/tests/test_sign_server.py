@@ -157,6 +157,42 @@ class SignServerTests(unittest.TestCase):
         except urllib.error.HTTPError as e:
             self.assertEqual(e.code, 503)
 
+    def test_alerts_requires_auth(self):
+        try:
+            urllib.request.urlopen(self._url("/alerts"))
+            self.fail("expected 401")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 401)
+
+    def test_alerts_with_auth_empty(self):
+        req = urllib.request.Request(self._url("/alerts"),
+                                     headers={"X-Telegram-Init-Data": init_data(1)})
+        r = json.load(urllib.request.urlopen(req))
+        self.assertEqual(r["alerts"], [])
+
+    def test_series_bad_address(self):
+        req = urllib.request.Request(self._url("/series?token=0x1"),
+                                     headers={"X-Telegram-Init-Data": init_data(1)})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 400")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
+
+    def test_add_alert_dedup_and_filter(self):
+        s = SubscriptionStore(self.db)
+        s.add_alert({"token": TOK, "kind": "dev_sell", "severity": "high", "block": 5,
+                     "message": "x"}, ts=1)
+        s.add_alert({"token": TOK, "kind": "dev_sell", "severity": "high", "block": 5,
+                     "message": "x"}, ts=1)   # duplicate (token,kind,block) -> ignored
+        s.add_alert({"token": "0x" + "b" * 40, "kind": "large_sell", "severity": "medium",
+                     "block": 6, "message": "y"}, ts=1)
+        self.assertEqual(len(s.recent_alerts()), 2)
+        only = s.recent_alerts(tokens=[TOK])
+        self.assertEqual(len(only), 1)
+        self.assertEqual(only[0]["kind"], "dev_sell")
+        s.close()
+
     def test_buy_order_requires_auth(self):
         body = json.dumps({"token": "0x" + "1" * 40, "amount_usdc": 10}).encode()
         req = urllib.request.Request(self._url("/buy_order"), data=body,

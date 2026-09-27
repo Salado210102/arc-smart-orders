@@ -78,6 +78,32 @@ def load_token_card(storage, token, head_block=None) -> dict:
         vol24=vol24, price=price, supply=supply_h, thin_reason=thin, creator_rep=rep)
 
 
+def load_series(storage, token, bucket_seconds: int = 600, max_buckets: int = 48) -> dict:
+    """Bounded price + volume buckets for a token (for the Mini App chart).
+
+    Returns {'bucket_blocks', 'head', 'price': [[block, px]], 'volume': [[block, vol]]}.
+    """
+    token = (token or "").lower()
+    bpb = max(1, int(bucket_seconds / 0.52))
+    conn = storage.pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT max(block) FROM legs WHERE token=%s", (token,))
+            head = int(cur.fetchone()[0] or 0)
+            lo = max(0, head - max_buckets * bpb)
+            cur.execute(
+                "SELECT ((block / %s) * %s) AS b, sum(stable_value), avg(price) "
+                "FROM legs WHERE token=%s AND block > %s GROUP BY 1 ORDER BY 1",
+                (bpb, bpb, token, lo))
+            price, volume = [], []
+            for b, vol, px in cur.fetchall():
+                volume.append([int(b or 0), round(float(vol or 0.0), 2)])
+                price.append([int(b or 0), float(px or 0.0)])
+            return {"bucket_blocks": bpb, "head": head, "price": price, "volume": volume}
+    finally:
+        storage.pool.putconn(conn)
+
+
 def load_pool(storage, token) -> dict | None:
     """The v4 pool whose currency0 or currency1 is `token`, or None."""
     token = (token or "").lower()

@@ -183,6 +183,34 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, {"positions": views, "summary": portfolio_summary(views)})
             finally:
                 store.close()
+        if u.path == "/alerts":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            store = SubscriptionStore(DB)
+            try:
+                row = store.get(uid)
+                toks = sorted(row["tokens"]) if row else []
+                kinds = sorted(row["kinds"]) if row else []
+                al = store.recent_alerts(tokens=toks, kinds=kinds, limit=50) if toks else []
+            finally:
+                store.close()
+            return self._send(200, {"alerts": al})
+        if u.path == "/series":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            tok = (parse_qs(u.query).get("token") or [""])[0]
+            if not ADDR_RE.match(tok or ""):
+                return self._send(400, {"error": "bad_address"})
+            st = _storage()
+            if st is None:
+                return self._send(503, {"error": "no_storage"})
+            try:
+                from .miniapp_data import load_series
+                return self._send(200, load_series(st, tok))
+            except Exception:
+                return self._send(502, {"error": "series_failed"})
         if u.path == "/buy_quote":
             uid = self._auth_user()
             if uid is None:

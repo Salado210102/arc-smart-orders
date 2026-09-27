@@ -287,6 +287,8 @@ firma rechazada → volver a Paso 3 sin perder datos; `deadline` vencido → rec
 | GET | `/wallet` | **sí** | wallet enlazada + auto-subs | `miniapp_api.wallet_view` |
 | GET | `/buy_quote?token=&amount_usdc=&slippage=` | **sí** | quote de compra + payload firmable (preview) | `execution.quotes`, `preorders.build_sign_payload` |
 | POST | `/buy_order` | **sí** | crea y **persiste** una orden de compra; devuelve `sign_token`/`sign_url` | `store.create_preorder(kind='buy')`, `execution.quotes` |
+| GET | `/alerts` | **sí** | alertas recientes de **tus tokens** (persistidas en el bucle) | `store.recent_alerts` |
+| GET | `/series?token=` | **sí** | precio + volumen por bucket (para el gráfico) | `miniapp_data.load_series` |
 
 > `/buy_quote` devuelve `{token, pool, quote, payload}` con `preview:true, persisted:false` (vista
 > previa). `POST /buy_order` persiste la orden (`kind='buy'`, estado `armed`) y devuelve un
@@ -297,7 +299,6 @@ firma rechazada → volver a Paso 3 sin perder datos; `deadline` vencido → rec
 
 | Método | Ruta | Devuelve | Reutiliza |
 |---|---|---|---|
-| GET | `/alerts?kinds=&token=` | alertas recientes con series para el gráfico | `stream_alerts`, `load_volume_buckets` |
 | GET | `/token` | liquidez USD (estimación) | `pools_v4`, `v4_liquidity` |
 | POST | `/plan` | crea `ExitPlan` + nº de pre-órdenes a firmar | `strategy.ExitPlan`, `store.create_preorder` |
 | POST | `/cancel` | cancela una pre-orden (on-chain) | `preorders` + `cancelOrder` |

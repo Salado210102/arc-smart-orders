@@ -728,6 +728,10 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
                 a.context["symbol"] = symbols.get(a.token, "")
                 if a.kind in ("dev_sell", "compound", "volume_collapse"):
                     store.add_paper_alert(a.kind, a.token, a.block, now_ts)
+                try:
+                    store.add_alert(a.__dict__, now_ts)   # persist for the Mini App Alerts tab
+                except Exception:
+                    pass
             store.enqueue_alert_many([a.__dict__ for a in alerts])
             try:
                 from .commands import fire_preorders
