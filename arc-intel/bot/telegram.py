@@ -408,6 +408,14 @@ def check_token(storage, token: str) -> str:
     thin = is_thin_market(n, w, age, no_trade_blocks=100000) if ob else None
     status = f"\u26A0\uFE0F thin market ({thin})" if thin else "\U0001F7E2 has market activity"
 
+    rep = {}
+    if creator:
+        try:
+            from indexer.creator_rep import creator_report
+            rep = creator_report(storage, creator)
+        except Exception:
+            rep = {}
+
     hd = f"<b>{_h.escape(symbol)}</b> \u00B7 " if symbol else ""
     lines = ["\U0001F50E <b>Token check</b>", "",
              f"{hd}<code>{_h.escape(token)}</code>"]
@@ -415,7 +423,15 @@ def check_token(storage, token: str) -> str:
         lines.append(f"\U0001F3F7\uFE0F {_h.escape(name)}")
     lines.append(f"\U0001F3ED Launchpad: <b>{_h.escape(launchpad or 'unknown')}</b>")
     if creator:
-        lines.append(f"\U0001F464 Creator: <code>{_h.escape(creator)}</code>")
+        cl = f"\U0001F464 Creator: <code>{_h.escape(creator)}</code>"
+        if rep.get("created"):
+            cl += f" \u00B7 created {rep['created']}"
+            if rep["dumped"]:
+                cl += f" \u00B7 <b>dumped {rep['dumped']} ({rep['rug_rate'] * 100:.0f}%)</b>"
+                if rep.get("dumped_value"):
+                    cl += f" (${rep['dumped_value']:,.0f})"
+                cl += " \u26A0\uFE0F"
+        lines.append(cl)
     lines.append(f"\U0001F552 Created: block {ob} (~{age_txt} ago)" if ob else "\U0001F552 Created: unknown")
     lines.append(f"\U0001F4CA Activity: <b>{n}</b> swaps \u00B7 <b>{w}</b> wallets")
     lines.append(f"\U0001F4B0 Price: <b>{price_txt}</b>")
