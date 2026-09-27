@@ -109,8 +109,11 @@ Reusa lo que ya tenemos (Permit2 + v4, no-custodia) y añade sesiones:
    (`/session/authorize`, `/session/revoke`, `/sessions`) ✅; firma EIP-712 de la `SessionOrder` ✅
    (recupera la session key). **Pendiente:** el `keeper` que envíe `executeWithSession`
    (requiere la **v2 desplegada** por el Safe).
-4. **UI**: onboarding "activar trading 1-toque" (envía las 3 txs de setup), estado de sesión, revocar. ✅
+4. **UI**: onboarding "activar trading 1-toque" (envía las txs de setup), estado de sesión, revocar. ✅
    (`miniapp/index.html`: pestaña Cartera → "⚡ Trading 1-toque"; el firmante ahora envía txs).
+   - **Una activación = 2 sesiones** (compra `tokenIn=USDC` + venta `tokenIn=token`) → **6 txs una vez**.
+   - **Vender** por sesión: botones 25/50/75/100% en Posiciones → `POST /sell_order` (1 toque).
+   - Si no hay sesión, "Comprar" ofrece **"⚡ Activar 1-toque y comprar"** (no manda a firmar).
 5. **Keeper de sesión**: `execution/session_keeper.py` firma `SessionOrder` con la session key y envía
    `executeWithSession` (sin firma del usuario). ✅ (dormido hasta el allowlist del pool).
 5. **Auditoría** (punto 3) del contrato v2.

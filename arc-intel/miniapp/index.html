@@ -340,7 +340,16 @@
         const { status, body } = await api("/buy_order", { method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token: token.address, amount_usdc: amt, slippage: slip }) });
-        if (status === 200 && body && body.sign_url) {
+        if (status === 200 && body && body.executing) {
+          $("armout").innerHTML = '<span class="ok">✅ Comprando en 1 toque (sin firma).</span>';
+        } else if (status === 200 && body && body.need_session) {
+          $("armout").innerHTML = 'Activa el <b>trading 1-toque</b> (una sola vez) y compra: ';
+          const btn = document.createElement("button");
+          btn.className = "primary";
+          btn.textContent = "⚡ Activar 1-toque y comprar";
+          btn.onclick = () => activateSessionThenBuy(token.address, amt, slip);
+          $("armout").appendChild(btn);
+        } else if (status === 200 && body && body.sign_url) {
           location.href = body.sign_url;
         } else if (body && body.hint === "link_wallet") {
           $("armout").innerHTML = 'Primero enlaza tu wallet: envía <b>/link_wallet 0xTuDireccion</b> en el chat del bot y vuelve a intentar.';
@@ -365,8 +374,24 @@
             <div class="kv"><span>${esc(p.token.slice(0,10))}…</span><b class="${cls}">${(p.unrealized_pct*100).toFixed(1)}%</b></div>
             <div class="kv mut"><span>cantidad</span><b>${p.qty.toLocaleString(undefined,{maximumFractionDigits:2})}</b></div>
             <div class="kv mut"><span>coste medio</span><b>${p.avg_cost.toPrecision(4)}</b></div>
-            <div class="kv mut"><span>PnL no realizado</span><b>${p.unrealized.toFixed(2)} USDC</b>${rec}</div></div>`;
+            <div class="kv mut"><span>PnL no realizado</span><b>${p.unrealized.toFixed(2)} USDC</b>${rec}</div>
+            <div class="row" style="margin-top:6px">
+              ${[25, 50, 75, 100].map(x => `<button class="ghost sellpct" data-t="${esc(p.token)}" data-p="${x}">vender ${x}%</button>`).join("")}
+            </div></div>`;
         }).join("");
+        document.querySelectorAll(".sellpct").forEach(b => {
+          b.onclick = async () => {
+            const tok = b.dataset.t, pct = parseFloat(b.dataset.p);
+            b.disabled = true; b.textContent = "…";
+            const { status, body } = await api("/sell_order", { method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token: tok, pct }) });
+            if (status === 200 && body && body.executing) { b.innerHTML = '<span class="ok">✅</span>'; }
+            else if (body && body.error === "activate") { b.textContent = "activar 1-toque"; }
+            else if (body && body.error === "no_position") { b.textContent = "sin posición"; }
+            else { b.textContent = "err"; }
+          };
+        });
         const s = body.summary;
         $("possummary").innerHTML = `Total: valor <b>${s.value.toFixed(2)}</b> · coste <b>${s.cost.toFixed(2)}</b> · no realizado <b>${s.unrealized.toFixed(2)}</b> USDC · realizado <b>${s.realized.toFixed(2)}</b>`;
       }
@@ -379,6 +404,32 @@
            <div class="kv"><span>Auto-seguidos</span><b>${body.count}</b></div>` +
           (body.auto_subs.length ? `<div class="mut" style="margin-top:6px">${body.auto_subs.map(esc).join("<br>")}</div>` : "");
         loadSessions().catch(() => {});
+      }
+
+      async function activateSessionThenBuy(tok, amt, slip) {
+        $("armout").textContent = "Creando sesión…";
+        const { status, body } = await api("/session/authorize", { method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: tok, max_per_order: Math.max(50, amt), max_total: 200, ttl: 86400 }) });
+        if (status !== 200 || !body || !body.txs) {
+          $("armout").innerHTML = `<span class="bad">Error: ${esc((body && body.error) || status)}</span>`;
+          return;
+        }
+        try {
+          const s = await getSigner();
+          for (let i = 0; i < body.txs.length; i++) {
+            $("armout").textContent = `Firma ${i + 1}/${body.txs.length}: ${body.txs[i].desc}…`;
+            await s.sendTx({ to: body.txs[i].to, data: body.txs[i].data });
+          }
+          $("armout").textContent = "Sesión activa. Comprando…";
+          const r = await api("/buy_order", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: tok, amount_usdc: amt, slippage: slip }) });
+          $("armout").innerHTML = (r.status === 200 && r.body && r.body.executing)
+            ? '<span class="ok">✅ Sesión activa. Comprando en 1 toque (sin firma).</span>'
+            : `<span class="bad">Error: ${esc((r.body && r.body.error) || r.status)}</span>`;
+        } catch (e) {
+          $("armout").textContent = "Cancelado/error: " + (e && e.message ? e.message : e);
+        }
       }
 
       async function loadSessions() {

@@ -94,25 +94,107 @@ class Handler(BaseHTTPRequestHandler):
             return 400, {"error": "bad_amount"}
         expiry = int(time.time()) + ttl
         pid = S.pool_id(pool)
-        key = S.new_session_key()
-        enc_secret = S.encrypt_secret(key["private_key"], enc)
+        #  Two sessions: buy (spend the stable) and sell (spend the token) -> one setup, both ways.
+        buy = S.new_session_key()
+        sell = S.new_session_key()
+        sell_cap = 10 ** 30  # effectively "any amount" for the sell side
         store = SubscriptionStore(DB)
         try:
-            store.save_session(uid, key["address"], enc_secret, executor, pid, stable,
-                               max_per_order, max_total, min_out_floor, expiry, status="active")
+            store.save_session(uid, buy["address"], S.encrypt_secret(buy["private_key"], enc),
+                               executor, pid, stable, max_per_order, max_total, min_out_floor,
+                               expiry, status="active")
+            store.save_session(uid, sell["address"], S.encrypt_secret(sell["private_key"], enc),
+                               executor, pid, addr, sell_cap, sell_cap, 0, expiry, status="active")
         finally:
             store.close()
         txs = [
-            {"to": stable, "data": S.calldata_approve(PERMIT2, max_total), "desc": "Approve USDC to Permit2"},
+            {"to": stable, "data": S.calldata_approve(PERMIT2, max_total), "desc": "1/6 Approve USDC"},
             {"to": PERMIT2, "data": S.calldata_permit2_approve(stable, executor, max_total, expiry),
-             "desc": "Permit2 approve to executor"},
-            {"to": executor, "data": S.calldata_authorize_session(key["address"], pid, stable,
+             "desc": "2/6 Permit2 USDC"},
+            {"to": executor, "data": S.calldata_authorize_session(buy["address"], pid, stable,
                                                                   max_per_order, max_total, min_out_floor, expiry),
-             "desc": "Authorize session"},
+             "desc": "3/6 Sesión compra"},
+            {"to": addr, "data": S.calldata_approve(PERMIT2, sell_cap), "desc": "4/6 Approve token"},
+            {"to": PERMIT2, "data": S.calldata_permit2_approve(addr, executor, sell_cap, expiry),
+             "desc": "5/6 Permit2 token"},
+            {"to": executor, "data": S.calldata_authorize_session(sell["address"], pid, addr,
+                                                                  sell_cap, sell_cap, 0, expiry),
+             "desc": "6/6 Sesión venta"},
         ]
-        return 200, {"session_key": key["address"], "pool_id": pid, "token_in": stable,
-                     "expiry": expiry, "max_per_order": max_per_order, "max_total": max_total,
-                     "min_out_floor": min_out_floor, "txs": txs}
+        return 200, {"session_key": buy["address"], "sell_session_key": sell["address"],
+                     "pool_id": pid, "token_in": stable, "expiry": expiry,
+                     "max_per_order": max_per_order, "max_total": max_total,
+                     "min_out_floor": min_out_floor, "txs": txs, "tx_count": len(txs)}
+
+    def _sell(self, uid, data):
+        """1-tap sell via the user's sell session (no per-order signature)."""
+        import time
+        from . import tokenmeta
+        from .miniapp_data import load_pool, latest_price
+        from execution import sessions as S
+        from execution.quotes import sell_quote
+        from execution.preorders import zero_for_one_for
+        from execution.eip712 import new_nonce
+        addr = (data.get("token") or "").lower()
+        if not ADDR_RE.match(addr):
+            return 400, {"error": "bad_address"}
+        try:
+            pct = float(data.get("pct") or 0)
+            floor = float(data.get("floor_pct") or 0)
+        except (TypeError, ValueError):
+            return 400, {"error": "bad_amount"}
+        if not (0 < pct <= 100):
+            return 400, {"error": "bad_pct"}
+        executor = os.environ.get("ARC_INTEL_EXECUTOR")
+        if not executor:
+            return 503, {"error": "no_executor"}
+        st = _storage()
+        if st is None:
+            return 503, {"error": "no_storage"}
+        pool = load_pool(st, addr)
+        if not pool:
+            return 404, {"error": "no_pool"}
+        price = latest_price(st, addr)
+        if price <= 0:
+            return 409, {"error": "no_price"}
+        store = SubscriptionStore(DB)
+        try:
+            recipient = store.get_linked_wallet(uid)
+            pos = store.get_position(uid, addr)
+            sess = store.get_session(uid, S.pool_id(pool), addr) if recipient else None
+        finally:
+            store.close()
+        if not recipient:
+            return 409, {"error": "link_wallet"}
+        if sess is None:
+            return 409, {"error": "activate"}
+        if pos["qty"] <= 0:
+            return 409, {"error": "no_position"}
+        qty = pos["qty"] * pct / 100.0
+        try:
+            quote = sell_quote(qty=qty, price=price, token_decimals=tokenmeta.rpc_decimals(addr),
+                               floor_pct=floor)
+        except ValueError as e:
+            return 400, {"error": str(e)}
+        import time as _t
+        deadline = int(_t.time()) + int(os.environ.get("ARC_INTEL_ORDER_TTL", "1800"))
+        intent = {"mode": "session", "pool_id": S.pool_id(pool), "token_in": addr,
+                  "key": {"currency0": pool["currency0"], "currency1": pool["currency1"],
+                          "fee": pool["fee"], "tick_spacing": pool["tick_spacing"],
+                          "hooks": pool["hooks"]},
+                  "zero_for_one": zero_for_one_for(addr, pool["currency0"]),
+                  "amount_in": quote["amount_in_base"], "min_out": quote["min_out_base"],
+                  "recipient": recipient}
+        store = SubscriptionStore(DB)
+        try:
+            pid = store.create_preorder(uid, recipient, addr, pct, floor, quote["min_out_base"],
+                                        deadline, new_nonce(), status="armed", kind="session")
+            store.save_sig_payload(pid, json.dumps(intent))
+        finally:
+            store.close()
+        self._kick_session_keeper()
+        return 200, {"persisted": True, "executing": True, "id": pid, "qty": qty,
+                     "quote": quote, "session_key": sess["session_key"]}
 
     def _buy(self, uid, addr, amount_usdc, slippage, persist):
         """Buy quote (and, if persist, a stored buy order) -> (http_code, body)."""
@@ -189,7 +271,7 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         pid = s3.create_preorder(uid, recipient, addr, 0.0, slippage,
                                                  quote["min_out_base"], deadline, order_nonce,
-                                                 status="armed", kind="buy")
+                                                 status="armed", kind="session")
                         s3.save_sig_payload(pid, json.dumps(intent))
                     finally:
                         s3.close()
@@ -198,24 +280,16 @@ class Handler(BaseHTTPRequestHandler):
                                  "session_key": sess["session_key"]})
                     return 200, resp
 
+        if persist:
+            # No session for this pool yet -> the user activates 1-tap trading first (no sign page).
+            resp.update({"need_session": True, "hint": "activate_session", "token": addr})
+            return 200, resp
         permit_nonce = new_nonce()
         resp["payload"] = build_buy_payload(
             chain_id=chain_id, executor=executor, pool=pool, stable=stable,
             amount_in_base=amount_in_base, min_out_base=quote["min_out_base"],
             recipient=recipient, order_nonce=order_nonce, permit_nonce=permit_nonce,
             deadline=deadline)
-        if persist:
-            store = SubscriptionStore(DB)
-            try:
-                pid = store.create_preorder(uid, recipient, addr, 0.0, slippage,
-                                            quote["min_out_base"], deadline, order_nonce,
-                                            status="armed", kind="buy")
-                store.save_sig_payload(pid, json.dumps(resp["payload"]))
-                po = store.get_preorder(pid)
-            finally:
-                store.close()
-            resp.update({"id": pid, "sign_token": po["sign_token"],
-                         "sign_url": f"/?t={po['sign_token']}"})
         return 200, resp
 
     def _kick_session_keeper(self):
@@ -473,6 +547,17 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 store.close()
             return self._send(200 if ok else 404, {"ok": ok})
+        if u.path == "/sell_order":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send(400, {"error": "bad_json"})
+            code, resp = self._sell(uid, data)
+            return self._send(code, resp)
         if u.path == "/session/authorize":
             uid = self._auth_user()
             if uid is None:

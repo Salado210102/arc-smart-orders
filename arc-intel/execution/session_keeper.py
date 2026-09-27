@@ -59,7 +59,7 @@ def run_session_keeper(store, *, submit=None, now=None, enc_key=None, executor=N
         return {"skipped": "not_configured", "submitted": 0, "failed": 0}
     submit = submit or _default_submit
     submitted = failed = 0
-    for po in store.armed_orders("buy", now, limit=limit):
+    for po in store.armed_orders("session", now, limit=limit):
         try:
             intent = json.loads(po.get("sig_payload") or "{}")
         except ValueError:

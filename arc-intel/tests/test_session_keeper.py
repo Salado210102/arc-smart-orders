@@ -24,7 +24,7 @@ class SessionKeeperTests(unittest.TestCase):
         intent = {"mode": "session", "pool_id": POOL_ID, "token_in": USDC, "key": KEY,
                   "zero_for_one": True, "amount_in": 50, "min_out": 10, "recipient": USER}
         self.pid = self.store.create_preorder(1, USER, TOK, 0, 0, 10, 9999999999, 5,
-                                              status="armed", kind="buy")
+                                              status="armed", kind="session")
         self.store.save_sig_payload(self.pid, json.dumps(intent))
 
     def tearDown(self):

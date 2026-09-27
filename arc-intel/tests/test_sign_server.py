@@ -174,6 +174,16 @@ class SignServerTests(unittest.TestCase):
         except urllib.error.HTTPError as e:
             self.assertEqual(e.code, 401)
 
+    def test_sell_order_requires_auth(self):
+        body = json.dumps({"token": "0x" + "1" * 40, "pct": 50}).encode()
+        req = urllib.request.Request(self._url("/sell_order"), data=body,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 401")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 401)
+
     def test_session_revoke_requires_auth(self):
         body = json.dumps({"session_key": "0x" + "b" * 40}).encode()
         req = urllib.request.Request(self._url("/session/revoke"), data=body,
