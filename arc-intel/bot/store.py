@@ -79,6 +79,14 @@ class SubscriptionStore:
             "floor_pct REAL, min_out REAL, deadline INTEGER, order_nonce INTEGER, status TEXT, "
             "created_ts INTEGER, signature TEXT, sign_token TEXT, sig_payload TEXT, "
             "kind TEXT DEFAULT 'sell')")
+        # holdings (tokens bought through the bot wallet) + per-token exit plan (SL/TP %)
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS holdings ("
+            "chat TEXT, token TEXT, added_ts INTEGER, PRIMARY KEY (chat, token))")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS exit_plans ("
+            "chat TEXT, token TEXT, sl_pct REAL, tp_pct REAL, updated_ts INTEGER, "
+            "PRIMARY KEY (chat, token))")
         # custodial quick wallet (Modo Maestro/Banana): bot-held key per user (encrypted)
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS custody ("
@@ -338,6 +346,39 @@ class SubscriptionStore:
             (token, kind, int(now_ts)))
         self.conn.commit()
         return True
+
+    # --- holdings + exit plans (SL/TP %) ---
+    def add_holding(self, chat, token) -> None:
+        self.conn.execute("INSERT OR IGNORE INTO holdings(chat,token,added_ts) VALUES(?,?,?)",
+                          (str(chat), str(token).lower(), int(time.time())))
+        self.conn.commit()
+
+    def remove_holding(self, chat, token) -> None:
+        self.conn.execute("DELETE FROM holdings WHERE chat=? AND token=?",
+                          (str(chat), str(token).lower()))
+        self.conn.commit()
+
+    def list_holdings(self, chat) -> list:
+        return [r[0] for r in self.conn.execute(
+            "SELECT token FROM holdings WHERE chat=? ORDER BY added_ts DESC", (str(chat),)).fetchall()]
+
+    def set_exit_plan(self, chat, token, sl_pct, tp_pct) -> None:
+        self.conn.execute(
+            "INSERT INTO exit_plans(chat,token,sl_pct,tp_pct,updated_ts) VALUES(?,?,?,?,?) "
+            "ON CONFLICT(chat,token) DO UPDATE SET sl_pct=excluded.sl_pct, tp_pct=excluded.tp_pct, "
+            "updated_ts=excluded.updated_ts",
+            (str(chat), str(token).lower(), float(sl_pct or 0), float(tp_pct or 0), int(time.time())))
+        self.conn.commit()
+
+    def get_exit_plan(self, chat, token) -> dict | None:
+        r = self.conn.execute("SELECT sl_pct,tp_pct FROM exit_plans WHERE chat=? AND token=?",
+                              (str(chat), str(token).lower())).fetchone()
+        return {"sl_pct": float(r[0] or 0), "tp_pct": float(r[1] or 0)} if r else None
+
+    def list_exit_plans(self, chat) -> dict:
+        return {t: {"sl_pct": float(sl or 0), "tp_pct": float(tp or 0)} for t, sl, tp in
+                self.conn.execute("SELECT token,sl_pct,tp_pct FROM exit_plans WHERE chat=?",
+                                  (str(chat),)).fetchall()}
 
     # --- custodial quick wallet ---
     def save_custody(self, chat, address, enc_secret, status="active") -> None:

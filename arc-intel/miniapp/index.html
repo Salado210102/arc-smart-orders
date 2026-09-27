@@ -395,36 +395,47 @@
 
       async function loadPositions() {
         $("poslist").innerHTML = '<span class="mut">Cargando…</span>';
-        const { status, body } = await api("/positions");
-        if (status !== 200 || !body) { $("poslist").innerHTML = `<span class="bad">Error: ${status}${status===401?" (abre en Telegram)":""}</span>`; return; }
-        if (!body.positions.length) { $("poslist").innerHTML = '<span class="mut">Sin posiciones.</span>'; $("possummary").textContent = ""; return; }
+        const { status, body } = await api("/portfolio");
+        if (status !== 200 || !body) { $("poslist").innerHTML = `<span class="bad">Error: ${status}${status === 401 ? " (abre en Telegram)" : ""}</span>`; return; }
+        if (!body.positions.length) { $("poslist").innerHTML = '<span class="mut">Sin posiciones. Compra un token en la pestaña Compra.</span>'; $("possummary").textContent = ""; return; }
         $("poslist").innerHTML = body.positions.map(p => {
-          const cls = p.unrealized_pct >= 0 ? "ok" : "bad";
-          const rec = p.reconciled === false ? ' <span class="warn">⚠︎ reconciliar</span>' : '';
+          const t = p.token;
           return `<div class="card" style="padding:10px">
-            <div class="kv"><span>${esc(p.token.slice(0,10))}…</span><b class="${cls}">${(p.unrealized_pct*100).toFixed(1)}%</b></div>
-            <div class="kv mut"><span>cantidad</span><b>${p.qty.toLocaleString(undefined,{maximumFractionDigits:2})}</b></div>
-            <div class="kv mut"><span>coste medio</span><b>${p.avg_cost.toPrecision(4)}</b></div>
-            <div class="kv mut"><span>PnL no realizado</span><b>${p.unrealized.toFixed(2)} USDC</b>${rec}</div>
+            <div class="kv"><span><code>${esc(t.slice(0, 10))}…</code></span><b>${p.qty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</b></div>
+            <div class="kv mut"><span>valor</span><b>${p.value ? "$" + p.value.toFixed(2) : "—"}</b></div>
+            <div class="row" style="margin-top:6px;align-items:center">
+              <span class="mut" style="font-size:12px">SL %</span>
+              <input class="sl" type="number" value="${p.sl_pct || ""}" placeholder="20" style="width:64px">
+              <span class="mut" style="font-size:12px">TP %</span>
+              <input class="tp" type="number" value="${p.tp_pct || ""}" placeholder="50" style="width:64px">
+              <button class="ghost saveplan" data-t="${esc(t)}">Guardar</button>
+            </div>
             <div class="row" style="margin-top:6px">
-              ${[25, 50, 75, 100].map(x => `<button class="ghost sellpct" data-t="${esc(p.token)}" data-p="${x}">vender ${x}%</button>`).join("")}
+              ${[25, 50, 75, 100].map(x => `<button class="ghost sellpct" data-t="${esc(t)}" data-p="${x}">vender ${x}%</button>`).join("")}
             </div></div>`;
         }).join("");
+        document.querySelectorAll(".saveplan").forEach(b => {
+          b.onclick = async () => {
+            const card = b.closest(".card");
+            const sl = parseFloat(card.querySelector(".sl").value || "0") || 0;
+            const tp = parseFloat(card.querySelector(".tp").value || "0") || 0;
+            b.textContent = "…";
+            const r = await api("/exit_plan", { method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token: b.dataset.t, sl_pct: sl, tp_pct: tp }) });
+            b.textContent = (r.status === 200 && r.body && r.body.ok) ? "✅" : "err";
+          };
+        });
         document.querySelectorAll(".sellpct").forEach(b => {
           b.onclick = async () => {
             const tok = b.dataset.t, pct = parseFloat(b.dataset.p);
             b.disabled = true; b.textContent = "…";
-            const { status, body } = await api("/sell_order", { method: "POST",
-              headers: { "Content-Type": "application/json" },
+            const r = await api("/custody/sell", { method: "POST", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ token: tok, pct }) });
-            if (status === 200 && body && body.executing) { b.innerHTML = '<span class="ok">✅</span>'; }
-            else if (body && body.error === "activate") { b.textContent = "activar 1-toque"; }
-            else if (body && body.error === "no_position") { b.textContent = "sin posición"; }
+            if (r.status === 200 && r.body && r.body.executing) { b.innerHTML = '<span class="ok">✅</span>'; setTimeout(loadPositions, 1500); }
             else { b.textContent = "err"; }
           };
         });
-        const s = body.summary;
-        $("possummary").innerHTML = `Total: valor <b>${s.value.toFixed(2)}</b> · coste <b>${s.cost.toFixed(2)}</b> · no realizado <b>${s.unrealized.toFixed(2)}</b> USDC · realizado <b>${s.realized.toFixed(2)}</b>`;
+        $("possummary").textContent = "";
       }
       async function loadWallet() {
         $("walletinfo").innerHTML = '<span class="mut">Cargando…</span>';

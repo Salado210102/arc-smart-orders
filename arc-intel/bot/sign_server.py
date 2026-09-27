@@ -424,7 +424,40 @@ class Handler(BaseHTTPRequestHandler):
                          order_nonce=new_nonce(), deadline=int(time.time()) + 600)
         except Exception as e:
             return 502, {"error": "swap_failed", "detail": str(e)[:160]}
+        store2 = SubscriptionStore(DB)
+        try:
+            store2.add_holding(uid, tok)
+        finally:
+            store2.close()
         return 200, {"executing": True, "tx": txh, "quote": quote}
+
+    def _portfolio(self, uid):
+        """Custody holdings with qty (on-chain), price and the SL/TP plan."""
+        from execution import custody as C
+        from . import tokenmeta
+        from .miniapp_data import latest_price
+        c = self._custody_of(uid)
+        if not c:
+            return 200, {"positions": []}
+        store = SubscriptionStore(DB)
+        try:
+            holds = store.list_holdings(uid)
+            plans = store.list_exit_plans(uid)
+        finally:
+            store.close()
+        st = _storage()
+        out = []
+        for t in holds:
+            raw = C.erc20_balance(t, c["address"])
+            if raw <= 0:
+                continue
+            dec = tokenmeta.rpc_decimals(t)
+            price = latest_price(st, t) if st is not None else 0.0
+            qty = raw / (10 ** dec)
+            plan = plans.get(t) or {"sl_pct": 0, "tp_pct": 0}
+            out.append({"token": t, "qty": qty, "price": price, "value": qty * price,
+                        "sl_pct": plan["sl_pct"], "tp_pct": plan["tp_pct"]})
+        return 200, {"positions": out, "address": c["address"]}
 
     def _custody_sell(self, uid, data):
         import time
@@ -657,6 +690,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(401, {"error": "unauthorized"})
             code, resp = self._custody_view(uid)
             return self._send(code, resp)
+        if u.path == "/portfolio":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            code, resp = self._portfolio(uid)
+            return self._send(code, resp)
         if u.path == "/sessions":
             uid = self._auth_user()
             if uid is None:
@@ -751,6 +790,31 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "bad_json"})
             code, resp = self._sell(uid, data)
             return self._send(code, resp)
+        if u.path == "/exit_plan":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send(400, {"error": "bad_json"})
+            tok = (data.get("token") or "").lower()
+            if not ADDR_RE.match(tok):
+                return self._send(400, {"error": "bad_address"})
+            try:
+                sl = float(data.get("sl_pct") or 0)
+                tp = float(data.get("tp_pct") or 0)
+            except (TypeError, ValueError):
+                return self._send(400, {"error": "bad_amount"})
+            if not (0 <= sl <= 99) or not (0 <= tp <= 10000):
+                return self._send(400, {"error": "bad_pct"})
+            store = SubscriptionStore(DB)
+            try:
+                store.set_exit_plan(uid, tok, sl, tp)
+            finally:
+                store.close()
+            return self._send(200, {"ok": True, "sl_pct": sl, "tp_pct": tp})
         if u.path in ("/custody/create", "/custody/withdraw", "/custody/buy", "/custody/sell"):
             uid = self._auth_user()
             if uid is None:
