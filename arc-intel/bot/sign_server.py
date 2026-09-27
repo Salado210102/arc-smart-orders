@@ -33,6 +33,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         u = urlparse(self.path)
+        if u.path in ("/", "/index.html"):
+            path = os.environ.get("ARC_INTEL_MINIAPP", "/root/arc-intel/miniapp/index.html")
+            try:
+                body = open(path, "rb").read()
+            except OSError:
+                return self._send(404, {"error": "miniapp_missing"})
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if u.path != "/order":
             return self._send(404, {"error": "not_found"})
         tok = (parse_qs(u.query).get("t") or [""])[0]

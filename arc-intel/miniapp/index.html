@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SNIPER IA · Sign</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0b0e12;color:#eaeef3;
+         margin:0;padding:20px;max-width:560px}
+    h3{margin:4px 0 12px}
+    pre{background:#141a22;border-radius:10px;padding:12px;overflow:auto;font-size:12px}
+    button{width:100%;padding:16px;border:0;border-radius:12px;background:#2f7dff;color:#fff;font-size:16px;
+           font-weight:600;margin-top:12px}
+    button:disabled{opacity:.5}
+    .ok{color:#38d39f}
+  </style>
+</head>
+<body>
+  <h3>🛡️ SNIPER IA — Arm protection</h3>
+  <div id="info">Cargando…</div>
+  <pre id="details"></pre>
+  <button id="go" disabled>Conectar wallet y firmar</button>
+  <div id="out"></div>
+
+  <script type="module">
+    //  Config: set these when deploying behind the domain.
+    const PROJECT_ID = "REPLACE_WITH_WALLETCONNECT_PROJECT_ID"; // Reown/WalletConnect Cloud (free)
+    const CHAIN_ID   = 5042002;                                 // Arc testnet (mainnet = 5042)
+    const API        = location.origin;                         // the sign server (same origin)
+
+    const t = new URLSearchParams(location.search).get("t");
+    const info = document.getElementById("info");
+    const details = document.getElementById("details");
+    const out = document.getElementById("out");
+    const go = document.getElementById("go");
+    let payload = null;
+
+    async function load() {
+      if (!t) { info.textContent = "Falta el token (?t=…)"; return; }
+      const r = await fetch(`${API}/order?t=${encodeURIComponent(t)}`).then(x => x.json());
+      if (r.error) { info.textContent = "Orden no disponible: " + r.error; return; }
+      payload = r.payload;
+      info.textContent = "Vas a firmar una orden de PROTECCIÓN (no custodia: tú firmas, el bot nunca tiene tus llaves).";
+      details.textContent = JSON.stringify({
+        poolKey: payload.poolKey, zeroForOne: payload.zeroForOne, order: payload.order
+      }, null, 2);
+      go.disabled = false;
+    }
+
+    go.onclick = async () => {
+      try {
+        out.textContent = "Conectando wallet…";
+        const { EthereumProvider } = await import("https://esm.sh/@walletconnect/ethereum-provider@2");
+        const provider = await EthereumProvider.init({
+          projectId: PROJECT_ID,
+          chains: [CHAIN_ID],
+          optionalChains: [CHAIN_ID],
+          showQrModal: true,
+          methods: ["eth_signTypedData_v4", "personal_sign"],
+        });
+        await provider.connect();
+        const from = provider.accounts[0];
+        out.textContent = "Firma en tu wallet…";
+        const sig = await provider.request({
+          method: "eth_signTypedData_v4",
+          params: [from, JSON.stringify(payload.typedData)],
+        });
+        const res = await fetch(`${API}/sign`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ t, signature: sig }),
+        }).then(x => x.json());
+        out.innerHTML = res.ok
+          ? '<span class="ok">✅ Protección armada. Vuelve a Telegram.</span>'
+          : "Error: " + JSON.stringify(res);
+      } catch (e) {
+        out.textContent = "Cancelado/error: " + (e && e.message ? e.message : e);
+      }
+    };
+
+    load();
+  </script>
+</body>
+</html>

@@ -52,6 +52,10 @@ class SignServerTests(unittest.TestCase):
         self.assertEqual(s2.get_preorder(self.pid)["signature"], "0xdead")
         s2.close()
 
+    def test_serves_miniapp_page(self):
+        html = urllib.request.urlopen(self._url("/")).read().decode()
+        self.assertIn("SNIPER IA", html)
+
     def test_unknown_token_404(self):
         try:
             urllib.request.urlopen(self._url("/order?t=nope"))
