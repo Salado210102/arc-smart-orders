@@ -311,8 +311,14 @@
           body: JSON.stringify({ token: token.address, amount_usdc: amt, slippage: slip }) });
         if (status === 200 && body && body.sign_url) {
           location.href = body.sign_url;
+        } else if (body && body.hint === "link_wallet") {
+          $("armout").innerHTML = 'Primero enlaza tu wallet: envía <b>/link_wallet 0xTuDireccion</b> en el chat del bot y vuelve a intentar.';
+        } else if (body && body.error === "no_pool") {
+          $("armout").innerHTML = '<span class="warn">Ese token no tiene pool v4 en Arc todavía; no se puede operar aquí.</span>';
+        } else if (body && body.error) {
+          $("armout").innerHTML = `<span class="bad">No se pudo crear la orden: ${esc(body.error)}</span>`;
         } else {
-          $("armout").innerHTML = `<span class="bad">Error: ${esc((body&&body.error)||status)}</span>`;
+          $("armout").innerHTML = `<span class="bad">No se pudo crear la orden (HTTP ${status}).</span>`;
         }
       };
 
