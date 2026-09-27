@@ -13,8 +13,9 @@ EXPLORER = "https://explorer.arc.io/address/"
 _RICH_EMOJI = {"high": "🔴", "medium": "🟠", "low": "🟡"}
 _RICH_LABEL = {"dev_sell": "DEV-SELL", "volume_collapse": "VOLUME COLLAPSE",
                "compound": "COMPOSITE RISK", "liquidity_removal": "LIQUIDITY REMOVAL",
-               "thin_market": "THIN MARKET", "volume_spike": "VOLUME SPIKE",
+               "thin_market": "THIN MARKET", "volume_spike": "VOLUME UP + PRICE UP",
                "price_surge": "PRICE SURGE", "whale_buy": "WHALE BUY", "large_sell": "LARGE SELL"}
+DISCOVERY_KINDS = {"volume_spike", "price_surge", "whale_buy"}
 
 
 def _esc(s) -> str:
@@ -29,8 +30,10 @@ def format_alert_rich(alert: dict) -> str:
     tok = alert.get("token") or ""
     sym = (alert.get("context") or {}).get("symbol") or ""
     sev = alert.get("severity")
-    label = _RICH_LABEL.get(alert.get("kind"), (alert.get("kind") or "").upper())
-    head = f"{_RICH_EMOJI.get(sev, '⚪')} <b>ARC AI · {_esc(label)}</b>"
+    kind = alert.get("kind")
+    label = _RICH_LABEL.get(kind, (kind or "").upper())
+    emoji = "\U0001F7E2" if kind in DISCOVERY_KINDS else _RICH_EMOJI.get(sev, "⚪")
+    head = f"{emoji} <b>ARC AI · {_esc(label)}</b>"
     if sym:
         title = f"<b>${_esc(sym)}</b> · <code>{_esc(tok)}</code>"
     else:

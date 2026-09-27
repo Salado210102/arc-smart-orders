@@ -33,7 +33,11 @@ class IncrementalState:
     large_sell_ratio: float = 0.5        # ...and >= 50% of the token's recent (6-bucket) volume
     price_surge_pct: float = 50.0        # discovery: price +>=50% vs ~lookback buckets ago
     whale_buy_usd: float = 2000.0        # discovery: single buy >= $2k dominating recent volume
+    spike_min_price_pct: float = 0.0     # volume spike ONLY if price is up >= this % (not a dump)
+    spike_min_buy_ratio: float = 1.2     # ...and buy volume >= sell volume * this (net buyers)
     prices: dict = field(default_factory=dict)          # token -> {bucket: price}
+    buys: dict = field(default_factory=dict)            # token -> {bucket: buy_vol}
+    sells: dict = field(default_factory=dict)           # token -> {bucket: sell_vol}
     last_surge_bucket: dict = field(default_factory=dict)
     positions: dict = field(default_factory=dict)        # (wallet, token) -> [qty, cost, entry]
     volume: dict = field(default_factory=dict)           # token -> {bucket: vol}
@@ -78,6 +82,14 @@ class IncrementalState:
             if len(pr) > keep:
                 for b in sorted(pr)[:-keep]:
                     pr.pop(b, None)
+        # Buy/sell FLOW per bucket (who's in control): only bullish flow should alert buys.
+        fs = self.buys if side == "buy" else (self.sells if side == "sell" else None)
+        if fs is not None:
+            fd = fs.setdefault(token, {})
+            fd[buck] = fd.get(buck, 0.0) + sv
+            if len(fd) > keep:
+                for b in sorted(fd)[:-keep]:
+                    fd.pop(b, None)
 
         creator = (creators.get(token) or "").lower()
         if wallet == creator and creator:
@@ -175,20 +187,39 @@ class IncrementalState:
                                  f"at {block} (z={val})")
                     alerts.append(c)
 
+        flow_buy = sum(v for b, v in self.buys.get(token, {}).items() if b >= buck - 6)
+        flow_sell = sum(v for b, v in self.sells.get(token, {}).items() if b >= buck - 6)
+        price_up = self._price_up(token, buck)
+        net_buy = flow_buy > 0 and flow_buy >= flow_sell * self.spike_min_buy_ratio
+        # QUALITY: volume up AND price up AND net buyers (never a dump disguised as a spike).
         if (z and z[-1][1] is not None and z[-1][0] == buck and z[-1][1] >= self.spike_z
                 and vols.get(buck, 0.0) >= self.min_spike_usdc
+                and price_up and net_buy
                 and self.last_spike_bucket.get(token) != buck):
             self.last_spike_bucket[token] = buck
             val = round(z[-1][1], 3)
             if emit:
                 a = Alert(token=token, kind="volume_spike",
                           severity="high" if val >= self.spike_z + 1.0 else "medium", block=block,
-                          context={"z": val, "vol_usdc": round(vols.get(buck, 0.0), 0)})
-                a.message = (f"{token}: volume spike at block {block} "
-                             f"(z={val}, ~${vols.get(buck, 0.0):,.0f} this bucket). "
-                             "A surge is two-faced: it can precede a pump or a rug — verify.")
+                          context={"z": val, "vol_usdc": round(vols.get(buck, 0.0), 0),
+                                   "buy_usd": round(flow_buy, 0), "sell_usd": round(flow_sell, 0)})
+                a.message = (f"{token}: volume UP + price UP at block {block} · "
+                             f"vol ~${vols.get(buck, 0.0):,.0f} · buys ${flow_buy:,.0f} vs "
+                             f"sells ${flow_sell:,.0f} (last hour)")
                 alerts.append(a)
         return alerts
+
+    def _price_up(self, token, buck) -> bool:
+        """True if the price is up >= spike_min_price_pct vs ~lookback buckets ago."""
+        pr = self.prices.get(token, {})
+        past = [b for b in pr if b <= buck - self.lookback]
+        if not past:
+            return False
+        old = pr[max(past)]
+        cur = pr.get(buck, 0.0)
+        if old <= 0 or cur <= 0:
+            return False
+        return (cur / old - 1.0) * 100.0 >= self.spike_min_price_pct
 
     def apply_legs(self, legs: list, creators: dict, emit: bool = True) -> list[Alert]:
         out: list[Alert] = []

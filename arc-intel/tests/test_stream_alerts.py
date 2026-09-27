@@ -105,6 +105,18 @@ class StreamAlertsTests(unittest.TestCase):
                 except OSError:
                     pass
 
+    def test_volume_spike_requires_price_up_and_buyers(self):
+        st = IncrementalState(bucket_blocks=1000, lookback=12, min_spike_usdc=1.0)
+        creators = {"0xtok": "0xother"}
+        alerts = []
+        # 12 buckets alternating small buys at price 0.01 (qty=100, sv=1 or 2)
+        for i in range(12):
+            sv = 1.0 if i % 2 == 0 else 2.0
+            alerts += st.apply_leg(leg("0xo", "0xtok", i * 1000 + 1, "buy", 100.0, sv), creators)
+        # big volume bucket but price CRASHES (qty=10000, sv=10 -> price 0.001)
+        alerts += st.apply_leg(leg("0xo", "0xtok", 12 * 1000 + 1, "buy", 10000.0, 10.0), creators)
+        self.assertNotIn("volume_spike", [a.kind for a in alerts])
+
     def test_price_surge(self):
         st = IncrementalState(bucket_blocks=1000, lookback=12, price_surge_pct=50.0)
         creators = {"0xtok": "0xother"}
