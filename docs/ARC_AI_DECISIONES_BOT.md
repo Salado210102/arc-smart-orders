@@ -201,6 +201,21 @@ auditoría + hot key acotada; no es lo primero).
 4. **Terminal TMA con PnL en vivo (websocket)**.
 
 **Foso real:** A (seguridad) + B (Arc-nativo) no los puede copiar fácil un custodial genérico.
+
+---
+
+## 13. Infra y Mini App (empezar mañana)
+- **Mini App (TMA):** Telegram **exige HTTPS** para Mini Apps → hay que **comprar un dominio** (p. ej. `.com`/`.io`)
+  + certificado. Empezamos mañana.
+- **VPS actual (medido 2026-09-27):** **2 vCPU · 4 GB RAM** (≈1.3 GB libres) · **disco 96% (solo 1.8 GB libres)**.
+  Corre: `arcai-pg`, contenedores BasePump (api/orders-keeper/telegram/keeper/autoheal), y `pm2`
+  (arc-alerts, arc-keeper mainnet+testnet, arc-metrics, 5× mev, logrotate).
+  - **Para la Mini App (frontend estático + API ligera): el VPS actual VALE**, pero **hay que liberar disco
+    primero** (96% es riesgo real: BD/postgres + datos del indexer).
+  - **Para trading real / velocidad:** mejor un **VPS aparte** (aislar API/keeper del indexer, para que un
+    ciclo pesado no afecte al camino de trading) + **RPC dedicado** (la latencia la da el RPC, no el tamaño).
+    Considerar **8 GB RAM + más disco**.
+  - **Acción inmediata:** vigilar/limpiar disco (logs, cache, dumps) o ampliarlo **antes** de la Mini App.
 - **2026-09-27 (madrugada)** — Se elige la **Opción 2 (órdenes pre-firmadas)** para velocidad; Opción 3
   (session keys) diferida. 4 decisiones pendientes (duración, `minOut` standby, cancelación, alcance).
 - **2026-09-27 (tarde)** — Bot: `/check` con **Buy** (importes $10/$20/$50/$100 u "Other"), **PnL** y
