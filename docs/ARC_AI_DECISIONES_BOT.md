@@ -220,6 +220,13 @@
   PoolManager; un **revert** → `transfer_reverts` (nivel **high**, `honeypot_hint`). Si **ningún**
   holder tiene saldo, `transfer_sim=null` (honesto: no se finge). Cacheado 1 h; acotado a 3 holders.
   Verificado: la simulación ejecuta; en BCAT devolvió `null` (holders sin saldo). Tests **299 passed**.
+- **2026-09-27 (punto 2 — relayer)** — Generado el wallet de **relayer** en el VPS:
+  **`0x5ce3F78E69Fe6bdBF5745cb4E18B4B9C2F37A98f`** (clave en `/root/arc-intel/relayer.env`, modo 600,
+  **no mostrada**). Activación = añadir `EnvironmentFile=/root/arc-intel/relayer.env` a los servicios
+  `arc-intel-*` **tras fondear** la dirección con **USDC testnet** (gas; `https://faucet.circle.com`).
+  **Incidencia de seguridad:** el primer `cast wallet new` **imprimió la clave privada** en el log; el
+  wallet estaba **sin fondos** (sin pérdida) → se **descartó** y se regeneró **sin imprimir**. **Nunca
+  fondear** la dirección descartada `0xe31A75…507D`.
 
 ---
 

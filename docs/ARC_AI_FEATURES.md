@@ -67,6 +67,7 @@ Leyenda de estado: **[LIVE]** ya operativo · **[TESTNET]** probado en testnet, 
 | **Venta por %** | 25 / 50 / 75 / 100 % sobre la posición real (`sell_quantity`) | [TESTNET] |
 | **Órdenes pre-firmadas** (Opción 2) | el usuario firma **una vez**; el **keeper** ejecuta sola — sin hot keys del usuario | [TESTNET] |
 | **Keeper permissionless** | envía órdenes firmadas; no puede robar ni alterar términos (la firma los liga) | [TESTNET] |
+| **Relayer (gas)** | wallet dedicada que envía las órdenes; dirección generada, **pendiente de fondear** con USDC testnet | [TESTNET] |
 | **Plan de salida** (TP / SL / trailing / scale-out) | motor `strategy.py`; `/plan` crea una venta condicional | [TESTNET] |
 | **Cancelación** | `/cancel` (reposo del keeper) + `cancelOrder` on-chain (usuario) | [TESTNET] |
 | **Posiciones + reconciliación** | coste medio, PnL no realizado, cotejo con saldo on-chain | [LIVE] |
