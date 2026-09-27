@@ -576,6 +576,7 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
     state_path = "/root/arc-intel/state.pkl"
     state = IncrementalState()
     cursor = int(store.get_state("alert_cursor", str(start_block)) or start_block)
+    liq_cursor = int(store.get_state("liq_cursor", str(cursor)) or cursor)
     loaded, lcur = load_state(state_path)
     if loaded is not None:
         state = loaded
@@ -668,6 +669,23 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
 
     threading.Thread(target=worker, daemon=True).start()
 
+    # Wallet tracking in its OWN thread (own DB connection): on-chain balance scans can be slow
+    # and flaky, and must NEVER delay alert detection/delivery.
+    wstore = SubscriptionStore(db)
+
+    def wallet_worker():
+        while not stop.is_set():
+            try:
+                from .wallet_track import scan_wallets
+                scan = scan_wallets(storage, wstore, head=clock["block"])
+                if scan["new_subs"] or scan["dropped_subs"]:
+                    logger({"wallet_track": scan})
+            except Exception:
+                pass
+            stop.wait(180)
+
+    threading.Thread(target=wallet_worker, daemon=True).start()
+
     try:
         while cycles <= 0 or k < cycles:
             k += 1
@@ -684,7 +702,26 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
             if end_block:
                 head = min(head, int(end_block))
             legs = fetch_new_legs(storage, cursor, head, limit_per_cycle)
+            if legs:
+                # Refresh creator/symbol maps for the new tokens (avoid stale maps -> missed dev-sells).
+                toks = {lg["token"] for lg in legs if lg.get("token")}
+                try:
+                    from indexer.stream_alerts import load_creators_for, load_symbols_for
+                    creators.update(load_creators_for(storage, toks))
+                    symbols.update(load_symbols_for(storage, toks))
+                except Exception:
+                    pass
             alerts = state.apply_legs(legs, creators)
+            # Liquidity removals (rug signal) since the last scan — monitored live now.
+            try:
+                from indexer.alerts import load_liquidity_removals, liquidity_removal_alerts
+                liq = liquidity_removal_alerts(load_liquidity_removals(storage, since_block=liq_cursor))
+                if liq:
+                    alerts.extend(liq)
+                    liq_cursor = max(liq_cursor, max(a.block for a in liq))
+                    store.set_state("liq_cursor", str(liq_cursor))
+            except Exception:
+                pass
             alerts = apply_collapse_cooldown(alerts, store, int(time.time()), collapse_cooldown)
             now_ts = int(time.time())
             for a in alerts:
@@ -697,13 +734,6 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
                 fired = fire_preorders(store, alerts, transport, thr, price_fn)
                 if fired:
                     logger({"cycle": k, "preorders_fired": fired})
-            except Exception:
-                pass
-            try:
-                from .wallet_track import scan_wallets
-                scan = scan_wallets(storage, store, head=cursor)
-                if scan["new_subs"] or scan["dropped_subs"]:
-                    logger({"cycle": k, "wallet_track": scan})
             except Exception:
                 pass
             batch = store.dequeue(2000)
@@ -742,9 +772,12 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
                 persist_pending(storage, store, 45)
             except Exception:
                 pass
-            if ingest_note == "ok" or not ingest:
-                logger({"cycle": k, "new_legs": len(legs), "alerts": len(alerts),
-                        "queue": store.queue_size(), "dispatched": n, "cursor": cursor})
+            sig = {}
+            for a in alerts:
+                sig[a.kind] = sig.get(a.kind, 0) + 1
+            logger({"cycle": k, "new_legs": len(legs), "alerts": len(alerts), "signals": sig,
+                    "lag": head - cursor, "watch": len(store.list()), "queue": store.queue_size(),
+                    "dispatched": n, "cursor": cursor, "ingest": ingest_note})
             _activity(t_cycle0, time.time())
             if cycles <= 0 or k < cycles:
                 time.sleep(interval)
@@ -753,6 +786,7 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
         sender.close()
         store.close()
         cmd_store.close()
+        wstore.close()
         storage.close()
 
 

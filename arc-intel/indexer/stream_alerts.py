@@ -8,6 +8,8 @@ z-score collapse, compound).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from dataclasses import fields as _dc_fields
+from dataclasses import MISSING as _DC_MISSING
 
 from .alerts import Alert, is_significant_sell, pct_of_position, severity_for, rolling_zscore
 
@@ -27,11 +29,27 @@ class IncrementalState:
     spike_z: float = 2.5                 # volume spike: z >= +2.5
     min_spike_usdc: float = 500.0        # ...and >= $500 in the bucket (avoid noise)
     min_confirm_usdc: float = 500.0      # recent volume that confirms a dev-sell
+    large_sell_usd: float = 5000.0       # whale/team dump: single sell >= $5k
+    large_sell_ratio: float = 0.5        # ...and >= 50% of the token's recent (6-bucket) volume
     positions: dict = field(default_factory=dict)        # (wallet, token) -> [qty, cost, entry]
     volume: dict = field(default_factory=dict)           # token -> {bucket: vol}
     last_dev_sell_block: dict = field(default_factory=dict)
     last_collapse_bucket: dict = field(default_factory=dict)
     last_spike_bucket: dict = field(default_factory=dict)
+
+    def __setstate__(self, d: dict) -> None:
+        """Forward-compatible with older pickles: fill any missing field with its default.
+
+        Robustness: adding a new field to this dataclass must NOT break loading a state saved by
+        an older version (that would crash the loop). Missing attributes get their default.
+        """
+        for f in _dc_fields(self):
+            if f.name not in d:
+                if f.default_factory is not _DC_MISSING:
+                    d[f.name] = f.default_factory()
+                elif f.default is not _DC_MISSING:
+                    d[f.name] = f.default
+        self.__dict__.update(d)
 
     def apply_leg(self, leg: dict, creators: dict, emit: bool = True) -> list[Alert]:
         token = (leg.get("token") or "").lower()
@@ -86,6 +104,20 @@ class IncrementalState:
                 pos[0] -= sell_qty
                 if pos[0] <= 1e-18:
                     self.positions.pop(key, None)
+
+        # Whale / team dump: a large non-creator sell that dominates recent traded volume.
+        if emit and side == "sell" and wallet != creator and sv >= self.large_sell_usd:
+            vol_recent = sum(v for b, v in vols.items() if b >= buck - 6)
+            if vol_recent <= 0 or sv >= self.large_sell_ratio * vol_recent:
+                sev = "high" if sv >= self.large_sell_usd * 4 else "medium"
+                share = (sv / vol_recent * 100.0) if vol_recent else 0.0
+                a = Alert(token=token, kind="large_sell", severity=sev, block=block,
+                          wallet=wallet, role="holder", amount_usdc=sv,
+                          context={"usd": round(sv, 0), "vol_recent": round(vol_recent, 0),
+                                   "share_pct": round(share, 1)})
+                a.message = (f"{wallet} sold ~${sv:,.0f} of {token} "
+                             f"({share:.0f}% of recent volume) at block {block}")
+                alerts.append(a)
 
         series = sorted(self.volume[token].items())
         z = rolling_zscore(series, self.lookback)
@@ -149,6 +181,36 @@ def load_creators(storage) -> dict:
         storage.pool.putconn(conn)
 
 
+def load_symbols_for(storage, tokens) -> dict:
+    """Symbols for a bounded set of tokens (per-cycle refresh)."""
+    toks = [str(t).lower() for t in tokens if t]
+    if not toks:
+        return {}
+    conn = storage.pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT lower(address), symbol FROM tokens "
+                        "WHERE symbol IS NOT NULL AND lower(address) = ANY(%s)", (toks,))
+            return {a: s for a, s in cur.fetchall() if s}
+    finally:
+        storage.pool.putconn(conn)
+
+
+def load_creators_for(storage, tokens) -> dict:
+    """Creators for a bounded set of tokens (per-cycle refresh -> no stale map)."""
+    toks = [str(t).lower() for t in tokens if t]
+    if not toks:
+        return {}
+    conn = storage.pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT lower(address), lower(creator) FROM tokens "
+                        "WHERE creator IS NOT NULL AND lower(address) = ANY(%s)", (toks,))
+            return {t: c for t, c in cur.fetchall()}
+    finally:
+        storage.pool.putconn(conn)
+
+
 def build_initial_state(storage, state: IncrementalState, creators: dict, upto_block: int,
                         on_progress=None) -> int:
     """Rebuild state from history (block <= upto_block) WITHOUT emitting alerts."""
@@ -184,22 +246,33 @@ def fetch_new_legs(storage, after_block: int, upto_block: int, limit: int = 2000
 
 
 def save_state(path: str, state, cursor: int) -> None:
+    """Atomic, durable save: write .tmp, keep previous as .bak, then os.replace."""
+    import os
     import pickle
+    tmp = f"{path}.tmp"
     try:
-        with open(path, "wb") as fh:
+        with open(tmp, "wb") as fh:
             pickle.dump({"state": state, "cursor": int(cursor)}, fh)
+        if os.path.exists(path):
+            try:
+                os.replace(path, path + ".bak")
+            except OSError:
+                pass
+        os.replace(tmp, path)
     except OSError:
         pass
 
 
 def load_state(path: str):
     import pickle
-    try:
-        with open(path, "rb") as fh:
-            d = pickle.load(fh)
-        return d.get("state"), int(d.get("cursor", 0))
-    except Exception:
-        return None, None
+    for p in (path, path + ".bak"):
+        try:
+            with open(p, "rb") as fh:
+                d = pickle.load(fh)
+            return d.get("state"), int(d.get("cursor", 0))
+        except Exception:
+            continue
+    return None, None
 
 
 def load_price_series(storage, token: str) -> list:

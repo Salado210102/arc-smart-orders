@@ -132,7 +132,8 @@ class SubscriptionStore:
             "VALUES(?,?,?,?,?)", (str(chat_id), "", "", "", int(since_block)))
         self.conn.commit()
 
-    def add_token(self, chat_id, token: str, now_block: int = 0) -> tuple[bool, str]:
+    def add_token(self, chat_id, token: str, now_block: int = 0,
+                  allow_over_cap: bool = False) -> tuple[bool, str]:
         row = self.get(chat_id)
         if row is None:
             self.ensure_subscriber(chat_id, since_block=now_block)
@@ -141,7 +142,7 @@ class SubscriptionStore:
         token = token.lower()
         if token in tokens:
             return True, "already"
-        if len(tokens) >= self.MAX_TOKENS:
+        if not allow_over_cap and len(tokens) >= self.MAX_TOKENS:
             return False, f"limit_{self.MAX_TOKENS}"
         tokens.add(token)
         since = row["since_block"] or now_block
@@ -472,7 +473,8 @@ class SubscriptionStore:
         """Auto-subscribe (future alerts only). Only NEW subs are marked as auto; an existing
         (manual) subscription is left untouched."""
         token = str(token).lower()
-        ok, reason = self.add_token(chat_id, token, now_block=now_block)
+        # A held token must always be watched -> auto-subs may exceed the manual cap.
+        ok, reason = self.add_token(chat_id, token, now_block=now_block, allow_over_cap=True)
         if reason == "added":
             self.conn.execute("INSERT OR IGNORE INTO auto_subs(chat_id,token) VALUES(?,?)",
                               (str(chat_id), token))

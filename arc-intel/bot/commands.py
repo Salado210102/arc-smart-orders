@@ -18,10 +18,11 @@ from . import i18n
 from .sender import DirectSender
 
 ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
-ALLOWED_KINDS = {"dev_sell", "compound", "volume_spike"}
-ALL_KINDS = ["dev_sell", "compound", "volume_spike"]
+ALLOWED_KINDS = {"dev_sell", "compound", "volume_spike", "liquidity_removal", "large_sell"}
+ALL_KINDS = ["dev_sell", "compound", "volume_spike", "liquidity_removal", "large_sell"]
 KIND_LABELS = {"dev_sell": "Dev-sell", "compound": "Compound risk",
-               "volume_spike": "Volume spike"}
+               "volume_spike": "Volume spike", "liquidity_removal": "Liquidity removal",
+               "large_sell": "Large sell"}
 
 
 def _enabled_kinds(store, chat) -> set:
@@ -63,8 +64,8 @@ CLOSED_BETA = ("This bot is in closed beta. Send /start to request access and th
 DISCLAIMER = ("Not financial advice. Alerts are informational and derived from on-chain data; "
               "they are not guarantees and can be wrong. Always do your own research.")
 ONBOARDING = ("ARC AI — on-chain risk alerts for Arc.\n"
-              "I watch Arc tokens and warn you about dev-sells, volume collapses and "
-              "compound risk (so you can decide for yourself).\n\n"
+              "I watch the tokens you hold and warn you about dev-sells, compound risk, "
+              "liquidity removals and large sells (so you can decide for yourself).\n\n"
               "Get started:\n"
               "/subscribe <token>   — follow a token (future alerts only)\n"
               "/subscribe_recent [n] [hours] — follow the n most active recent tokens\n"
@@ -73,7 +74,7 @@ ONBOARDING = ("ARC AI — on-chain risk alerts for Arc.\n"
               "/pending             — your [PAPER] proposals\n"
               "/approve <id> [code]   /cancel <id>\n"
               "/stats               — signal value (with both faces)\n"
-              "/settings dev_sell,compound,volume_spike\n\n"
+              "/settings dev_sell,compound,volume_spike,liquidity_removal,large_sell\n\n"
               + DISCLAIMER)
 HELP = ONBOARDING
 
@@ -572,10 +573,10 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
             return "Could not check that token right now."
     if cmd == "/settings":
         if not arg:
-            return "Usage: /settings dev_sell,compound,volume_spike"
+            return "Usage: /settings dev_sell,compound,volume_spike,liquidity_removal,large_sell"
         kinds = {k.strip() for k in arg.split(",") if k.strip()}
         if not kinds or not kinds <= ALLOWED_KINDS:
-            return "Allowed kinds: dev_sell, compound, volume_spike"
+            return "Allowed kinds: dev_sell, compound, volume_spike, liquidity_removal, large_sell"
         store.set_kinds(chat_id, kinds)
         return "Kinds set: " + ",".join(sorted(kinds))
     return "Unknown command. /help"

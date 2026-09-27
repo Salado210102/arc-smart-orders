@@ -62,6 +62,49 @@ class StreamAlertsTests(unittest.TestCase):
         self.assertGreaterEqual(spikes[0].context["z"], 2.5)
         self.assertEqual(spikes[0].severity, "high")
 
+    def test_large_sell_non_creator(self):
+        st = IncrementalState(bucket_blocks=1000, lookback=12, large_sell_usd=1000.0)
+        creators = {"0xtok": "0xdev"}
+        alerts = st.apply_leg(leg("0xwhale", "0xtok", 1000, "sell", 1000.0, 5000.0), creators)
+        self.assertIn("large_sell", [a.kind for a in alerts])
+
+    def test_large_sell_ignores_creator(self):
+        st = IncrementalState(bucket_blocks=1000, lookback=12, large_sell_usd=1000.0)
+        creators = {"0xtok": "0xdev"}
+        st.apply_leg(leg("0xdev", "0xtok", 10, "buy", 100.0, 1.0), creators, emit=False)
+        alerts = st.apply_leg(leg("0xdev", "0xtok", 1000, "sell", 100.0, 5000.0), creators)
+        self.assertNotIn("large_sell", [a.kind for a in alerts])
+
+    def test_old_pickle_is_forward_compatible(self):
+        import pickle
+        st = IncrementalState(bucket_blocks=1000, lookback=12)
+        for k in ("spike_z", "min_spike_usdc", "large_sell_usd", "last_spike_bucket"):
+            st.__dict__.pop(k, None)
+        st2 = pickle.loads(pickle.dumps(st))
+        self.assertEqual(st2.spike_z, 2.5)
+        self.assertEqual(st2.large_sell_usd, 5000.0)
+        self.assertEqual(st2.last_spike_bucket, {})
+
+    def test_atomic_save_and_bak_fallback(self):
+        st = IncrementalState(bucket_blocks=1000, lookback=12)
+        fd, path = tempfile.mkstemp(suffix=".pkl")
+        os.close(fd)
+        try:
+            save_state(path, st, 100)
+            _, cur = load_state(path)
+            self.assertEqual(cur, 100)
+            save_state(path, st, 200)          # rotates previous into .bak
+            with open(path, "wb") as fh:
+                fh.write(b"garbage")           # corrupt the main file
+            _, cur2 = load_state(path)
+            self.assertEqual(cur2, 100)        # recovered from .bak
+        finally:
+            for p in (path, path + ".bak", path + ".tmp"):
+                try:
+                    os.unlink(p)
+                except OSError:
+                    pass
+
     def test_dev_sell_volume_confirmation(self):
         st = IncrementalState(bucket_blocks=1000, lookback=12, min_confirm_usdc=500.0)
         creators = {"0xtok": "0xdev"}

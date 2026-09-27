@@ -178,6 +178,18 @@
   (`store.record_fill` → `add_auto_sub`/`remove_auto_sub`; patrón del wallet tracking). `Protect`
   dispara con **dev_sell / compound** (sin collapse). Tests: +3 (auto-watch, parcial mantiene), +1
   (dispatch no empuja collapse) y ajustes de settings → **260 passed**. Desplegado (servicios activos).
+- **2026-09-27 (vigilancia robusta — hardening)** — Investigación a fondo del pipeline
+  (`docs/ARC_AI_MONITORING.md`) y corrección de **fallos reales**: (G1) refresco de
+  creadores/símbolos **cada ciclo** para los tokens nuevos (antes el dev-sell de tokens nuevos se
+  perdía); (G2) **retirada de liquidez en vivo** (`liquidity_removal`, con `liq_cursor`); (G3)
+  **venta grande** (`large_sell`, ≥$5k y ≥50% del volumen reciente, no-creator); (G8, **crítico**)
+  **crash-loop** al desplegar: un `state.pkl` antiguo no tenía los campos nuevos del dataclass →
+  `IncrementalState.__setstate__` retrocompatible; (G9) `scan_wallets` **movido a su propio hilo**
+  (RPC serial ya no retrasa las alertas); (G10) el resumen por ciclo **no se logueaba** con ingesta
+  OK → ahora se loguea **cada vuelta** con `lag`/`signals`/`watch`. Estado durable (escritura atómica
+  + `.bak`), y auto-sub de tokens **tenidos** que **supera** el tope manual (`MAX_TOKENS`). Señales
+  nuevas visibles en `/settings`: `liquidity_removal`, `large_sell`. Tests **265 passed** (1 fallo
+  ambiental local). Desplegado y verificado: bot sano, `lag:0`, log por ciclo.
 
 ---
 

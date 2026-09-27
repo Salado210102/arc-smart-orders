@@ -243,19 +243,26 @@ def liquidity_removal_alerts(rows: list[dict], min_ratio: float = 0.5) -> list[A
     return out
 
 
-def load_liquidity_removals(storage) -> list[dict]:
+def load_liquidity_removals(storage, since_block: int | None = None) -> list[dict]:
     conn = storage.pool.getconn()
     try:
         with conn.cursor() as cur:
+            where = "(l.liquidity_delta)::numeric < 0"
+            params: list = []
+            if since_block is not None:
+                where += " AND l.block_number > %s"
+                params.append(int(since_block))
+            # Only aggregate the pools that actually have a removal (bounded, fast).
             cur.execute(
-                "WITH agg AS (SELECT pool_id, sum(CASE WHEN (liquidity_delta)::numeric > 0 "
-                "  THEN (liquidity_delta)::numeric ELSE 0 END) AS added "
-                "  FROM v4_liquidity GROUP BY pool_id) "
-                "SELECT l.pool_id, l.sender, l.block_number, (l.liquidity_delta)::numeric, "
-                " t.creator, t.address, a.added, l.salt "
-                "FROM v4_liquidity l LEFT JOIN tokens t ON t.pool_id = l.pool_id "
-                "LEFT JOIN agg a ON a.pool_id = l.pool_id "
-                "WHERE (l.liquidity_delta)::numeric < 0")
+                "WITH rem AS (SELECT pool_id, sender, block_number, liquidity_delta, salt "
+                "  FROM v4_liquidity WHERE " + where + "), "
+                "agg AS (SELECT v.pool_id, sum(CASE WHEN (v.liquidity_delta)::numeric > 0 "
+                "  THEN (v.liquidity_delta)::numeric ELSE 0 END) AS added "
+                "  FROM v4_liquidity v WHERE v.pool_id IN (SELECT pool_id FROM rem) GROUP BY v.pool_id) "
+                "SELECT r.pool_id, r.sender, r.block_number, (r.liquidity_delta)::numeric, "
+                " t.creator, t.address, a.added, r.salt "
+                "FROM rem r LEFT JOIN tokens t ON t.pool_id = r.pool_id "
+                "LEFT JOIN agg a ON a.pool_id = r.pool_id", params)
             return [{"pool_id": r[0], "sender": r[1], "block": int(r[2]), "delta": float(r[3] or 0),
                      "creator": r[4], "token": r[5], "added": float(r[6] or 0), "salt": r[7]}
                     for r in cur.fetchall()]

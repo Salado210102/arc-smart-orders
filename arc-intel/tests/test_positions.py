@@ -103,6 +103,12 @@ class StorePositionTests(unittest.TestCase):
         self.store.record_fill("s1", 1, TOK, "sell", 40.0, 120.0)    # partial
         self.assertTrue(self.store.is_auto_sub(1, TOK))
 
+    def test_auto_sub_bypasses_manual_cap(self):
+        self.store.MAX_TOKENS = 1
+        self.store.add_token(1, "0x" + "1" * 40)          # fills the manual cap
+        self.store.add_auto_sub(1, "0x" + "2" * 40)       # a held token must still be watched
+        self.assertTrue(self.store.is_auto_sub(1, "0x" + "2" * 40))
+
 
 if __name__ == "__main__":
     unittest.main()
