@@ -148,13 +148,11 @@ auditoría + hot key acotada; no es lo primero).
   caliente).
 - **Velocidad real = infra** (RPC / keeper / inclusión), no la firma.
 
-### 4 decisiones (recomendación para cerrar mañana)
-1. **Duración:** **30 días** por defecto (configurable; expira sola). Es una red de seguridad → interesa
-   que dure y no re-firmar a diario.
+### 4 decisiones — ✅ CONFIRMADAS (2026-09-28)
+1. **Duración:** **30 días** por defecto (configurable; expira sola).
 2. **`minOut` en standby:** **configurable**; por defecto **−30%** del precio al firmar, con opción
-   **"salir a cualquier precio"** (suelo muy bajo) para rug. Un suelo muy ajustado no entra en un desplome.
-3. **Cancelación:** **botón cancelar on-chain** (`cancelOrder` consume el nonce → la orden **nunca** puede
-   ejecutarse aunque hackeen el keeper) **+ expiración**. Recomendado.
+   **"salir a cualquier precio"** (suelo muy bajo) para rug.
+3. **Cancelación:** **botón cancelar on-chain** (`cancelOrder` consume el nonce) **+ expiración**.
 4. **Alcance:** **solo venta/proteger** el día 1; **compras límite** en fase 2.
 
 **Próximo paso (mañana):** empezar por la **UX de firma**, que desbloquea el resto.
