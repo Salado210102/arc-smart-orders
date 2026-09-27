@@ -148,12 +148,62 @@ auditoría + hot key acotada; no es lo primero).
   caliente).
 - **Velocidad real = infra** (RPC / keeper / inclusión), no la firma.
 
-### 4 decisiones pendientes (cerrar mañana a primera hora)
-1. **Duración** de la orden (7 días / 30 días).
-2. **`minOut` en standby** (suelo p. ej. −30%, o control fino).
-3. **Cancelación** (solo expiración, o botón `cancelOrder` on-chain).
-4. **Alcance** (solo venta/proteger al inicio, o también compras límite).
+### 4 decisiones (recomendación para cerrar mañana)
+1. **Duración:** **30 días** por defecto (configurable; expira sola). Es una red de seguridad → interesa
+   que dure y no re-firmar a diario.
+2. **`minOut` en standby:** **configurable**; por defecto **−30%** del precio al firmar, con opción
+   **"salir a cualquier precio"** (suelo muy bajo) para rug. Un suelo muy ajustado no entra en un desplome.
+3. **Cancelación:** **botón cancelar on-chain** (`cancelOrder` consume el nonce → la orden **nunca** puede
+   ejecutarse aunque hackeen el keeper) **+ expiración**. Recomendado.
+4. **Alcance:** **solo venta/proteger** el día 1; **compras límite** en fase 2.
 
 **Próximo paso (mañana):** empezar por la **UX de firma**, que desbloquea el resto.
+
+---
+
+## 12. Ideas diferenciales (atraer público — que la competencia no tiene)
+> Los bots grandes (Maestro, Banana Gun, Trojan, Photon) son **custodiales, genéricos y "casino"**.
+> Nuestro foso: **capa de SEGURIDAD para memecoins de Arc, sin custodia y honesta**.
+
+### A. Seguridad (ventaja #1 — nadie la da)
+1. **🛡️ Kill-switch no-custodial** (auto-salida en dev-sell) — producto estrella (Opción 2).
+2. **Reputación on-chain del creador** — si el dev ya rugueó, avisar **antes** de comprar (historial de carteras).
+3. **Detección de bundle/insider** — snipers/bundles que entran en el mismo bloque al lanzar (ya tenemos `coordinated_clusters`).
+4. **Badge de LP bloqueada y verificable** — sello de confianza (Argus ya la bloquea por construcción).
+5. **Chequeo anti-impostor** — tokens que imitan símbolo/nombre de otro (phishing).
+6. **"Rug risk score"** por token (dev%, snipers, liquidez, actividad), calculado on-chain y **verificable**.
+
+### B. Arc-nativo (nadie sirve Arc de verdad)
+7. **Primer bot hecho PARA Arc** (USDC gas, bloques sub-segundo).
+8. **Terminal (TMA)** con precio y **PnL en vivo por websocket** — UX estilo GMGN.
+9. **Bridge no-custodial** (Base/Solana → Arc USDC) + aviso al llegar.
+10. **Whale watch de Arc** — compras/ventas grandes en tiempo real.
+
+### C. Honestidad (imposible de copiar sin cambiar su modelo)
+11. **Track record público y verificable** (con las **dos caras**).
+12. **Modo práctica [PAPER]** (ya lo tenemos): "aprende antes de arriesgar".
+13. **PnL honesto** de tu wallet (solo lectura), sin ocultar pérdidas.
+
+### D. Economía / growth (ya diseñado)
+14. **Concurso por volumen** trader + afiliado (50/50, cada 12 h).
+15. **Referidos de por vida** con números que cierran.
+16. **Insignias/rangos** por uso (retención).
+
+### E. Descubrimiento (arriba del embudo)
+17. **Feed de lanzamientos de Arc** (Argus) con filtro de seguridad.
+18. **Ranking semanal de launchpads** por seguridad/actividad (ya hicimos clustering de hooks).
+19. **"Antes de comprar"**: pegas la CA y te dice **riesgo** (no solo el precio).
+
+### Prioridad recomendada
+1. **Kill-switch no-custodial** (Opción 2) — diferenciador nº1.
+2. **Reputación on-chain del creador** (usa datos que ya indexamos; rápido y único).
+3. **Badge LP bloqueada + rug risk score**.
+4. **Terminal TMA con PnL en vivo (websocket)**.
+
+**Foso real:** A (seguridad) + B (Arc-nativo) no los puede copiar fácil un custodial genérico.
 - **2026-09-27 (madrugada)** — Se elige la **Opción 2 (órdenes pre-firmadas)** para velocidad; Opción 3
   (session keys) diferida. 4 decisiones pendientes (duración, `minOut` standby, cancelación, alcance).
+- **2026-09-27 (tarde)** — Bot: `/check` con **Buy** (importes $10/$20/$50/$100 u "Other"), **PnL** y
+  **venta 25/50/75/100%** con 1 clic ([PAPER], botón 🔄 para refrescar precio). Añadida sección
+  **12 · Ideas diferenciales** (seguridad on-chain, Arc-nativo, honestidad) y **recomendaciones** para
+  las 4 decisiones de la Opción 2.
