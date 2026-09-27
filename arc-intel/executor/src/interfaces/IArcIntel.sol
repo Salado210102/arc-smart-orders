@@ -34,6 +34,10 @@ interface IPermit2 {
         string calldata witnessTypeString,
         bytes calldata signature
     ) external;
+
+    //  Allowance-based pull (no per-order signature): requires the owner to have called
+    //  Permit2.approve(token, spender, amount, expiration) beforehand.
+    function transferFrom(address from, address to, uint160 amount, address token) external;
 }
 
 /// @dev Canonical Uniswap v4 PoolManager. `Currency` is an `address` at the ABI level,

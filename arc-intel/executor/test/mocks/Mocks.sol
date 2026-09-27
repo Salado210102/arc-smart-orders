@@ -57,6 +57,11 @@ contract MockPermit2 {
         lastAmount = permit.permitted.amount;
         MockERC20(permit.permitted.token).transferFrom(owner, transferDetails.to, transferDetails.requestedAmount);
     }
+
+    //  Allowance-based pull used by the session path.
+    function transferFrom(address from, address to, uint160 amount, address token) external {
+        MockERC20(token).transferFrom(from, to, amount);
+    }
 }
 
 /// @dev Simulates just enough of the v4 PoolManager: unlock callback, swap delta, take/sync/settle.

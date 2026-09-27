@@ -98,9 +98,13 @@ Reusa lo que ya tenemos (Permit2 + v4, no-custodia) y añade sesiones:
 
 ## 7. Fases de implementación
 
-1. **Diseño** (este doc) + decisión de arquitectura. ← estamos aquí
-2. **Contrato** `ArcIntelExecutor v2` (o módulo `SessionModule`) con sesiones + **tests Foundry**
-   (authorize/revoke/scope/expiry/topos/allowance-pull).
+1. **Diseño** (este doc) + decisión de arquitectura. ✅ hecho (arquitectura **B**).
+2. **Contrato** `ArcIntelExecutorV2` con sesiones + **tests Foundry**. ✅ hecho
+   (`src/ArcIntelExecutorV2.sol`; **13/13 tests** de la v2; suite Foundry **41 passed**, v1 intacta).
+   - `authorizeSession`/`revokeSession`; `executeWithSession(order, sig)`.
+   - Scope on-chain: pool + tokenIn + `maxPerOrder` + `maxTotal` + `minOutFloor` + `expiry` +
+     `recipient == user` + nonce single-use; pull vía **Permit2 `transferFrom`** (allowance, sin firma).
+   - EIP-712 propio (`DOMAIN_SEPARATOR`), baja-s, recover.
 3. **Backend**: generación y **cifrado** de session keys, gestión de scope, y `keeper` usando la
    sesión (sin firma por orden).
 4. **UI**: onboarding "activar trading 1-toque", estado de sesión, revocar.
