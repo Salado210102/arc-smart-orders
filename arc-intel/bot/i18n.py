@@ -68,6 +68,11 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "subs_header": {"en": "Subscribed tokens:", "es": "Tokens suscritos:", "zh": "已订阅代币："},
     "language_choose": {"en": "Choose your language:", "es": "Elige tu idioma:", "zh": "请选择语言："},
+    "settings_text": {
+        "en": "\u2699\uFE0F <b>Alert settings</b>\nTap to turn each alert on/off:",
+        "es": "\u2699\uFE0F <b>Ajustes de alertas</b>\nToca para activar/desactivar cada alerta:",
+        "zh": "\u2699\uFE0F <b>提醒设置</b>\n点击开启/关闭每种提醒：",
+    },
     "language_set": {"en": "Language set to English.", "es": "Idioma cambiado a Español.",
                      "zh": "语言已设置为中文。"},
     "btn_alerts": {"en": "\U0001F514 My alerts", "es": "\U0001F514 Mis alertas", "zh": "\U0001F514 我的提醒"},
@@ -79,6 +84,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "btn_language": {"en": "\U0001F1EC\U0001F1E7 Language", "es": "\U0001F1EA\U0001F1F8 Idioma",
                      "zh": "\U0001F1E8\U0001F1F3 语言"},
     "btn_help": {"en": "\u2753 Help", "es": "\u2753 Ayuda", "zh": "\u2753 帮助"},
+    "btn_docs": {"en": "\U0001F4DA Documentation", "es": "\U0001F4DA Documentaci\u00F3n",
+                 "zh": "\U0001F4DA \u6587\u6863"},
     "btn_wallet": {"en": "\U0001F517 Connect wallet", "es": "\U0001F517 Conectar cartera",
                    "zh": "\U0001F517 连接钱包"},
     "btn_signals": {"en": "\U0001F4C8 Signals \u00B7 soon", "es": "\U0001F4C8 Señales \u00B7 pronto",
@@ -115,20 +122,28 @@ TEXTS: dict[str, dict[str, str]] = {
         "es": "\U0001F517 Cartera conectada (solo lectura): <code>{addr}</code>",
         "zh": "\U0001F517 已连接钱包（只读）：<code>{addr}</code>",
     },
+    "wallet_balances": {
+        "en": "\U0001F4B0 Balance: <b>{native:.4f} USDC</b> (native) \u00B7 <b>{usdc:.2f} USDC</b> (ERC-20)",
+        "es": "\U0001F4B0 Saldo: <b>{native:.4f} USDC</b> (nativo) \u00B7 <b>{usdc:.2f} USDC</b> (ERC-20)",
+        "zh": "\U0001F4B0 余额：<b>{native:.4f} USDC</b>（原生）\u00B7 <b>{usdc:.2f} USDC</b>（ERC-20）",
+    },
+    "btn_connect": {"en": "\U0001F517 Connect wallet", "es": "\U0001F517 Conectar cartera",
+                    "zh": "\U0001F517 连接钱包"},
+    "btn_change_wallet": {"en": "\U0001F504 Change wallet", "es": "\U0001F504 Cambiar cartera",
+                          "zh": "\U0001F504 更换钱包"},
+    "btn_disconnect": {"en": "\u274C Disconnect", "es": "\u274C Desconectar", "zh": "\u274C 断开"},
+    "btn_refresh": {"en": "\U0001F501 Refresh", "es": "\U0001F501 Actualizar", "zh": "\U0001F501 刷新"},
+    "wallet_disconnected": {"en": "\u2705 Wallet disconnected.", "es": "\u2705 Cartera desconectada.",
+                            "zh": "\u2705 钱包已断开。"},
     "wallet_text": {
-        "en": ("\U0001F510 <b>Wallet (non-custodial)</b>\n\n"
+        "en": ("\U0001F510 <b>Wallet (non-custodial)</b>\n"
                "SNIPER IA never holds your funds or keys. You trade with <b>your own wallet</b> and "
-               "sign every order yourself.\n\n"
-               "There is no deposit/withdraw inside the bot: your money stays in your wallet. "
-               "A connect-wallet option is coming."),
-        "es": ("\U0001F510 <b>Cartera (no-custodial)</b>\n\n"
+               "sign every order yourself. No deposit/withdraw inside the bot."),
+        "es": ("\U0001F510 <b>Cartera (no-custodial)</b>\n"
                "SNIPER IA nunca guarda tus fondos ni tus claves. Operas con <b>tu propia cartera</b> y "
-               "firmas tú cada orden.\n\n"
-               "No hay depósito/retiro dentro del bot: tu dinero sigue en tu cartera. "
-               "La opción de conectar cartera llegará pronto."),
-        "zh": ("\U0001F510 <b>钱包（非托管）</b>\n\n"
-               "SNIPER IA 从不保管你的资金或私钥。你使用<b>自己的钱包</b>交易，并亲自签署每一笔订单。\n\n"
-               "机器人内没有充值/提现：资金始终在你的钱包里。连接钱包功能即将上线。"),
+               "firmas tú cada orden. Sin depósito/retiro dentro del bot."),
+        "zh": ("\U0001F510 <b>钱包（非托管）</b>\n"
+               "SNIPER IA 从不保管你的资金或私钥。你使用<b>自己的钱包</b>交易并亲自签署每笔订单。机器人内无充值/提现。"),
     },
     "btn_check_now": {"en": "\u26A1 Check a token now", "es": "\u26A1 Consultar un token ahora",
                       "zh": "\u26A1 立即查询代币"},

@@ -17,6 +17,45 @@ from . import i18n
 
 ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 ALLOWED_KINDS = {"dev_sell", "volume_collapse", "compound"}
+ALL_KINDS = ["dev_sell", "volume_collapse", "compound"]
+KIND_LABELS = {"dev_sell": "Dev-sell", "volume_collapse": "Volume collapse",
+               "compound": "Compound risk"}
+
+
+def _enabled_kinds(store, chat) -> set:
+    """Empty stored set = all enabled (default); {'none'} = all muted."""
+    row = store.get(chat)
+    cur = set(row["kinds"]) if row else set()
+    if not cur:
+        return set(ALL_KINDS)
+    if cur == {"none"}:
+        return set()
+    return cur
+
+
+def settings_screen(store, chat, lang) -> dict:
+    enabled = _enabled_kinds(store, chat)
+    rows = []
+    for k in ALL_KINDS:
+        mark = "\u2705" if k in enabled else "\u2B1C"
+        rows.append([{"text": f"{mark} {KIND_LABELS[k]}", "data": f"setkind:{k}"}])
+    return {"text": i18n.t("settings_text", lang), "inline": rows, "parse_mode": "HTML"}
+
+
+def _toggle_kind(store, chat, kind) -> None:
+    if kind not in ALLOWED_KINDS:
+        return
+    enabled = _enabled_kinds(store, chat)
+    if kind in enabled:
+        enabled.discard(kind)
+    else:
+        enabled.add(kind)
+    if len(enabled) == len(ALL_KINDS):
+        store.set_kinds(chat, set())      # default (empty = all)
+    elif not enabled:
+        store.set_kinds(chat, {"none"})   # muted
+    else:
+        store.set_kinds(chat, enabled)
 CLOSED_BETA = ("This bot is in closed beta. Send /start to request access and the operator "
                "will enable it if there is room.")
 DISCLAIMER = ("Not financial advice. Alerts are informational and derived from on-chain data; "
@@ -95,11 +134,19 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
     cmd = (norm.split() or [""])[0].lower().split("@")[0]
     if cmd == "/language":
         return {"text": i18n.t("language_choose", lang), "inline": i18n.language_buttons()}
+    if cmd == "/settings" and len(norm.split()) == 1:
+        return settings_screen(store, chat_id, lang)
+    if cmd == "/wallet":
+        return wallet_screen(store, chat_id, lang)
     reply = command_reply(norm, chat_id, store, token_exists, check_fn, now_block,
                           recent_fn=recent_fn, paper_price_fn=paper_price_fn, symbol_fn=symbol_fn)
-    if cmd in ("/start", "/help", "/menu"):
+    if cmd == "/help":
+        btns = i18n.menu_buttons(lang)
+        btns.append([{"text": i18n.t("btn_docs", lang), "url": i18n.DOCS_URL}])
+        return {"text": reply, "inline": btns, "parse_mode": "HTML"}
+    if cmd in ("/start", "/menu"):
         return {"text": reply, "inline": i18n.menu_buttons(lang), "parse_mode": "HTML"}
-    if cmd in ("/list", "/stats", "/wallet", "/connect"):
+    if cmd in ("/list", "/stats", "/wallet", "/connect", "/check"):
         return {"text": reply, "parse_mode": "HTML"}
     return reply
 
@@ -114,6 +161,31 @@ def is_authorized(store, chat_id) -> bool:
 def _is_admin(store, chat_id) -> bool:
     admin = store.get_state("admin_chat")
     return bool(admin and str(chat_id) == str(admin))
+
+
+def wallet_screen(store, chat, lang) -> dict:
+    from . import tokenmeta as _tm
+    w = store.get_wallet(chat)
+    note = i18n.t("wallet_text", lang)
+    rows = []
+    if w:
+        bal = ""
+        try:
+            nat = _tm.native_balance_eth(w) / 1e18
+            usd = _tm.erc20_balance(w)
+            bal = i18n.t("wallet_balances", lang).format(native=nat, usdc=usd)
+        except Exception:
+            bal = ""
+        head = i18n.t("wallet_connected", lang).format(addr=w)
+        text = head + (("\n" + bal) if bal else "") + "\n\n" + note
+        rows.append([{"text": i18n.t("btn_change_wallet", lang), "data": "cmd:/connect"},
+                     {"text": i18n.t("btn_disconnect", lang), "data": "disconnect"}])
+        rows.append([{"text": i18n.t("btn_refresh", lang), "data": "wallet:refresh"}])
+    else:
+        text = i18n.t("wallet_none", lang) + "\n\n" + note
+        rows.append([{"text": i18n.t("btn_connect", lang), "data": "cmd:/connect"}])
+        rows.append([{"text": i18n.t("btn_refresh", lang), "data": "wallet:refresh"}])
+    return {"text": text, "inline": rows, "parse_mode": "HTML"}
 
 
 def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: int,
@@ -230,8 +302,8 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
         if not row or not row["tokens"]:
             return i18n.t("no_subs", lang)
         toks = sorted(row["tokens"])
-        kinds = ", ".join(sorted(row["kinds"])) or "all"
-        lines = [f"\U0001F4CB <b>{i18n.t('subs_header', lang)}</b> \u00B7 {len(toks)}"]
+        kinds = " \u00B7 ".join(sorted(row["kinds"])) or "all"
+        lines = [f"\U0001F4CB <b>{i18n.t('subs_header', lang)}</b>  <i>({len(toks)})</i>", ""]
         for i, tok in enumerate(toks, 1):
             sym = ""
             if symbol_fn:
@@ -239,12 +311,13 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
                     sym = symbol_fn(tok) or ""
                 except Exception:
                     sym = ""
+            short = tok[:6] + "\u2026" + tok[-4:]
             if sym:
-                lines.append(f"{i}. <b>{_html.escape(sym)}</b> \u00B7 <code>{tok}</code>")
+                lines.append(f"{i}. <b>{_html.escape(sym)}</b>  \u00B7  <code>{short}</code>")
             else:
-                lines.append(f"{i}. <code>{tok}</code>")
+                lines.append(f"{i}. <code>{short}</code>")
         lines.append("")
-        lines.append(f"\u2699\uFE0F <b>{kinds}</b>")
+        lines.append(f"\u2699\uFE0F {_html.escape(kinds)}")
         return "\n".join(lines)
     if cmd == "/subscribe":
         if not arg:
@@ -320,7 +393,8 @@ def _emit(transport, chat, reply) -> str:
     """Send a reply. Never raise: if the formatted (HTML) send fails, retry as plain text."""
     if isinstance(reply, dict):
         text = reply["text"]
-        kw = {"keyboard": reply.get("keyboard"), "inline": reply.get("inline")}
+        kw = {"keyboard": reply.get("keyboard"), "inline": reply.get("inline"),
+              "remove_keyboard": reply.get("remove_keyboard", False)}
         try:
             transport.send(chat, text, parse_mode=reply.get("parse_mode"), **kw)
         except Exception:
@@ -336,14 +410,20 @@ def _emit(transport, chat, reply) -> str:
     return reply
 
 
-def _answer_callback(bot_token, callback_id) -> None:
+def _answer_callback(bot_token, callback_id) -> bool:
     try:
         url = f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery"
         body = json.dumps({"callback_query_id": callback_id}).encode()
         req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
         urllib.request.urlopen(req, timeout=10).read()
-    except Exception:
-        pass
+        return True
+    except Exception as exc:
+        try:
+            with open("/root/arc-intel/answer.log", "a", encoding="utf-8") as fh:
+                fh.write(f"{int(time.time())} {type(exc).__name__} {getattr(exc, 'code', '')}\n")
+        except OSError:
+            pass
+        return False
 
 
 def _handle_callback(data, chat, store, token_exists, check_fn, now_block,
@@ -358,6 +438,20 @@ def _handle_callback(data, chat, store, token_exists, check_fn, now_block,
         return {"text": i18n.t("language_choose", lang), "inline": i18n.language_buttons()}
     if data.startswith("soon:"):
         return i18n.t("soon_text", lang)
+    if data.startswith("setkind:"):
+        _toggle_kind(store, chat, data.split(":", 1)[1])
+        screen = settings_screen(store, chat, lang)
+        screen["edit"] = True
+        return screen
+    if data == "disconnect":
+        store.set_wallet(chat, "")
+        screen = wallet_screen(store, chat, lang)
+        screen["edit"] = True
+        return screen
+    if data == "wallet:refresh":
+        screen = wallet_screen(store, chat, lang)
+        screen["edit"] = True
+        return screen
     if data.startswith("cmd:"):
         return command_reply_rich(data[4:], chat, store, token_exists, check_fn, now_block,
                                   recent_fn=recent_fn, paper_price_fn=paper_price_fn, symbol_fn=symbol_fn)
@@ -375,6 +469,11 @@ def _log_command(chat, cmd, reply) -> None:
 
 def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
               recent_fn=None, paper_price_fn=None, symbol_fn=None, timeout: int = 25) -> int:
+    try:
+        with open("/root/arc-intel/poll.log", "a", encoding="utf-8") as fh:
+            fh.write(str(int(time.time())) + "\n")
+    except OSError:
+        pass
     offset = int(store.get_state("tg_offset", "0") or 0)
     if offset == 0:
         # skip any backlog so we don't reply to old messages
@@ -394,7 +493,9 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
         cb = u.get("callback_query")
         if cb:
             _answer_callback(bot_token, cb.get("id"))
-            chat = ((cb.get("message") or {}).get("chat") or {}).get("id")
+            cm = cb.get("message") or {}
+            chat = (cm.get("chat") or {}).get("id")
+            message_id = cm.get("message_id")
             if chat is None:
                 continue
             data = cb.get("data") or ""
@@ -408,7 +509,16 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
                                              symbol_fn=symbol_fn)
                 except Exception as exc:
                     reply = f"Error handling action: {type(exc).__name__}"
-                log_reply = _emit(transport, chat, reply)
+                if isinstance(reply, dict) and reply.get("edit") and message_id is not None:
+                    try:
+                        transport.edit_message(chat, message_id, reply["text"],
+                                               parse_mode=reply.get("parse_mode"),
+                                               inline=reply.get("inline"))
+                    except Exception:
+                        _emit(transport, chat, reply)
+                    log_reply = reply["text"]
+                else:
+                    log_reply = _emit(transport, chat, reply)
             _log_command(chat, f"cb:{data}", log_reply)
             n += 1
             continue

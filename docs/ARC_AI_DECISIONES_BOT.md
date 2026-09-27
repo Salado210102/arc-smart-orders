@@ -96,6 +96,11 @@
 - Qué parte del **bot de alertas actual** se reutiliza tal cual vs se integra en la TMA.
 - Moneda/representación del pozo y pagos (USDC, on-chain).
 - Cuándo arranca el primer concurso y cómo se comunican las reglas.
+- **URL de documentación** (botón Help): hoy apunta al repo GitHub; sustituir por **web/Notion propia**
+  cuando exista (configurable con `ARC_INTEL_DOCS_URL`, sin tocar código).
+- **Botones "pronto"**: Signals · Copytrade · Bridge · Premium (y la **TMA / terminal**).
+- **Trading real**: desplegar el executor en **mainnet** + **firma con la wallet del usuario** +
+  **auditoría**. (Hoy: solo testnet, y conectar wallet es solo informativo.)
 
 ## 9. Artefactos y estado
 | Artefacto | Estado |
@@ -115,3 +120,10 @@
   por usuario); botón **Connect wallet** watch-only (no-custodial); **logos de token** desde Argus
   `image_uri` (IPFS→`gateway.pinata.cloud`, fallback DexScreener) en las alertas; `/list` con símbolo;
   envío directo por HTTP + conexión propia del hilo de comandos (latencia ~0.24 s/botón). Tests 50/50.
+- **2026-09-27 (botón a botón)** — Revisados con el usuario: `/list` (nombres por tabla o RPC + dirección
+  corta); `/check` ampliado (nombre, launchpad, creador, antigüedad, actividad, **precio**, **market cap**,
+  **volumen 24h**, estado, explorer); `/settings` con **interruptores** (dev_sell / volume_collapse /
+  compound); `/wallet` con **saldo** y botones (cambiar / desconectar / actualizar); `/help` con enlace a
+  **Documentación**. Comandos registrados EN/ES/ZH (botón “/” en web y móvil) y **teclado fijo eliminado**.
+  Pendiente: URL de documentación propia, botones "pronto" (Signals/Copytrade/Bridge/Premium + TMA),
+  trading real (mainnet + firma + auditoría).

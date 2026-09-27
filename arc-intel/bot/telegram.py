@@ -74,10 +74,70 @@ def load_token() -> str | None:
     return None
 
 
+def set_bot_commands(token: str, timeout: int = 10) -> bool:
+    """Register the bot's command list (the square 'menu' button in Telegram). Best-effort."""
+    import urllib.request
+
+    def post(method, payload):
+        url = f"https://api.telegram.org/bot{token}/{method}"
+        req = urllib.request.Request(url, data=json.dumps(payload).encode(),
+                                     headers={"Content-Type": "application/json"})
+        return urllib.request.urlopen(req, timeout=timeout).read()
+
+    en = [
+        {"command": "start", "description": "Start / menu"},
+        {"command": "list", "description": "My alerts"},
+        {"command": "check", "description": "Check a token"},
+        {"command": "stats", "description": "Signal stats"},
+        {"command": "pending", "description": "Pending proposals"},
+        {"command": "positions", "description": "Paper positions"},
+        {"command": "wallet", "description": "Connect wallet"},
+        {"command": "settings", "description": "Alert settings"},
+        {"command": "language", "description": "Language"},
+        {"command": "disclaimer", "description": "Disclaimer"},
+        {"command": "help", "description": "Help"},
+    ]
+    es = [
+        {"command": "start", "description": "Iniciar / menú"},
+        {"command": "list", "description": "Mis alertas"},
+        {"command": "check", "description": "Consultar token"},
+        {"command": "stats", "description": "Estadísticas"},
+        {"command": "pending", "description": "Pendientes"},
+        {"command": "positions", "description": "Posiciones"},
+        {"command": "wallet", "description": "Conectar cartera"},
+        {"command": "settings", "description": "Ajustes"},
+        {"command": "language", "description": "Idioma"},
+        {"command": "disclaimer", "description": "Aviso legal"},
+        {"command": "help", "description": "Ayuda"},
+    ]
+    zh = [
+        {"command": "start", "description": "\u5f00\u59cb / \u83dc\u5355"},
+        {"command": "list", "description": "\u6211\u7684\u63d0\u9192"},
+        {"command": "check", "description": "\u67e5\u8be2\u4ee3\u5e01"},
+        {"command": "stats", "description": "\u7edf\u8ba1"},
+        {"command": "pending", "description": "\u5f85\u5904\u7406"},
+        {"command": "positions", "description": "\u6301\u4ed3"},
+        {"command": "wallet", "description": "\u8fde\u63a5\u94b1\u5305"},
+        {"command": "settings", "description": "\u8bbe\u7f6e"},
+        {"command": "language", "description": "\u8bed\u8a00"},
+        {"command": "disclaimer", "description": "\u514d\u8d23\u58f0\u660e"},
+        {"command": "help", "description": "\u5e2e\u52a9"},
+    ]
+    try:
+        post("setMyCommands", {"commands": en})
+        post("setMyCommands", {"commands": es, "language_code": "es"})
+        post("setMyCommands", {"commands": zh, "language_code": "zh"})
+        post("setChatMenuButton", {"menu_button": {"type": "commands"}})
+        return True
+    except Exception:
+        return False
+
+
 class ConsoleTransport:
     send_html = False
 
-    def send(self, chat_id, text: str, parse_mode=None, keyboard=None, inline=None) -> None:
+    def send(self, chat_id, text: str, parse_mode=None, keyboard=None, inline=None,
+             remove_keyboard=False) -> None:
         print(f"----- Telegram -> chat {chat_id} -----")
         print(text)
         if keyboard:
@@ -92,6 +152,11 @@ class ConsoleTransport:
         print(caption)
         print("-------------------------------------------")
 
+    def edit_message(self, chat_id, message_id, text, parse_mode=None, inline=None) -> None:
+        print(f"----- Telegram EDIT -> chat {chat_id} msg {message_id} -----")
+        print(text)
+        print("-------------------------------------------")
+
 
 class TelegramTransport:
     send_html = True
@@ -104,13 +169,15 @@ class TelegramTransport:
         self.token = token
 
     def send(self, chat_id, text: str, parse_mode=None, keyboard=None,
-             inline=None) -> None:  # pragma: no cover (needs network)
+             inline=None, remove_keyboard=False) -> None:  # pragma: no cover (needs network)
         # Direct HTTP call: no per-message client/event-loop setup -> much lower latency.
         import urllib.request
         payload = {"chat_id": chat_id, "text": text, "disable_web_page_preview": True}
         if parse_mode:
             payload["parse_mode"] = parse_mode
-        if keyboard:
+        if remove_keyboard:
+            payload["reply_markup"] = {"remove_keyboard": True}
+        elif keyboard:
             payload["reply_markup"] = {
                 "keyboard": keyboard, "resize_keyboard": True, "is_persistent": True}
         elif inline:
@@ -147,6 +214,28 @@ class TelegramTransport:
                 kb.append(r)
             payload["reply_markup"] = {"inline_keyboard": kb}
         url = f"https://api.telegram.org/bot{self.token}/sendPhoto"
+        req = urllib.request.Request(url, data=json.dumps(payload).encode(),
+                                     headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=30).read()
+
+    def edit_message(self, chat_id, message_id, text, parse_mode=None,
+                     inline=None) -> None:  # pragma: no cover (needs network)
+        import urllib.request
+        payload = {"chat_id": chat_id, "message_id": message_id, "text": text,
+                   "disable_web_page_preview": True}
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+        if inline:
+            rows = inline if isinstance(inline[0], list) else [inline]
+            kb = []
+            for row in rows:
+                r = []
+                for b in row:
+                    r.append({"text": b["text"], "url": b["url"]} if b.get("url")
+                             else {"text": b["text"], "callback_data": b.get("data")})
+                kb.append(r)
+            payload["reply_markup"] = {"inline_keyboard": kb}
+        url = f"https://api.telegram.org/bot{self.token}/editMessageText"
         req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                      headers={"Content-Type": "application/json"})
         urllib.request.urlopen(req, timeout=30).read()
@@ -247,30 +336,94 @@ class AlertLoop:
 
 
 def check_token(storage, token: str) -> str:
-    """On-demand /check <token>: thin-market status + basic activity (no push)."""
+    """On-demand /check <token>: rich token card (HTML)."""
+    import html as _h
     from indexer.alerts import is_thin_market
+
+    BLOCKS_24H = 166153  # ~24h at 0.52 s/block
+    token = (token or "").lower()
     conn = storage.pool.getconn()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT min(block_number) FROM launchpad_events "
-                        "WHERE event_name='TokenCreated' AND token=%s", (token,))
-            cb = cur.fetchone()[0]
-            cur.execute("SELECT count(*), count(DISTINCT wallet), max(block) FROM legs "
-                        "WHERE token=%s", (token,))
-            n, w, lb = cur.fetchone()
-            cur.execute("SELECT max(block_number) FROM swaps")
+            cur.execute("SELECT symbol,name,creator,launchpad,pool_id FROM tokens "
+                        "WHERE address=%s OR lower(address)=%s LIMIT 1", (token, token))
+            row = cur.fetchone()
+            symbol = name = creator = launchpad = pool_id = None
+            if row:
+                symbol, name, creator, launchpad, pool_id = row
+            cur.execute("SELECT block_number, topics FROM launchpad_events "
+                        "WHERE event_name='TokenCreated' AND token=%s LIMIT 1", (token,))
+            ev = cur.fetchone()
+            created_block = int(ev[0]) if ev else None
+            if ev and not creator and ev[1]:
+                parts = ev[1].split(",")
+                if len(parts) >= 3:
+                    creator = "0x" + parts[2][-40:]
+            cur.execute("SELECT count(*), count(DISTINCT wallet), min(block), max(block) "
+                        "FROM legs WHERE token=%s", (token,))
+            n, w, first_blk, last_blk = cur.fetchone()
+            cur.execute("SELECT max(block) FROM legs")
             head = int(cur.fetchone()[0] or 0)
+            cur.execute("SELECT coalesce(sum(stable_value),0) FROM legs "
+                        "WHERE token=%s AND block >= %s", (token, head - BLOCKS_24H))
+            vol24 = float(cur.fetchone()[0] or 0)
+            cur.execute("SELECT price FROM legs WHERE token=%s ORDER BY block DESC LIMIT 1", (token,))
+            pr = cur.fetchone()
+            price = float(pr[0]) if pr and pr[0] is not None else 0.0
     finally:
         storage.pool.putconn(conn)
+
     n = int(n or 0)
     w = int(w or 0)
-    age = (head - int(cb)) if cb else 0
-    reason = is_thin_market(n, w, age, no_trade_blocks=100000) if cb else None
-    status = f"THIN MARKET ({reason})" if reason else "has market activity"
-    return (f"check {token}\n"
-            f"- created: block {cb} | age: {age} blocks\n"
-            f"- activity: {n} swaps, {w} distinct wallets\n"
-            f"- status: {status}")
+    if not symbol:
+        symbol = tokenmeta.rpc_symbol(token) or ""
+    supply = tokenmeta.rpc_total_supply(token)
+    dec = tokenmeta.rpc_decimals(token)
+    supply_h = supply / (10 ** dec) if supply else 0.0
+    mcap = price * supply_h
+    if price >= 0.01:
+        price_txt = f"${price:,.4f}"
+    elif price >= 1e-6:
+        price_txt = f"${price:.8f}"
+    elif price > 0:
+        price_txt = f"${price:.2e}"
+    else:
+        price_txt = "n/a"
+
+    def _usd(v):
+        return f"${v:,.0f}" if v else "n/a"
+
+    first = int(first_blk) if first_blk else None
+    ob = created_block or first
+    age = (head - ob) if ob else 0
+    secs = age * 0.52
+    if secs >= 86400:
+        age_txt = f"{secs / 86400:.1f} d"
+    elif secs >= 3600:
+        age_txt = f"{secs / 3600:.1f} h"
+    else:
+        age_txt = f"{secs / 60:.0f} min"
+    thin = is_thin_market(n, w, age, no_trade_blocks=100000) if ob else None
+    status = f"\u26A0\uFE0F thin market ({thin})" if thin else "\U0001F7E2 has market activity"
+
+    hd = f"<b>{_h.escape(symbol)}</b> \u00B7 " if symbol else ""
+    lines = ["\U0001F50E <b>Token check</b>", "",
+             f"{hd}<code>{_h.escape(token)}</code>"]
+    if name:
+        lines.append(f"\U0001F3F7\uFE0F {_h.escape(name)}")
+    lines.append(f"\U0001F3ED Launchpad: <b>{_h.escape(launchpad or 'unknown')}</b>")
+    if creator:
+        lines.append(f"\U0001F464 Creator: <code>{_h.escape(creator)}</code>")
+    lines.append(f"\U0001F552 Created: block {ob} (~{age_txt} ago)" if ob else "\U0001F552 Created: unknown")
+    lines.append(f"\U0001F4CA Activity: <b>{n}</b> swaps \u00B7 <b>{w}</b> wallets")
+    lines.append(f"\U0001F4B0 Price: <b>{price_txt}</b>")
+    lines.append(f"\U0001F3E6 Market cap: <b>{_usd(mcap)}</b>")
+    lines.append(f"\U0001F4C8 Vol 24h: <b>{_usd(vol24)}</b>")
+    if last_blk:
+        lines.append(f"\U0001F551 Last trade: block {int(last_blk)}")
+    lines.append(f"\U0001F4CA Status: {status}")
+    lines.append(f'\U0001F517 <a href="https://explorer.arc.io/address/{_h.escape(token)}">view on explorer</a>')
+    return "\n".join(lines)
 
 
 def demo() -> None:
@@ -381,6 +534,7 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
     if not tok:
         print("no token")
         return
+    set_bot_commands(tok)
     store = SubscriptionStore(db)
     thr = Throttle(global_per_sec=20, per_chat_per_sec=1.0)
     transport = TelegramTransport(tok)
@@ -459,7 +613,7 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
     sym_lc = {(k or "").lower(): v for k, v in (symbols or {}).items()}
 
     def symbol_fn(tok: str) -> str:
-        return sym_lc.get((tok or "").lower(), "")
+        return sym_lc.get((tok or "").lower()) or tokenmeta.rpc_symbol(tok)
 
     def worker():
         while not stop.is_set():

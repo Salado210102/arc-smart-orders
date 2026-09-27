@@ -60,7 +60,7 @@ class CommandTests(unittest.TestCase):
 
     def test_list(self):
         self.reply(f"/subscribe {ADDR}")
-        self.assertIn(ADDR, self.reply("/list"))
+        self.assertIn(ADDR[:6], self.reply("/list"))
 
     def test_limit_per_user(self):
         for i in range(SubscriptionStore.MAX_TOKENS):
@@ -118,7 +118,7 @@ class CommandTests(unittest.TestCase):
 
     def test_label_my_alerts_maps_to_list(self):
         self.reply(f"/subscribe {ADDR}")
-        self.assertIn(ADDR, self.reply("\U0001F4CB My alerts"))
+        self.assertIn(ADDR[:6], self.reply("\U0001F4CB My alerts"))
 
     def test_paste_address_triggers_check(self):
         self.assertIn("check", self.reply(ADDR))
@@ -161,6 +161,39 @@ class CommandTests(unittest.TestCase):
     def test_connect_bad_address(self):
         self.assertIn("/connect", self.reply("/connect 0x123"))
 
+    def test_wallet_screen_buttons(self):
+        from bot import tokenmeta as _tm
+        _tm.native_balance_eth = lambda a: 0
+        _tm.erc20_balance = lambda a: 0.0
+        self.store.set_wallet(1, ADDR)
+        r = command_reply_rich("/wallet", 1, self.store, self.exists, self.check, 1000)
+        self.assertIsInstance(r, dict)
+        self.assertTrue(r["inline"])
+
+    def test_wallet_disconnect(self):
+        self.store.set_wallet(1, ADDR)
+        _handle_callback("disconnect", 1, self.store, self.exists, self.check, 1000)
+        self.assertEqual(self.store.get_wallet(1), "")
+
+    def test_help_has_docs_link(self):
+        r = command_reply_rich("/help", 1, self.store, self.exists, self.check, 1000)
+        self.assertIsInstance(r, dict)
+        self.assertTrue(any("url" in b for row in r["inline"] for b in row))
+
+    def test_settings_screen_has_toggles(self):
+        r = command_reply_rich("/settings", 1, self.store, self.exists, self.check, 1000)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(len(r["inline"]), 3)
+
+    def test_settings_toggle_off_one(self):
+        _handle_callback("setkind:dev_sell", 1, self.store, self.exists, self.check, 1000)
+        self.assertEqual(self.store.get(1)["kinds"], {"volume_collapse", "compound"})
+
+    def test_settings_toggle_all_off_mutes(self):
+        for k in ("dev_sell", "volume_collapse", "compound"):
+            _handle_callback(f"setkind:{k}", 1, self.store, self.exists, self.check, 1000)
+        self.assertEqual(self.store.get(1)["kinds"], {"none"})
+
     def test_soon_callback(self):
         r = _handle_callback("soon:Signals", 1, self.store, self.exists, self.check, 1000)
         self.assertIn("soon", r.lower())
@@ -170,7 +203,7 @@ class CommandTests(unittest.TestCase):
         r = command_reply("/list", 1, self.store, self.exists, self.check, 1000,
                           symbol_fn=lambda t: "PEPE")
         self.assertIn("PEPE", r)
-        self.assertIn(ADDR, r)
+        self.assertIn(ADDR[:6], r)
 
     def test_rich_non_menu_is_plain_string(self):
         self.assertIsInstance(self.reply("/stats"), str)
