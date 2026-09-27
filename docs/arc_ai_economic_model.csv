@@ -1,0 +1,36 @@
+ARC AI - Modelo economico simple (entra vs sale),,,,
+Edita solo la columna B de SUPUESTOS/REPARTO. Las celdas con = se recalculan.,,,,
+,,,,
+SUPUESTOS,B (editable),,Nota,
+Tarifa por operacion,0.01,,1% del volumen
+Coste fijo infra mensual (USD),300,,RPC + servidores + monitoreo
+,,,,
+REPARTO de la comision,%,,,
+Premio trader (mayor volumen propio),0.05,,concurso diario
+Premio afiliado (mayor volumen de referidos),0.05,,concurso diario
+Referidos (comision de por vida),0.20,,sobre la comision neta del referido
+Operaciones / infra,0.30,,
+Equipo / beneficio,0.40,,
+Total (debe dar 1.00),=B9+B10+B11+B12+B13,,,
+,,,,
+ESCENARIO,BAJO,MEDIO,ALTO,
+Volumen diario (USD),10000,100000,1000000,
+Volumen mensual (USD),=B17*30,=C17*30,=D17*30,
+,,,,
+ENTRA,,,,
+Comision del mes (USD),=B18*$B$5,=C18*$B$5,=D18*$B$5,
+,,,,
+SALE (reparto de la comision),,,,
+Premio trader,=B21*$B$9,=C21*$B$9,=D21*$B$9,
+Premio afiliado,=B21*$B$10,=C21*$B$10,=D21*$B$10,
+Referidos,=B21*$B$11,=C21*$B$11,=D21*$B$11,
+Operaciones / infra,=B21*$B$12,=C21*$B$12,=D21*$B$12,
+Equipo / beneficio,=B21*$B$13,=C21*$B$13,=D21*$B$13,
+Total repartido,=SUM(B24:B28),=SUM(C24:C28),=SUM(D24:D28),
+,,,,
+INFRA,,,,
+Infra asignada - coste fijo,=B27-$B$6,=C27-$B$6,=D27-$B$6,
+Beneficio neto (tras cubrir infra),=B28+MIN(0,B32),=C28+MIN(0,C32),=D28+MIN(0,D32),
+Comprobacion entra - sale,=B21-B29,=C21-C29,=D21-D29,
+,,,,
+Punto de equilibrio volumen/mes (USD),=B6/($B$5*$B$12),,,infra 30% cubre el coste fijo (~3.3k/dia)
