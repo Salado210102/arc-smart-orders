@@ -270,13 +270,11 @@ def dispatch(alerts: list, store: SubscriptionStore, transport, throttle=None,
             if sent >= per_chat_cap:
                 break
             kind = a.get("kind")
-            if kind in PUSH_EXCLUDED_KINDS:
-                continue
+            if kind in PUSH_EXCLUDED_KINDS or kind in DISCOVERY_KINDS:
+                continue  # discovery/buy signals not pushed (no measured edge)
             if int(a.get("block") or 0) <= since:
                 continue
-            if kind in DISCOVERY_KINDS:
-                pass  # public discovery feed -> every subscriber
-            elif kind in RISK_KINDS:
+            if kind in RISK_KINDS:
                 if a.get("token") not in holds:
                     continue  # risk alerts only for tokens the user holds
                 if not matches(s, a):

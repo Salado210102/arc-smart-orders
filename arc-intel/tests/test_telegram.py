@@ -158,12 +158,11 @@ class TelegramTests(unittest.TestCase):
             self.store.remove_from_queue(a["token"], a["kind"], a["block"])
         self.assertEqual(self.store.queue_size(), 3)  # excess preserved, not discarded
 
-    def test_discovery_alert_is_public(self):
-        self.store.subscribe(chat_id=1, tokens=("0xother",), kinds=())
+    def test_discovery_not_pushed(self):
+        self.store.subscribe(chat_id=1, tokens=("0xnew",), kinds=())
         alerts = [{"token": "0xnew", "kind": "volume_spike", "severity": "high", "block": 5,
                    "message": "spike"}]
-        n = dispatch(alerts, self.store, FakeTransport())
-        self.assertEqual(n, 1)  # discovery is public even if the token isn't subscribed
+        self.assertEqual(dispatch(alerts, self.store, FakeTransport()), 0)  # discovery disabled
 
     def test_risk_alert_needs_holdings(self):
         self.store.subscribe(chat_id=1, tokens=("0xt",), kinds=())

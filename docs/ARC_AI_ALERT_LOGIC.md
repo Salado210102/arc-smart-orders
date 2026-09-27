@@ -55,7 +55,8 @@ empujarse como "Comprar"** — haría perder dinero al usuario. El valor defendi
 
 ## Decisión
 - **Desactivar el feed público de "compra"** (volume_spike / price_surge / whale_buy) salvo que se
-  demuestre edge con research serio.
+  demuestre edge con research serio. **✅ HECHO (2026-09-27):** ya no se empujan ni se muestran; el
+  bot queda centrado en **riesgo** (holdings).
 - Mantener **alertas de RIESGO** (validadas) como núcleo del producto + **escáner de seguridad**.
 - Si algún día hay una señal con edge medido, se promociona; mientras, **honestidad**: no vender
   señales de compra que no funcionan.
