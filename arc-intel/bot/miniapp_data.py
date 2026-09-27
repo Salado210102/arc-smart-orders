@@ -78,10 +78,23 @@ def load_token_card(storage, token, head_block=None) -> dict:
         risk = analyze_token(token, holders=holders_for(storage, token))
     except Exception:
         risk = {}
-    return miniapp_api.build_token_card(
+    card = miniapp_api.build_token_card(
         address=token, symbol=symbol or "", name=name or "", launchpad=launchpad or "",
         creator=creator or "", created_block=created_block, head_block=head, swaps=n, wallets=w,
         vol24=vol24, price=price, supply=supply_h, thin_reason=thin, creator_rep=rep, risk=risk)
+    try:
+        dex = tokenmeta.dex_info(token)
+    except Exception:
+        dex = {}
+    card["dex"] = dex
+    if dex:
+        if not card.get("symbol") and dex.get("symbol"):
+            card["symbol"] = dex["symbol"]
+        if not card.get("name") and dex.get("name"):
+            card["name"] = dex["name"]
+        if dex.get("logo"):
+            card["logo"] = dex["logo"]
+    return card
 
 
 def load_series(storage, token, bucket_seconds: int = 600, max_buckets: int = 48) -> dict:

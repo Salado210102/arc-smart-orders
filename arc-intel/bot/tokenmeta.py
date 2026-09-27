@@ -200,6 +200,54 @@ def fetch(token: str) -> dict:
     return info
 
 
+_DEXINFO_CACHE: dict = {}
+_DEXINFO_TTL = 60
+
+
+def dex_info(token: str) -> dict:
+    """Best DexScreener pair for `token` (highest liquidity) with full stats + logo + chart url.
+
+    DexScreener DOES support Arc (chainId 'arc'). Best-effort: {} if not listed or on failure.
+    """
+    token = (token or "").lower()
+    if not token:
+        return {}
+    now = time.time()
+    hit = _DEXINFO_CACHE.get(token)
+    if hit and now - hit[0] < _DEXINFO_TTL:
+        return hit[1]
+    out: dict = {}
+    try:
+        req = urllib.request.Request(_DEX + token, headers={"User-Agent": "sniper-ia/1.0"})
+        data = json.load(urllib.request.urlopen(req, timeout=5))
+        pairs = [p for p in (data.get("pairs") or [])
+                 if (p.get("baseToken") or {}).get("address", "").lower() == token]
+        if pairs:
+            best = max(pairs, key=lambda p: (p.get("liquidity") or {}).get("usd") or 0)
+            info = best.get("info") or {}
+            base = best.get("baseToken") or {}
+            url = best.get("url") or ""
+            out = {
+                "symbol": base.get("symbol") or "", "name": base.get("name") or "",
+                "chain_id": best.get("chainId"), "dex": best.get("dexId"),
+                "pair": best.get("pairAddress"), "url": url,
+                "embed": (url + ("&" if "?" in url else "?") + "embed=1&theme=dark") if url else "",
+                "price_usd": float(best.get("priceUsd") or 0),
+                "price_change": best.get("priceChange") or {},
+                "volume": best.get("volume") or {},
+                "txns": best.get("txns") or {},
+                "liquidity_usd": (best.get("liquidity") or {}).get("usd") or 0,
+                "fdv": best.get("fdv"), "market_cap": best.get("marketCap"),
+                "created_at": best.get("pairCreatedAt"),
+                "logo": info.get("imageUrl") or "", "header": info.get("header") or "",
+                "websites": info.get("websites") or [], "socials": info.get("socials") or [],
+            }
+    except Exception:
+        out = {}
+    _DEXINFO_CACHE[token] = (now, out)
+    return out
+
+
 def symbol(token: str) -> str:
     return fetch(token).get("symbol", "")
 

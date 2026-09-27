@@ -46,6 +46,7 @@ Leyenda de estado: **[LIVE]** ya operativo · **[TESTNET]** probado en testnet, 
 |---|---|---|
 | `/start` + onboarding | alta, allowlist (beta cerrada), disclaimer | [LIVE] |
 | `/check <token>` | ficha: precio, **market cap**, **vol 24h**, **thin-market**, **reputación del creador**, **riesgo de contrato** (heurística), launchpad, logo, explorer | [LIVE] |
+| **DexScreener (Arc soportado)** | precio/MC/FDV/**liquidez**/volumen/txns **en vivo**, **logo**, **gráfico embebido** y redes (X/TG/web) en la ficha de compra | [LIVE] |
 | `/subscribe`, `/subscribe_recent`, `/list` | seguir tokens / top recientes / tus suscripciones | [LIVE] |
 | `/wallet`, `/link_wallet`, `/unlink_wallet` | wallet **watch-only** (nunca llaves) + auto-seguimiento | [LIVE] |
 | `/settings` | interruptores por tipo: dev_sell / compound / volume_spike / liquidity_removal / large_sell | [LIVE] |

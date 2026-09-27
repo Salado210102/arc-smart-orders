@@ -83,13 +83,7 @@
             <option value="3" selected>3%</option><option value="5">5%</option>
           </select>
         </div>
-        <button class="ghost" id="quote" style="margin-top:10px;width:100%">Cotizar</button>
-        <div id="quoter" class="hide" style="margin-top:10px"></div>
-      </div>
-
-      <div class="card hide" id="step3">
-        <div class="mut">Paso 3 · Armar y firmar (no-custodial)</div>
-        <button class="primary" id="arm" style="margin-top:8px">Armar orden y firmar</button>
+        <button class="primary" id="buynow" style="margin-top:10px">Comprar</button>
         <div id="armout" class="mut" style="margin-top:8px"></div>
       </div>
     </section>
@@ -326,36 +320,43 @@
         const { status, body } = await api(`/token?address=${addr}`);
         if (status !== 200 || !body || body.error) { $("tokencard").innerHTML = `<span class="bad">Error: ${esc((body&&body.error)||status)}</span>`; return; }
         token = body;
+        const d = body.dex || {};
         const r = body.creator_rep || {};
         const rep = (r.created != null) ? `creados ${r.created}` + (r.dumped ? ` · <span class="warn">volcados ${r.dumped}</span>` : "") : "—";
-        const thin = body.thin_market ? `<span class="warn">thin market (${esc(body.thin_market)})</span>` : `<span class="ok">actividad</span>`;
+        const thin = body.thin_market ? `<span class="warn">thin (${esc(body.thin_market)})</span>` : `<span class="ok">actividad</span>`;
+        const pc = d.price_change || {};
+        const chg = v => (v == null) ? "" : ` <span class="${v >= 0 ? "ok" : "bad"}">${v >= 0 ? "+" : ""}${Number(v).toFixed(1)}%</span>`;
+        const T = (d.txns || {}).h24 || {}, V = d.volume || {};
+        const money = x => (x == null || x === "") ? "—" : "$" + Number(x).toLocaleString(undefined, { maximumFractionDigits: 0 });
+        const links = [].concat((d.socials || []).map(s => ({ u: s.url, l: s.type })),
+                                (d.websites || []).map(w => ({ u: w.url, l: w.label || "web" })))
+          .map(s => `<a class="ghost" style="padding:4px 8px;border-radius:8px;text-decoration:none" href="${esc(s.u)}" target="_blank">${esc(s.l)}</a>`).join(" ");
+        const logo = d.logo || body.logo || "";
+        const rk = body.risk || {};
         $("tokencard").innerHTML =
-          `<div class="kv"><span>${esc(body.symbol||"?")}</span><b>${esc(body.name||"")}</b></div>
-           <div class="kv"><span>Precio</span><b>${esc(body.price_text)}</b></div>
-           <div class="kv"><span>Market cap</span><b>${esc(body.market_cap_text)}</b></div>
-           <div class="kv"><span>Vol 24h</span><b>${esc(body.vol24_text)}</b></div>
+          `<div class="row" style="gap:10px;align-items:center">
+             ${logo ? `<img src="${esc(logo)}" style="width:44px;height:44px;border-radius:10px" onerror="this.style.display='none'">` : ""}
+             <div><b>${esc(body.symbol || "?")}</b> <span class="mut">${esc(body.name || "")}</span></div>
+           </div>
+           <div class="kv"><span>Precio</span><b>${esc(body.price_text)}${chg(pc.h24)}</b></div>
+           <div class="kv"><span>Market cap</span><b>${d.market_cap ? money(d.market_cap) : esc(body.market_cap_text)}</b></div>
+           <div class="kv"><span>Liquidez</span><b>${money(d.liquidity_usd)}</b></div>
+           <div class="kv"><span>Vol 24h</span><b>${V.h24 ? money(V.h24) : esc(body.vol24_text)}</b></div>
+           <div class="kv"><span>Txns 24h</span><b>${T.buys != null ? T.buys + " ↑ / " + T.sells + " ↓" : "—"}</b></div>
+           <div class="kv"><span>Holders (wallets)</span><b>${body.wallets}</b></div>
            <div class="kv"><span>Estado</span><b>${thin}</b></div>
            <div class="kv"><span>Creador</span><b>${rep}</b></div>
-           ${body.risk && body.risk.level && body.risk.level !== "unknown" ? `<div class="kv"><span>Contrato (heurística)</span><b class="${body.risk.level === "high" ? "bad" : body.risk.level === "medium" ? "warn" : "ok"}">${esc(body.risk.level)}${body.risk.honeypot_hint ? " ⚠ honeypot?" : ""}</b></div>` : ""}
-           <div class="mut" style="margin-top:6px">${esc(body.address)}</div>`;
+           <div class="kv"><span>Contrato</span><b class="${rk.level === "high" ? "bad" : rk.level === "medium" ? "warn" : "ok"}">${esc(rk.level || "—")}${rk.honeypot_hint ? " ⚠" : ""}</b></div>
+           ${links ? `<div class="row" style="margin-top:6px">${links}</div>` : ""}
+           ${d.embed ? `<iframe src="${esc(d.embed)}" style="width:100%;height:340px;border:0;border-radius:10px;margin-top:8px" loading="lazy"></iframe>` : `<div class="mut" style="margin-top:8px">Sin gráfico de DexScreener.</div>`}
+           <div class="mut" style="margin-top:6px;font-size:12px">${esc(body.address)}</div>`;
         $("step2").classList.remove("hide");
       };
       document.querySelectorAll(".amt").forEach(b => b.onclick = () => { $("amount").value = b.dataset.a; });
-      $("quote").onclick = async () => {
+      $("buynow").onclick = async () => {
         const amt = parseFloat($("amount").value || "0");
         const slip = parseFloat($("slippage").value || "3");
-        $("quoter").classList.remove("hide"); $("quoter").innerHTML = '<span class="mut">Cotizando…</span>';
-        const { status, body } = await api(`/buy_quote?token=${token.address}&amount_usdc=${amt}&slippage=${slip}`);
-        if (status !== 200 || !body || body.error) { $("quoter").innerHTML = `<span class="bad">Error: ${esc((body&&body.error)||status)}</span>`; return; }
-        $("quoter").innerHTML =
-          `<div class="kv"><span>Recibes ~</span><b>${body.quote.expected_out.toLocaleString(undefined,{maximumFractionDigits:0})} ${esc(body.token.symbol||"")}</b></div>
-           <div class="kv"><span>Mínimo (slippage)</span><b>${body.quote.min_out.toLocaleString(undefined,{maximumFractionDigits:0})}</b></div>
-           <div class="kv"><span>Fee</span><b>1%</b></div>`;
-        $("step3").classList.remove("hide");
-      };
-      $("arm").onclick = async () => {
-        const amt = parseFloat($("amount").value || "0");
-        const slip = parseFloat($("slippage").value || "3");
+        if (!token || !amt) { $("armout").textContent = "Consulta un token y pon un monto."; return; }
         if (CUSTODY && CUSTODY.exists) {
           $("armout").textContent = "Comprando al instante…";
           const r = await api("/custody/buy", { method: "POST", headers: { "Content-Type": "application/json" },
