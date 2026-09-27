@@ -205,7 +205,7 @@ def menu_buttons(lang: str = DEFAULT) -> list:
         [b("btn_alerts", "cmd:/list"), b("btn_check", "cmd:/check")],
         [b("btn_stats", "cmd:/stats"), b("btn_pending", "cmd:/pending")],
         [b("btn_positions", "cmd:/positions"), b("btn_settings", "cmd:/settings")],
-        [b("btn_wallet", "cmd:/wallet"), b("btn_help", "cmd:/help")],
+        [b("btn_wallet", "cmd:/connect"), b("btn_help", "cmd:/help")],
         [b("btn_signals", "soon:Signals"), b("btn_copytrade", "soon:Copytrade")],
         [b("btn_bridge", "soon:Bridge"), b("btn_premium", "soon:Premium")],
         # equal-length, no flags -> identical button widths across clients
