@@ -23,9 +23,10 @@ from .messages import format_alert, format_alert_rich
 from .store import SubscriptionStore
 from .throttle import Throttle
 
-PUSH_EXCLUDED_KINDS = {"thin_market", "volume_collapse"}  # not pushed (collapse feeds 'compound')
+PUSH_EXCLUDED_KINDS = {"thin_market", "volume_collapse", "volume_spike",
+                       "price_surge"}  # no measured edge -> never pushed
 RISK_KINDS = {"dev_sell", "compound", "liquidity_removal", "large_sell"}  # only if the user HOLDS it
-DISCOVERY_KINDS = {"volume_spike", "price_surge", "whale_buy"}  # public feed (any subscriber)
+DISCOVERY_KINDS = {"whale_buy", "graduation"}  # public buy feed (any subscriber)
 
 _IMG_CACHE: dict[str, str] = {}
 
@@ -270,11 +271,13 @@ def dispatch(alerts: list, store: SubscriptionStore, transport, throttle=None,
             if sent >= per_chat_cap:
                 break
             kind = a.get("kind")
-            if kind in PUSH_EXCLUDED_KINDS or kind in DISCOVERY_KINDS:
-                continue  # discovery/buy signals not pushed (no measured edge)
+            if kind in PUSH_EXCLUDED_KINDS:
+                continue
             if int(a.get("block") or 0) <= since:
                 continue
-            if kind in RISK_KINDS:
+            if kind in DISCOVERY_KINDS:
+                pass  # public buy feed -> every subscriber
+            elif kind in RISK_KINDS:
                 if a.get("token") not in holds:
                     continue  # risk alerts only for tokens the user holds
                 if not matches(s, a):

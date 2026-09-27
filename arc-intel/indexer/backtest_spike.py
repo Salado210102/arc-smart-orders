@@ -13,7 +13,7 @@ import statistics
 
 from .stream_alerts import IncrementalState, load_creators
 
-DISCOVERY = ("volume_spike", "price_surge", "whale_buy")
+DISCOVERY = ("whale_buy", "graduation")
 SECONDS_PER_BLOCK = 0.52
 
 

@@ -47,7 +47,8 @@ venden".
 |---|---|---|---|
 | **volume_spike** | −3.6% / **30%** (n=44) | −3.9% / 36% | +9.3% / 62% (n=8) |
 | **price_surge** | −4.1% / 38% (n=539) | −7.5% / 34% | −15.5% / 38% |
-| **whale_buy** | −1.2% / 33% (n=21) | −1.8% / 33% | −4.4% / 33% |
+| **whale_buy** (≥$1k, price up) | −1.1% / 30% (n=11) | −2.1% / 22% | −11.4% / 0% |
+| **graduation** (nuevo token en DEX) | −2.0% / **20%** (n=1527) | −1.9% / 27% | −5.3% / 26% |
 
 **Veredicto: las señales de compra NO tienen edge** (mediana negativa, %positivos < 50%). **NO deben
 empujarse como "Comprar"** — haría perder dinero al usuario. El valor defendible del producto es el

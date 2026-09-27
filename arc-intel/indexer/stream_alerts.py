@@ -32,7 +32,8 @@ class IncrementalState:
     large_sell_usd: float = 5000.0       # whale/team dump: single sell >= $5k
     large_sell_ratio: float = 0.5        # ...and >= 50% of the token's recent (6-bucket) volume
     price_surge_pct: float = 50.0        # discovery: price +>=50% vs ~lookback buckets ago
-    whale_buy_usd: float = 2000.0        # discovery: single buy >= $2k dominating recent volume
+    whale_buy_usd: float = 1000.0        # discovery: single buy >= $1k (whale) with price up
+    seen: set = field(default_factory=set)  # tokens already seen on the v4 DEX (graduation)
     spike_min_price_pct: float = 0.0     # volume spike ONLY if price is up >= this % (not a dump)
     spike_min_buy_ratio: float = 1.2     # ...and buy volume >= sell volume * this (net buyers)
     prices: dict = field(default_factory=dict)          # token -> {bucket: price}
@@ -67,6 +68,14 @@ class IncrementalState:
         sv = float(leg.get("stable_value") or 0.0)
         side = leg.get("side")
         alerts: list[Alert] = []
+
+        # Graduation: a token appears on the v4 DEX for the first time (launchpad -> DEX pool live).
+        if emit and token and token not in self.seen:
+            a = Alert(token=token, kind="graduation", severity="medium", block=block, context={})
+            a.message = f"{token}: new token on the DEX (graduated) at block {block}"
+            alerts.append(a)
+        if token:
+            self.seen.add(token)
 
         buck = bucket_of(block, self.bucket_blocks)
         vols = self.volume.setdefault(token, {})
@@ -142,14 +151,14 @@ class IncrementalState:
                              f"({share:.0f}% of recent volume) at block {block}")
                 alerts.append(a)
 
-        # Discovery: whale buy (a large buy dominating recent volume).
-        if emit and side == "buy" and sv >= self.whale_buy_usd:
+        # Discovery: whale buy (a large buy dominating recent volume) with price up.
+        if emit and side == "buy" and sv >= self.whale_buy_usd and self._price_up(token, buck):
             vol_recent = sum(v for b, v in vols.items() if b >= buck - 6)
             if vol_recent <= 0 or sv >= 0.5 * vol_recent:
                 a = Alert(token=token, kind="whale_buy",
-                          severity="high" if sv >= self.whale_buy_usd * 4 else "medium",
+                          severity="high" if sv >= self.whale_buy_usd * 5 else "medium",
                           block=block, wallet=wallet, amount_usdc=sv, context={"usd": round(sv, 0)})
-                a.message = f"{wallet} bought ~${sv:,.0f} of {token} at block {block}"
+                a.message = f"{wallet} bought ~${sv:,.0f} of {token} (price up) at block {block}"
                 alerts.append(a)
 
         # Discovery: price surge vs ~lookback buckets ago.

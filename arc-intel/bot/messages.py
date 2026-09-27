@@ -14,8 +14,9 @@ _RICH_EMOJI = {"high": "🔴", "medium": "🟠", "low": "🟡"}
 _RICH_LABEL = {"dev_sell": "DEV-SELL", "volume_collapse": "VOLUME COLLAPSE",
                "compound": "COMPOSITE RISK", "liquidity_removal": "LIQUIDITY REMOVAL",
                "thin_market": "THIN MARKET", "volume_spike": "VOLUME UP + PRICE UP",
-               "price_surge": "PRICE SURGE", "whale_buy": "WHALE BUY", "large_sell": "LARGE SELL"}
-DISCOVERY_KINDS = {"volume_spike", "price_surge", "whale_buy"}
+               "price_surge": "PRICE SURGE", "whale_buy": "WHALE BUY", "large_sell": "LARGE SELL",
+               "graduation": "NEW TOKEN"}
+DISCOVERY_KINDS = {"whale_buy", "graduation"}
 
 
 def _esc(s) -> str:

@@ -129,8 +129,17 @@ class StreamAlertsTests(unittest.TestCase):
     def test_whale_buy(self):
         st = IncrementalState(bucket_blocks=1000, lookback=12, whale_buy_usd=1000.0)
         creators = {"0xtok": "0xother"}
-        alerts = st.apply_leg(leg("0xwhale", "0xtok", 1000, "buy", 1000.0, 3000.0), creators)
+        alerts = []
+        for i in range(12):
+            alerts += st.apply_leg(leg("0xo", "0xtok", i * 1000 + 1, "buy", 100.0, 1.0), creators)
+        alerts += st.apply_leg(leg("0xwhale", "0xtok", 12 * 1000 + 1, "buy", 10000.0, 3000.0), creators)
         self.assertIn("whale_buy", [a.kind for a in alerts])
+
+    def test_graduation_on_first_leg(self):
+        st = IncrementalState(bucket_blocks=1000)
+        creators = {"0xtok": "0xother"}
+        alerts = st.apply_leg(leg("0xo", "0xtok", 1000, "buy", 1.0, 1.0), creators)
+        self.assertIn("graduation", [a.kind for a in alerts])
 
     def test_dev_sell_volume_confirmation(self):
         st = IncrementalState(bucket_blocks=1000, lookback=12, min_confirm_usdc=500.0)
