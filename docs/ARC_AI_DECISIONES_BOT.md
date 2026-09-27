@@ -337,3 +337,9 @@ auditoría + hot key acotada; no es lo primero).
   actuales (`_enabled_kinds` default). Verificado con `dispatch` real → **2 entregadas**. **Al comprar**
   (wallet del bot) → `record_fill` → `add_auto_sub` → el token queda **auto-vigilado** y el usuario
   recibe sus anomalías.
+- **2026-09-27 (alertas no despachaban: causa raíz)** — El bucle quedaba **bloqueado en la ingesta
+  (RPC 429)** dentro del ciclo → nunca llegaba a `dispatch`. **Fix de infra:** ingesta **desacoplada**
+  en un **timer systemd cada 60 s** (`arc-intel-ingest.timer` → `indexer.ingest`) y el bot con
+  **`--no-ingest --interval 60`** (ciclos rápidos). Además, `dispatch` **blinda el envío** (un chat
+  inválido ya no rompe el bucle) y se eliminaron suscriptores de prueba. Verificado: `dispatched: 20`.
+  Se activó el **feed público** de descubrimiento (volume spike / price surge / whale buy) a todos.

@@ -302,19 +302,22 @@ def dispatch(alerts: list, store: SubscriptionStore, transport, throttle=None,
                 danger = a.get("kind") in RISK_KINDS
                 label = "\U0001F534 Vender" if danger else "\U0001F7E2 Comprar"
                 inline = [[{"text": label, "web_app": f"{MINIAPP_URL}?token={tk}"}]]
-            if logo and hasattr(transport, "send_photo"):
-                try:
-                    transport.send_photo(chat, logo, caption=text, parse_mode="HTML", inline=inline)
-                except Exception:
-                    # a bad image URL must never drop the alert
-                    if getattr(transport, "send_html", False):
-                        transport.send(chat, text, parse_mode="HTML", inline=inline)
-                    else:
-                        transport.send(chat, format_alert(a))
-            elif getattr(transport, "send_html", False):
-                transport.send(chat, text, parse_mode="HTML", inline=inline)
-            else:
-                transport.send(chat, format_alert(a))
+            try:
+                if logo and hasattr(transport, "send_photo"):
+                    try:
+                        transport.send_photo(chat, logo, caption=text, parse_mode="HTML", inline=inline)
+                    except Exception:
+                        # a bad image URL must never drop the alert
+                        if getattr(transport, "send_html", False):
+                            transport.send(chat, text, parse_mode="HTML", inline=inline)
+                        else:
+                            transport.send(chat, format_alert(a))
+                elif getattr(transport, "send_html", False):
+                    transport.send(chat, text, parse_mode="HTML", inline=inline)
+                else:
+                    transport.send(chat, format_alert(a))
+            except Exception:
+                continue  # one bad chat/alert must never break the loop; retry next cycle
             store.mark_delivered(chat, a.get("token"), a.get("kind"), a.get("block"))
             sent += 1
             total += 1
