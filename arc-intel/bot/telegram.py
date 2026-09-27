@@ -284,17 +284,22 @@ def dispatch(alerts: list, store: SubscriptionStore, transport, throttle=None,
                     logo = logo_fn(a.get("token")) or ""
                 except Exception:
                     logo = ""
+            tk = a.get("token")
+            inline = None
+            if tk:
+                from .i18n import MINIAPP_URL
+                inline = [[{"text": "\U0001F7E2 Comprar", "web_app": f"{MINIAPP_URL}?token={tk}"}]]
             if logo and hasattr(transport, "send_photo"):
                 try:
-                    transport.send_photo(chat, logo, caption=text, parse_mode="HTML")
+                    transport.send_photo(chat, logo, caption=text, parse_mode="HTML", inline=inline)
                 except Exception:
                     # a bad image URL must never drop the alert
                     if getattr(transport, "send_html", False):
-                        transport.send(chat, text, parse_mode="HTML")
+                        transport.send(chat, text, parse_mode="HTML", inline=inline)
                     else:
                         transport.send(chat, format_alert(a))
             elif getattr(transport, "send_html", False):
-                transport.send(chat, text, parse_mode="HTML")
+                transport.send(chat, text, parse_mode="HTML", inline=inline)
             else:
                 transport.send(chat, format_alert(a))
             store.mark_delivered(chat, a.get("token"), a.get("kind"), a.get("block"))

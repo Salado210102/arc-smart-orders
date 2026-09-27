@@ -10,7 +10,7 @@ class FakeTransport:
     def __init__(self):
         self.sent = []
 
-    def send(self, chat_id, text):
+    def send(self, chat_id, text, parse_mode=None, inline=None, **kw):
         self.sent.append((chat_id, text))
 
 
@@ -82,7 +82,7 @@ class TelegramTests(unittest.TestCase):
             def __init__(self):
                 self.calls = []
 
-            def send(self, chat_id, text, parse_mode=None):
+            def send(self, chat_id, text, parse_mode=None, inline=None, **kw):
                 self.calls.append((chat_id, text, parse_mode))
 
         t = HtmlTransport()
