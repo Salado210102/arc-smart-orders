@@ -16,6 +16,7 @@ import urllib.request
 
 from . import i18n
 from .sender import DirectSender
+from monetization import referrals as refs
 
 ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 ALLOWED_KINDS = {"dev_sell", "compound", "liquidity_removal", "large_sell", "whale_buy",
@@ -72,6 +73,7 @@ ONBOARDING = ("ARC AI — on-chain risk alerts for Arc.\n"
               "/subscribe_recent [n] [hours] — follow the n most active recent tokens\n"
               "/check <token>       — quick market/activity check\n"
               "/list                — your subscriptions\n"
+              "/referral            — invite friends & earn 30% for life\n"
               "/pending             — your [PAPER] proposals\n"
               "/approve <id> [code]   /cancel <id>\n"
               "/stats               — signal value (with both faces)\n"
@@ -138,6 +140,33 @@ def _route(text: str, chat_id, store) -> str:
     return _normalize(raw)
 
 
+def capture_referral(store, chat, text) -> None:
+    """Record a referral from '/start ref_CODE' (first binding wins; no self-referral)."""
+    try:
+        code = refs.parse_ref_param(text)
+        if not code:
+            return
+        owner = store.referral_owner(code)
+        if owner and str(owner) != str(chat):
+            store.bind_referral(chat, owner, code)
+    except Exception:
+        pass
+
+
+def referral_screen(store, chat, lang) -> dict:
+    code = store.ensure_referral_code(chat, refs.make_code(chat))
+    botu = store.get_state("bot_username", "") or refs.bot_username()
+    link = refs.referral_link(botu, code)
+    s = store.referral_summary(chat)
+    text = i18n.t("referral_text", lang).format(
+        code=code, link=link or "\u2014", referred=s["referred"],
+        accrued=s["accrued"], pending=s["pending"])
+    if not link:
+        text += "\n\n" + i18n.t("referral_nolink", lang).format(code=code)
+    rows = [[{"text": i18n.t("btn_app", lang), "web_app": i18n.MINIAPP_URL}]]
+    return {"text": text, "inline": rows, "parse_mode": "HTML"}
+
+
 def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_block: int,
                        recent_fn=None, paper_price_fn=None, symbol_fn=None):
     """Like `command_reply`, but returns a dict {text, inline} for menu commands.
@@ -152,6 +181,8 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
         return settings_screen(store, chat_id, lang)
     if cmd == "/wallet":
         return wallet_screen(store, chat_id, lang)
+    if cmd == "/referral":
+        return referral_screen(store, chat_id, lang)
     reply = command_reply(norm, chat_id, store, token_exists, check_fn, now_block,
                           recent_fn=recent_fn, paper_price_fn=paper_price_fn, symbol_fn=symbol_fn)
     if cmd == "/help":
@@ -397,6 +428,8 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
         w = store.get_wallet(chat_id)
         head = i18n.t("wallet_connected", lang).format(addr=w) if w else i18n.t("wallet_none", lang)
         return head + "\n\n" + i18n.t("wallet_text", lang)
+    if cmd == "/referral":
+        return referral_screen(store, chat_id, lang)["text"]
     if cmd == "/connect":
         if not _valid_addr(arg):
             return i18n.t("connect_prompt", lang)
@@ -581,6 +614,22 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
         store.set_kinds(chat_id, kinds)
         return "Kinds set: " + ",".join(sorted(kinds))
     return "Unknown command. /help"
+
+
+def _ensure_bot_username(bot_token, store) -> str:
+    """Cache the bot @username (for referral links) via getMe; best-effort."""
+    u = store.get_state("bot_username", "")
+    if u:
+        return u
+    try:
+        url = f"https://api.telegram.org/bot{bot_token}/getMe"
+        res = json.load(urllib.request.urlopen(url, timeout=10)).get("result", {})
+        u = res.get("username", "") or ""
+        if u:
+            store.set_state("bot_username", u)
+    except Exception:
+        u = ""
+    return u
 
 
 def _get_updates(bot_token: str, offset: int, timeout: int = 25):
@@ -805,6 +854,8 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
         chat = (msg.get("chat") or {}).get("id")
         if not text or chat is None:
             continue
+        capture_referral(store, chat, text)
+        _ensure_bot_username(bot_token, store)
         if not is_authorized(store, chat):
             store.add_request(chat, int(time.time()))
             log_reply = _emit(sender, chat, CLOSED_BETA)

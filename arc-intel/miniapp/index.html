@@ -140,6 +140,13 @@
           <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="apchk"><span class="mut" style="font-size:12px">ON</span></label>
         </div>
       </div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div class="mut" data-i18n="ref_title">🎁 Referidos — gana 30% de por vida</div>
+          <button class="ghost" id="refrefresh">↻</button>
+        </div>
+        <div id="refout" style="margin-top:8px"></div>
+      </div>
     </section>
 
     <section id="sec-alr" class="hide">
@@ -185,7 +192,10 @@
         alr_title: "Alertas de tus tokens", price: "Precio", mcap: "Market cap", liq: "Liquidez",
         vol: "Vol 24h", txns: "Txns 24h", holders: "Holders (wallets)", status: "Estado",
         creator: "Creador", contract: "Contrato", entry: "Entrada", pnl: "PnL", value: "valor",
-        sell: "vender", buy_more: "Comprar", save: "Guardar" },
+        sell: "vender", buy_more: "Comprar", save: "Guardar",
+        ref_title: "🎁 Referidos — gana 30% de por vida", ref_code: "Tu código",
+        ref_referred: "Invitados", ref_accrued: "Acumulado", ref_pending: "Pendiente de pago",
+        ref_hint: "30% de la comisión (1%) de por vida. Se paga en USDC." },
       en: { tab_buy: "Buy", tab_pos: "Positions", tab_wal: "Wallet", tab_alr: "Alerts",
         step1: "Step 1 · Paste the token address", check: "Check", step2: "Step 2 · Amount & slippage",
         amount: "amount USDC", buy: "Buy", tp_hint: "Optional: set automatically on buy.",
@@ -198,7 +208,10 @@
         alr_title: "Alerts for your tokens", price: "Price", mcap: "Market cap", liq: "Liquidity",
         vol: "Vol 24h", txns: "Txns 24h", holders: "Holders (wallets)", status: "Status",
         creator: "Creator", contract: "Contract", entry: "Entry", pnl: "PnL", value: "Value",
-        sell: "sell", buy_more: "Buy", save: "Save" },
+        sell: "sell", buy_more: "Buy", save: "Save",
+        ref_title: "🎁 Referrals — earn 30% for life", ref_code: "Your code",
+        ref_referred: "Invited", ref_accrued: "Accrued", ref_pending: "Pending payout",
+        ref_hint: "30% of the 1% fee, for life. Paid in USDC." },
       zh: { tab_buy: "买入", tab_pos: "持仓", tab_wal: "钱包", tab_alr: "提醒",
         step1: "步骤 1 · 粘贴代币地址", check: "查询", step2: "步骤 2 · 金额和滑点",
         amount: "金额 USDC", buy: "买入", tp_hint: "可选：买入时自动设置。",
@@ -208,7 +221,10 @@
         autoprotect_hint: "出现风险时自动卖出（dev-sell / 流动性）", alr_title: "你的代币提醒",
         price: "价格", mcap: "市值", liq: "流动性", vol: "24h 量", txns: "24h 交易", holders: "持有者",
         status: "状态", creator: "创建者", contract: "合约", entry: "成本", pnl: "盈亏", value: "价值",
-        sell: "卖出", buy_more: "买入", save: "保存" }
+        sell: "卖出", buy_more: "买入", save: "保存",
+        ref_title: "🎁 推荐 — 终身赚取 30%", ref_code: "你的代码",
+        ref_referred: "已邀请", ref_accrued: "累计", ref_pending: "待支付",
+        ref_hint: "终身赚取 1% 手续费的 30%。以 USDC 支付。" }
     };
     const t = (k) => (TR[LANG] && TR[LANG][k]) || TR.en[k] || k;
     function applyI18n() {
@@ -312,7 +328,7 @@
         }
         if (POS_TIMER) { clearInterval(POS_TIMER); POS_TIMER = null; }
         if (name === "pos") { loadPositions(); POS_TIMER = setInterval(() => loadPositions().catch(() => {}), 10000); }
-        if (name === "wal") { loadWallet(); loadCustody(); }
+        if (name === "wal") { loadWallet(); loadCustody(); loadReferral(); }
         if (name === "alr") loadAlerts();
       }
       $("tab-buy").onclick = () => tab("buy");
@@ -320,6 +336,7 @@
       $("tab-wal").onclick = () => tab("wal");
       $("tab-alr").onclick = () => tab("alr");
       $("alrrefresh").onclick = () => loadAlerts();
+      $("refrefresh").onclick = () => loadReferral();
 
       const KIND_LABEL = {dev_sell: "DEV-SELL", compound: "COMPOSITE", volume_spike: "VOL SPIKE",
         liquidity_removal: "LP REMOVAL", large_sell: "LARGE SELL", thin_market: "THIN"};
@@ -594,6 +611,22 @@
             loadCustody();
           };
         });
+      }
+
+      async function loadReferral() {
+        $("refout").innerHTML = '<span class="mut">…</span>';
+        const { status, body } = await api("/referral");
+        if (status !== 200 || !body) {
+          $("refout").innerHTML = `<span class="bad">Error: ${status}${status === 401 ? " (abre en Telegram)" : ""}</span>`;
+          return;
+        }
+        $("refout").innerHTML =
+          `<div class="kv"><span>${esc(t("ref_code"))}</span><b>${esc(body.code)}</b></div>` +
+          (body.link ? `<div class="mut" style="font-size:12px;word-break:break-all;margin-top:4px"><code>${esc(body.link)}</code></div>` : "") +
+          `<div class="kv" style="margin-top:6px"><span>${esc(t("ref_referred"))}</span><b>${body.referred}</b></div>` +
+          `<div class="kv"><span>${esc(t("ref_accrued"))}</span><b>$${(body.accrued || 0).toFixed(2)}</b></div>` +
+          `<div class="kv"><span>${esc(t("ref_pending"))}</span><b>$${(body.pending || 0).toFixed(2)}</b></div>` +
+          `<div class="mut" style="font-size:12px;margin-top:4px">${esc(t("ref_hint"))}</div>`;
       }
 
       async function saveExitPlanFromBuy(tok) {

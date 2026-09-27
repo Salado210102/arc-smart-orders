@@ -114,6 +114,17 @@ class SubscriptionStore:
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS auto_subs ("
             "chat_id TEXT, token TEXT, PRIMARY KEY (chat_id, token))")
+        # referrals: per-user code -> owner, who was referred by whom, and accrued commissions
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS referral_codes ("
+            "code TEXT PRIMARY KEY, owner_chat TEXT UNIQUE, created_ts INTEGER)")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS referral_bindings ("
+            "chat TEXT PRIMARY KEY, owner_chat TEXT, code TEXT, bound_ts INTEGER)")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS referral_credits ("
+            "fill_id TEXT PRIMARY KEY, owner_chat TEXT, buyer_chat TEXT, token TEXT, "
+            "fee_usdc REAL, commission_usdc REAL, created_ts INTEGER, status TEXT DEFAULT 'accrued')")
         for _col in ("signature TEXT", "sign_token TEXT", "sig_payload TEXT",
                      "kind TEXT DEFAULT 'sell'", "tx_hash TEXT", "attempts INTEGER DEFAULT 0"):
             try:
@@ -507,6 +518,11 @@ class SubscriptionStore:
                 self.remove_auto_sub(user, token)
         except Exception:
             pass
+        # Referral: credit the buyer's referrer a lifetime % of this fill's fee (idempotent).
+        try:
+            self.accrue_referral(fill_id, user, token, usdc, ts=int(ts or 0))
+        except Exception:
+            pass
         return True
 
     def get_position(self, user, token) -> dict:
@@ -723,6 +739,104 @@ class SubscriptionStore:
         self.conn.execute("UPDATE subscribers SET wallets='' WHERE chat_id=?", (str(chat_id),))
         self.conn.commit()
         return removed
+
+    # --- referrals (code -> owner, bindings, accrued commissions) ---
+    def ensure_referral_code(self, chat, code) -> str:
+        """Create the owner's code once (idempotent); returns the owner's stable code."""
+        row = self.conn.execute("SELECT code FROM referral_codes WHERE owner_chat=?",
+                                (str(chat),)).fetchone()
+        if row:
+            return row[0]
+        from monetization import referrals as _refs
+        fallback = _refs.make_code(f"{chat}:{secrets.token_hex(4)}")
+        for cand in (str(code).upper(), fallback):
+            cur = self.conn.execute(
+                "INSERT OR IGNORE INTO referral_codes(code,owner_chat,created_ts) VALUES(?,?,?)",
+                (cand, str(chat), int(time.time())))
+            self.conn.commit()
+            if cur.rowcount:
+                return cand
+        row = self.conn.execute("SELECT code FROM referral_codes WHERE owner_chat=?",
+                                (str(chat),)).fetchone()
+        return row[0] if row else fallback
+
+    def get_referral_code(self, chat) -> str:
+        row = self.conn.execute("SELECT code FROM referral_codes WHERE owner_chat=?",
+                                (str(chat),)).fetchone()
+        return row[0] if row else ""
+
+    def referral_owner(self, code) -> str:
+        row = self.conn.execute("SELECT owner_chat FROM referral_codes WHERE code=?",
+                                (str(code).upper(),)).fetchone()
+        return row[0] if row else ""
+
+    def bind_referral(self, chat, owner_chat, code) -> bool:
+        """Bind `chat` to `owner_chat` (first binding wins; no self-referral). Returns new."""
+        if str(chat) == str(owner_chat):
+            return False
+        cur = self.conn.execute(
+            "INSERT OR IGNORE INTO referral_bindings(chat,owner_chat,code,bound_ts) VALUES(?,?,?,?)",
+            (str(chat), str(owner_chat), str(code).upper(), int(time.time())))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def get_referrer(self, chat) -> str:
+        row = self.conn.execute("SELECT owner_chat FROM referral_bindings WHERE chat=?",
+                                (str(chat),)).fetchone()
+        return row[0] if row else ""
+
+    def add_referral_credit(self, fill_id, owner_chat, buyer_chat, token, fee_usdc, commission_usdc,
+                            ts=0) -> bool:
+        cur = self.conn.execute(
+            "INSERT OR IGNORE INTO referral_credits(fill_id,owner_chat,buyer_chat,token,fee_usdc,"
+            "commission_usdc,created_ts,status) VALUES(?,?,?,?,?,?,?,'accrued')",
+            (str(fill_id), str(owner_chat), str(buyer_chat), str(token).lower(), float(fee_usdc),
+             float(commission_usdc), int(ts or time.time())))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def accrue_referral(self, fill_id, buyer_chat, token, notional_usdc, ts=0,
+                        fee_bps=100, pct_bps=3000) -> float:
+        """Credit the buyer's referrer with a lifetime % of this fill's fee (idempotent by
+        fill_id). Simulated [PAPER] fills never pay. Returns the commission (0 if none)."""
+        if str(fill_id).startswith("paper"):
+            return 0.0
+        owner = self.get_referrer(buyer_chat)
+        if not owner:
+            return 0.0
+        from monetization.referrals import fee_from_notional, commission_usdc
+        fee = fee_from_notional(float(notional_usdc or 0), fee_bps)
+        if fee <= 0:
+            return 0.0
+        comm = commission_usdc(fee, pct_bps)
+        self.add_referral_credit(fill_id, owner, buyer_chat, token, fee, comm, ts=ts)
+        return comm
+
+    def list_referred(self, owner_chat) -> list:
+        return [r[0] for r in self.conn.execute(
+            "SELECT chat FROM referral_bindings WHERE owner_chat=? ORDER BY bound_ts DESC",
+            (str(owner_chat),)).fetchall()]
+
+    def referral_summary(self, owner_chat) -> dict:
+        n = self.conn.execute("SELECT COUNT(*) FROM referral_bindings WHERE owner_chat=?",
+                              (str(owner_chat),)).fetchone()[0]
+        total, fills = self.conn.execute(
+            "SELECT COALESCE(SUM(commission_usdc),0), COUNT(*) FROM referral_credits "
+            "WHERE owner_chat=?", (str(owner_chat),)).fetchone()
+        paid = self.conn.execute(
+            "SELECT COALESCE(SUM(commission_usdc),0) FROM referral_credits WHERE owner_chat=? "
+            "AND status='paid'", (str(owner_chat),)).fetchone()[0]
+        total, paid = float(total or 0.0), float(paid or 0.0)
+        return {"referred": int(n), "fills": int(fills or 0), "accrued": total,
+                "paid": paid, "pending": total - paid}
+
+    def list_referral_credits(self, owner_chat, limit: int = 50) -> list:
+        return [{"buyer": r[0], "token": r[1], "fee_usdc": float(r[2]),
+                 "commission_usdc": float(r[3]), "ts": int(r[4]), "status": r[5]}
+                for r in self.conn.execute(
+                    "SELECT buyer_chat,token,fee_usdc,commission_usdc,created_ts,status "
+                    "FROM referral_credits WHERE owner_chat=? ORDER BY created_ts DESC LIMIT ?",
+                    (str(owner_chat), int(limit))).fetchall()]
 
     def close(self) -> None:
         self.conn.close()

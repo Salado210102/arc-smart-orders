@@ -4,13 +4,16 @@
 > hagamos la **revisión final** de este documento. Cada punto lleva estado:
 > **CONFIRMADO** (acordado) · **ABIERTO** (por decidir) · **PENDIENTE REVISIÓN** (para el repaso final).
 >
-> Última actualización: **2026-09-26**
+> Última actualización: **2026-09-27**
 
 ---
 
 ## 0. Contexto
-- Ya existe y está en producción el **bot de alertas** de arc-intel (avisos de peligro, no-custodial, beta).
-- Ya existe el **executor no-custodial** probado end-to-end en testnet, listo para auditoría.
+- Ya existe y está en producción el **bot de alertas** de arc-intel (avisos de peligro, beta).
+- Ya existe el **executor** probado end-to-end en testnet (v1/v2/v3), listo para auditoría.
+- **Modo elegido (2026-09-27): CUSTODIAL — "Modo Maestro/Banana".** El bot crea y custodia una wallet
+  rápida por usuario (clave **cifrada** con `ARC_INTEL_SESSION_ENC_KEY`), con flujo **depósito → compra
+  instantánea → retiro**. La custodia **sustituye** a la firma por orden como camino de velocidad.
 - Este registro cubre la **nueva dirección** (terminal/sniper estilo GMGN, red Arc) y lo que decidamos.
 
 ---
@@ -19,24 +22,24 @@
 | # | Decisión | Estado |
 |---|---|---|
 | P1 | Construir una **Telegram Mini App (TMA)** estilo GMGN/DexScreener, no solo comandos de texto. | CONFIRMADO |
-| P2 | **No custodial**: el usuario firma con **su** wallet; el bot **nunca** guarda claves ni fondos. | CONFIRMADO |
-| P3 | Reutilizar el **executor** ya probado (v4, no-custodial) como capa de ejecución. | CONFIRMADO |
+| P2 | **CUSTODIAL (Modo Maestro/Banana)**: el bot crea/custodia una **wallet por usuario** (clave cifrada, **retiro en cualquier momento**). Sustituye al no-custodial. | CONFIRMADO (2026-09-27) |
+| P3 | Reutilizar el **executor** ya probado (v1/v2/v3) como capa de ejecución; en custodial, **el bot firma** con la wallet del usuario. | CONFIRMADO |
 | P4 | El **detector de rug pulls** (ya construido) es el gancho de seguridad del producto. | CONFIRMADO |
-| P5 | **Bridge no-custodial** (el usuario firma su puente), no una billetera-depósito del bot. | CONFIRMADO |
+| P5 | **Bridge** (Base/Solana/Arbitrum → Arc USDC). En Modo Maestro lo puede operar el bot con la wallet custodial. | CONFIRMADO |
 | P6 | Banner en vivo del **pozo del concurso** (contador + FOMO) dentro de la TMA. | CONFIRMADO |
 
 ## 2. Modelo de negocio
 | # | Decisión | Estado |
 |---|---|---|
 | N1 | Tarifa **1%** por operación. | CONFIRMADO |
-| N2 | Reparto de la comisión: **5% premio trader + 5% premio afiliado + 20% referidos + 30% infra + 40% equipo = 100%**. | CONFIRMADO |
+| N2 | Reparto de la comisión: **5% premio trader + 5% premio afiliado + 30% referidos + 30% infra + 30% equipo = 100%**. | CONFIRMADO |
 | N3 | Coste fijo de infra de referencia: **300 USD/mes** (RPC + servidores + monitoreo). | CONFIRMADO |
 | N4 | **Break-even:** ~**100,000 USD/mes** de volumen (~3,300 USD/día) solo para cubrir infra. | CONFIRMADO |
-| N5 | Regla dura: **pagos < ingresos** (premios + referidos + rebajas **≤ 40%** de la comisión). | CONFIRMADO |
+| N5 | Regla dura: **pagos < ingresos** (premios 10% + referidos hasta 30% = **40%**; rebajas VIP salen del equipo, no se suman). | CONFIRMADO |
 | N6 | **Infra primero**, beneficio del equipo **después**; premios = gasto **topado** (10%), nunca "lo que sobre". | CONFIRMADO |
 | N7 | Descuento de bienvenida temporal por referido: **1% → 0.9%**. | ABIERTO (definir duración) |
 | N8 | Rebaja VIP (para KOLs): hasta ~35%, **sale del beneficio**, nunca se suma; suelo ~0.65% neto. | ABIERTO (definir niveles) |
-| N9 | Referidos: **20% de por vida sobre la comisión NETA** del referido (nunca sobre el volumen bruto). | CONFIRMADO |
+| N9 | Referidos: **30% de por vida sobre la comisión NETA** del referido (nunca sobre el volumen bruto). Mercado: Trojan ≤35%, BullX 30%, Maestro 25%. | CONFIRMADO |
 
 ## 3. Concurso por volumen (sustituye a la lotería)
 | # | Decisión | Estado |
@@ -63,17 +66,17 @@
 ## 5. Lo que NO se hace (descartado)
 | # | Descartado | Motivo |
 |---|---|---|
-| X1 | Bot que **genere/guarde billeteras** (custodia). | Riesgo de seguridad + legal; contradice la marca. |
+| X1 | ~~Bot que genere/guarde billeteras (custodia).~~ **ADOPTADO** → ver **P2 (Modo Maestro)**: ya **no** se descarta. | Riesgo asumido; mitigado con clave cifrada + retiro libre (§7 legal). |
 | X2 | **Lotería de azar** como motor de retención. | Riesgo regulatorio (juego). Se sustituye por concurso por volumen. |
 | X3 | Repartos que suman **>100%** o rebajas que se suman al reparto. | Rompía la economía. |
 | X4 | Aleatoriedad por **hash del bloque**. | Manipulable por quien produce el bloque. |
-| X5 | Bridge que deje fondos **en una billetera del bot**. | Custodia encubierta. |
+| X5 | ~~Bridge que deje fondos en una billetera del bot.~~ Ya **no aplica**: la custodia es el modo elegido (P2). | — |
 
 ## 6. UX / TMA (a detallar)
 | # | Punto | Estado |
 |---|---|---|
 | U1 | Terminal con gráficos, slippage deslizable, botones de compra rápida **con firma del usuario**. | ABIERTO (alcance) |
-| U2 | Pestaña **Bridge** (Base/Solana/Arbitrum → Arc USDC) **no-custodial**. | ABIERTO |
+| U2 | Pestaña **Bridge** (Base/Solana/Arbitrum → Arc USDC); en Modo Maestro lo opera el bot (wallet custodial). | ABIERTO |
 | U3 | **PnL / historial** visual (verde/rojo) + estado "RUGGED" en trades afectados. | ABIERTO |
 | U4 | Firma biométrica (FaceID/TouchID) **solo sobre wallet del usuario** (no del bot). | ABIERTO |
 | U5 | Menú inline estilo Maestro (8 filas) + idiomas EN/ES/中文 + pegar-CA + positions. | HECHO (bot actual) |
@@ -84,14 +87,14 @@
 | # | Punto | Estado |
 |---|---|---|
 | L1 | Concurso por volumen: confirmar encaje legal (mérito, no azar). | PENDIENTE REVISIÓN |
-| L2 | Custodia: descartada (no aplica). | CONFIRMADO (fuera) |
+| L2 | Custodia: **ADOPTADA** (Modo Maestro). Revisar **responsabilidad sobre fondos de terceros** y seguros/garantías. | PENDIENTE REVISIÓN |
 | L3 | **Divulgación publicitaria** de KOLs (marcar patrocinado). | PENDIENTE REVISIÓN |
-| L4 | KYC/AML según jurisdicción (si se maneja dinero de terceros… no aplica al ser no-custodial, revisar igual). | PENDIENTE REVISIÓN |
+| L4 | KYC/AML según jurisdicción: **sí aplica** (el bot custodia fondos de terceros). Revisar **antes de mainnet**. | PENDIENTE REVISIÓN |
 
 ## 8. Pendiente de decidir (para la revisión final)
 - Duración del descuento de bienvenida (N7) y niveles VIP (N8).
 - Alcance exacto de la TMA (qué pestañas primero).
-- Método de firma/wallet (WalletConnect vs deep-link vs embebida-no-custodial).
+- Wallet del usuario: **custodial** (Modo Maestro) → sin WalletConnect por orden; retiro libre en cualquier momento.
 - Venues de swap en Arc (v4 vía executor; Argus; otros).
 - Qué parte del **bot de alertas actual** se reutiliza tal cual vs se integra en la TMA.
 - Moneda/representación del pozo y pagos (USDC, on-chain).
@@ -99,15 +102,15 @@
 - **URL de documentación** (botón Help): hoy apunta al repo GitHub; sustituir por **web/Notion propia**
   cuando exista (configurable con `ARC_INTEL_DOCS_URL`, sin tocar código).
 - **Botones "pronto"**: Signals · Copytrade · Bridge · Premium (y la **TMA / terminal**).
-- **Trading real**: desplegar el executor en **mainnet** + **firma con la wallet del usuario** +
-  **auditoría**. (Hoy: solo testnet, y conectar wallet es solo informativo.)
+- **Trading real**: desplegar el executor en **mainnet** + **auditoría**. En Modo Maestro firma el bot
+  con la wallet custodial (no exige firma del usuario por orden). (Hoy: solo testnet.)
 
 ## 9. Artefactos y estado
 | Artefacto | Estado |
 |---|---|
 | Modelo económico | `docs/ARC_AI_ECONOMIC_MODEL.md` + `.csv` (sin commitear) |
 | Bot de alertas (arc-intel) | En producción (beta) |
-| Executor no-custodial | Probado en testnet; paquete de auditoría congelado (tag `arc-intel-executor-v1`) |
+| Executor | Probado en testnet (v1/v2/v3); paquete de auditoría congelado (tag `arc-intel-executor-v1`) |
 | Registro de decisiones | este documento (sin commitear) |
 
 ---
@@ -115,7 +118,8 @@
 ## 10. Registro cronológico (append)
 - **2026-09-26** — Se define la nueva dirección (terminal/TMA no-custodial, red Arc). Se descarta custodia,
   lotería de azar y economía rota. Concurso por volumen (trader/afiliado), 50/50, cada 12 h, UTC.
-  Reparto 5/5/20/30/40. Publicación 1 h después del cierre. Documento de modelo económico creado.
+  Reparto 5/5/30/30/30 (actualizado 2026-09-27; antes 5/5/20/30/40). Publicación 1 h después del cierre.
+  Documento de modelo económico creado.
 - **2026-09-27** — Bot: menú inline estilo Maestro (8 filas) + idiomas EN/ES/中文 (ancho igual, persistente
   por usuario); botón **Connect wallet** watch-only (no-custodial); **logos de token** desde Argus
   `image_uri` (IPFS→`gateway.pinata.cloud`, fallback DexScreener) en las alertas; `/list` con símbolo;
@@ -241,7 +245,11 @@
 ---
 
 ## 11. Velocidad de ejecución — Opción 2 (órdenes pre-firmadas)
-**Decisión:** para ejecución rápida **no-custodial** se elige la **Opción 2 (órdenes pre-firmadas)**.
+> **⚠️ Superado en parte (2026-09-27):** el **Modo Maestro (custodial)** pasa a ser el camino de
+> velocidad por defecto (el bot firma con la wallet del usuario). Esta sección se mantiene como **diseño
+> de respaldo no-custodial** (por si se ofrece también ese modo).
+
+**Decisión (histórica):** para ejecución rápida **no-custodial** se elige la **Opción 2 (órdenes pre-firmadas)**.
 La **Opción 3 (session keys / ERC-4337)** queda **diferida** (smart account + módulo de sesión +
 auditoría + hot key acotada; no es lo primero).
 
@@ -271,10 +279,10 @@ auditoría + hot key acotada; no es lo primero).
 
 ## 12. Ideas diferenciales (atraer público — que la competencia no tiene)
 > Los bots grandes (Maestro, Banana Gun, Trojan, Photon) son **custodiales, genéricos y "casino"**.
-> Nuestro foso: **capa de SEGURIDAD para memecoins de Arc, sin custodia y honesta**.
+> Nuestro foso: **capa de SEGURIDAD para memecoins de Arc, honesta y con custodia declarada (Modo Maestro)**.
 
 ### A. Seguridad (ventaja #1 — nadie la da)
-1. **🛡️ Kill-switch no-custodial** (auto-salida en dev-sell) — producto estrella (Opción 2).
+1. **🛡️ Kill-switch** (auto-salida en dev-sell) — producto estrella (Modo Maestro; Opción 2 como respaldo).
 2. **Reputación on-chain del creador** — si el dev ya rugueó, avisar **antes** de comprar (historial de carteras).
 3. **Detección de bundle/insider** — snipers/bundles que entran en el mismo bloque al lanzar (ya tenemos `coordinated_clusters`).
 4. **Badge de LP bloqueada y verificable** — sello de confianza (Argus ya la bloquea por construcción).
@@ -284,7 +292,7 @@ auditoría + hot key acotada; no es lo primero).
 ### B. Arc-nativo (nadie sirve Arc de verdad)
 7. **Primer bot hecho PARA Arc** (USDC gas, bloques sub-segundo).
 8. **Terminal (TMA)** con precio y **PnL en vivo por websocket** — UX estilo GMGN.
-9. **Bridge no-custodial** (Base/Solana → Arc USDC) + aviso al llegar.
+9. **Bridge** (Base/Solana/Arbitrum → Arc USDC) + aviso al llegar.
 10. **Whale watch de Arc** — compras/ventas grandes en tiempo real.
 
 ### C. Honestidad (imposible de copiar sin cambiar su modelo)
@@ -303,7 +311,7 @@ auditoría + hot key acotada; no es lo primero).
 19. **"Antes de comprar"**: pegas la CA y te dice **riesgo** (no solo el precio).
 
 ### Prioridad recomendada
-1. **Kill-switch no-custodial** (Opción 2) — diferenciador nº1.
+1. **Kill-switch** (auto-salida en dev-sell) — diferenciador nº1.
 2. **Reputación on-chain del creador** (usa datos que ya indexamos; rápido y único).
 3. **Badge LP bloqueada + rug risk score**.
 4. **Terminal TMA con PnL en vivo (websocket)**.
@@ -343,3 +351,29 @@ auditoría + hot key acotada; no es lo primero).
   **`--no-ingest --interval 60`** (ciclos rápidos). Además, `dispatch` **blinda el envío** (un chat
   inválido ya no rompe el bucle) y se eliminaron suscriptores de prueba. Verificado: `dispatched: 20`.
   Se activó el **feed público** de descubrimiento (volume spike / price surge / whale buy) a todos.
+- **2026-09-27 (referidos: 30%)** — Investigación de la competencia y decisión: **referidos = 30% de por
+  vida** sobre la comisión neta. Mercado medido: **Trojan ≤35%** (multinivel 5, L1 15%), **BullX 30%**
+  (flat), **Maestro 25%** (sticky), **Banana Gun** revenue-share ligado a `$BANANA`, **GMGN** tiers por
+  volumen, **Photon** 0.9% (descuento, no paga), **Axiom** multinivel 3. Reparto recomputado a
+  **5% trader + 5% afiliado + 30% referidos + 30% infra + 30% equipo = 100%** (`ARC_AI_ECONOMIC_MODEL.md`
+  y `.csv` actualizados). Regla de pagos: premios (10%) + referidos (30%) = 40%; rebajas VIP salen del
+  equipo. Pendiente de decidir: multinivel (L2) más adelante.
+- **2026-09-27 (CUSTODIA adoptada)** — Se **alinea el registro con el código**: existe
+  `execution/custody.py` (**Modo Maestro/Banana**, wallet custodial cifrada) y el usuario **confirma
+  custodial como modo**. Se actualizan P2 (no-custodial → **CUSTODIAL**), P3/P5, **X1** (custodia ya
+  **no** se descarta) y **X5** (bridge a wallet del bot ya no aplica); **L2/L4** pasan a **PENDIENTE
+  REVISIÓN** (KYC/AML + responsabilidad sobre fondos de terceros, revisar **antes de mainnet**). La
+  custodia **sustituye a las session keys / firma por orden** (Opción 2/3) como camino de **velocidad**:
+  el bot firma con la wallet del usuario (clave cifrada con `ARC_INTEL_SESSION_ENC_KEY`, retiro libre).
+  Riesgo asumido y declarado: quien tenga la clave controla los fondos. Auditoría de mainnet **obligatoria**.
+- **2026-09-27 (referidos: implementación)** — Programa de referidos **funcional**:
+  `monetization/referrals.py` (puro: `make_code`, `parse_ref_param`, `referral_link`, comisión 1%→30%);
+  `bot/store.py` (tablas `referral_codes`/`referral_bindings`/`referral_credits`; `ensure_referral_code`,
+  `bind_referral` (sin auto-referido, primer vínculo gana), `accrue_referral` **idempotente por `fill_id`**
+  — los fills `[PAPER]` **no** pagan, y se engancha en `record_fill`); captura de `/start ref_CODE` en el
+  poller (`capture_referral`, incluso antes de la allowlist) + `_ensure_bot_username` (getMe→state);
+  comando **`/referral`** (código, enlace, invitados, acumulado/pendiente) + botón en el menú + alta en
+  `setMyCommands` (EN/ES/ZH); endpoint **`GET /referral`** (auth) y tarjeta en **Cartera** de la Mini App.
+  Tests: **63** en los módulos tocados (13 + 1 de pantalla + 1 de integración nuevos); suite total
+  **348 passed** (1 fallo **ambiental** local de la Mini App). Nota: las comisiones quedan **acumuladas**
+  (`status='accrued'`); el **pago en USDC** se hará cuando el cobro del fee esté activo en mainnet.

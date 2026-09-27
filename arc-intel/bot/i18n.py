@@ -174,6 +174,38 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "btn_check_now": {"en": "\u26A1 Check a token now", "es": "\u26A1 Consultar un token ahora",
                       "zh": "\u26A1 立即查询代币"},
+    "btn_referral": {"en": "\U0001F381 Referrals", "es": "\U0001F381 Referidos", "zh": "\U0001F381 推荐"},
+    "referral_text": {
+        "en": ("\U0001F381 <b>Referrals \u2014 earn 30% for life</b>\n"
+               "Invite friends and earn <b>30%</b> of the 1% fee on everything they trade, forever.\n\n"
+               "Your code: <code>{code}</code>\n"
+               "Your link: {link}\n\n"
+               "\U0001F465 Invited: <b>{referred}</b>\n"
+               "\U0001F4B5 Accrued: <b>${accrued:.2f}</b>\n"
+               "\u23F3 Pending payout: <b>${pending:.2f}</b>\n\n"
+               "<i>Paid in USDC. Not financial advice.</i>"),
+        "es": ("\U0001F381 <b>Referidos \u2014 gana 30% de por vida</b>\n"
+               "Invita amigos y gana el <b>30%</b> de la comisión del 1% de todo lo que operen, siempre.\n\n"
+               "Tu código: <code>{code}</code>\n"
+               "Tu enlace: {link}\n\n"
+               "\U0001F465 Invitados: <b>{referred}</b>\n"
+               "\U0001F4B5 Acumulado: <b>${accrued:.2f}</b>\n"
+               "\u23F3 Pendiente de pago: <b>${pending:.2f}</b>\n\n"
+               "<i>Se paga en USDC. No es consejo financiero.</i>"),
+        "zh": ("\U0001F381 <b>推荐 \u2014 终身赚取 30%</b>\n"
+               "邀请好友，终身赚取其每笔交易 1% 手续费的 <b>30%</b>。\n\n"
+               "你的代码：<code>{code}</code>\n"
+               "你的链接：{link}\n\n"
+               "\U0001F465 已邀请：<b>{referred}</b>\n"
+               "\U0001F4B5 累计：<b>${accrued:.2f}</b>\n"
+               "\u23F3 待支付：<b>${pending:.2f}</b>\n\n"
+               "<i>以 USDC 支付。非投资建议。</i>"),
+    },
+    "referral_nolink": {
+        "en": "Your code: <code>{code}</code> (share it; the bot will attribute new users).",
+        "es": "Tu código: <code>{code}</code> (compártelo; el bot atribuirá a los nuevos usuarios).",
+        "zh": "你的代码：<code>{code}</code>（分享它，机器人将归因新用户）。",
+    },
 }
 
 
@@ -208,6 +240,7 @@ def menu_buttons(lang: str = DEFAULT) -> list:
         [b("btn_wallet", "cmd:/connect"), b("btn_help", "cmd:/help")],
         [b("btn_signals", "soon:Signals"), b("btn_copytrade", "soon:Copytrade")],
         [b("btn_bridge", "soon:Bridge"), b("btn_premium", "soon:Premium")],
+        [b("btn_referral", "cmd:/referral")],
         # equal-length, no flags -> identical button widths across clients
         [{"text": "English", "data": "lang:en"},
          {"text": "Español", "data": "lang:es"},

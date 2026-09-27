@@ -143,11 +143,17 @@ class CommandTests(unittest.TestCase):
         r = command_reply_rich("/start", 1, self.store, self.exists, self.check, 1000)
         self.assertIsInstance(r, dict)
         self.assertTrue(r["inline"])
-        # Maestro-style grid: 9 rows; row 0 is the Mini App button (web_app)
-        self.assertEqual(len(r["inline"]), 9)
+        # Maestro-style grid: 10 rows; row 0 is the Mini App button (web_app)
+        self.assertEqual(len(r["inline"]), 10)
         self.assertIn("web_app", r["inline"][0][0])
         self.assertEqual(len(r["inline"][1]), 2)
         self.assertIn("SNIPER IA", r["text"])
+
+    def test_referral_screen(self):
+        r = command_reply_rich("/referral", 1, self.store, self.exists, self.check, 1000)
+        self.assertEqual(r["parse_mode"], "HTML")
+        self.assertIn("30%", r["text"])
+        self.assertIn(self.store.get_referral_code(1), r["text"])
 
     def test_wallet_panel_non_custodial(self):
         self.assertIn("custodial", self.reply("/wallet"))

@@ -8,9 +8,9 @@ Coste fijo infra mensual (USD),300,,RPC + servidores + monitoreo
 REPARTO de la comision,%,,,
 Premio trader (mayor volumen propio),0.05,,concurso diario
 Premio afiliado (mayor volumen de referidos),0.05,,concurso diario
-Referidos (comision de por vida),0.20,,sobre la comision neta del referido
+Referidos (comision de por vida),0.30,,sobre la comision neta del referido (paridad BullX)
 Operaciones / infra,0.30,,
-Equipo / beneficio,0.40,,
+Equipo / beneficio,0.30,,
 Total (debe dar 1.00),=B9+B10+B11+B12+B13,,,
 ,,,,
 ESCENARIO,BAJO,MEDIO,ALTO,
