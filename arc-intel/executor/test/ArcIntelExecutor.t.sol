@@ -17,7 +17,8 @@ contract ArcIntelExecutorTest is Test {
 
     IPoolManager.PoolKey internal key;
     bytes32 internal poolId;
-    bool internal zeroForOne;
+    bool internal zeroForOne;    // sell TOK
+    bool internal buyZeroForOne; // buy with USDC (the opposite direction)
 
     function setUp() public {
         usdc = new MockERC20("USDC");
@@ -25,6 +26,7 @@ contract ArcIntelExecutorTest is Test {
         (address c0, address c1) =
             address(tok) < address(usdc) ? (address(tok), address(usdc)) : (address(usdc), address(tok));
         zeroForOne = (c0 == address(tok)); // selling TOK -> tokenIn is TOK
+        buyZeroForOne = (c0 == address(usdc)); // buying: tokenIn is USDC
         key = IPoolManager.PoolKey(c0, c1, 10000, 200, address(0xBEef));
         poolId = keccak256(abi.encode(key));
 
@@ -95,6 +97,55 @@ contract ArcIntelExecutorTest is Test {
         );
         exec.execute(_permit(address(tok), amountIn), user, _order(100e18, 7, block.timestamp + 100), "");
         assertEq(MockPermit2(exec.PERMIT2()).lastWitness(), expectedWitness);
+    }
+
+    // ------------------------------------------------ BUY direction (USDC in -> token out)
+
+    function testBuyDirectionPaysUsdcReceivesToken() public {
+        uint256 amountIn = 100e18;
+        pm.setRate(1e18);
+        usdc.mint(user, 10_000e18);
+        tok.mint(address(pm), 10_000e18); // pool liquidity to pay the token out
+
+        uint256 usdcBefore = usdc.balanceOf(user);
+        uint256 tokBefore = tok.balanceOf(user);
+        ArcIntelExecutor.Order memory o = ArcIntelExecutor.Order({
+            key: key,
+            zeroForOne: buyZeroForOne,
+            minOut: amountIn,
+            recipient: user,
+            orderNonce: 11,
+            deadline: block.timestamp + 100
+        });
+        exec.execute(_permit(address(usdc), amountIn), user, o, "");
+
+        assertEq(usdcBefore - usdc.balanceOf(user), amountIn, "usdc spent");
+        assertEq(tok.balanceOf(user) - tokBefore, amountIn, "token received");
+        assertEq(tok.balanceOf(address(exec)), 0, "no custody");
+        assertEq(usdc.balanceOf(address(exec)), 0, "no custody (input)");
+    }
+
+    function testBuyWrongTokenReverts() public {
+        usdc.mint(user, 1e18);
+        ArcIntelExecutor.Order memory o = ArcIntelExecutor.Order({
+            key: key, zeroForOne: buyZeroForOne, minOut: 0, recipient: user,
+            orderNonce: 12, deadline: block.timestamp + 100
+        });
+        // paying TOK although the buy direction expects USDC as input
+        vm.expectRevert(ArcIntelExecutor.TokenMismatch.selector);
+        exec.execute(_permit(address(tok), 1e18), user, o, "");
+    }
+
+    function testBuyMinOutEnforced() public {
+        pm.setRate(1e18);
+        usdc.mint(user, 100e18);
+        tok.mint(address(pm), 100e18);
+        ArcIntelExecutor.Order memory o = ArcIntelExecutor.Order({
+            key: key, zeroForOne: buyZeroForOne, minOut: 101e18, recipient: user,
+            orderNonce: 13, deadline: block.timestamp + 100
+        });
+        vm.expectRevert(abi.encodeWithSelector(ArcIntelExecutor.InsufficientOutput.selector, 100e18, 101e18));
+        exec.execute(_permit(address(usdc), 100e18), user, o, "");
     }
 
     function testRevertWhenPaused() public {

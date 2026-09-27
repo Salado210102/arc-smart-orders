@@ -61,6 +61,15 @@ class SubscriptionStore:
             "CREATE TABLE IF NOT EXISTS paper_outcomes ("
             "kind TEXT, token TEXT, alert_block INTEGER, delay_seconds INTEGER, computed_ts INTEGER, "
             "horizons_json TEXT, PRIMARY KEY (kind, token, alert_block, delay_seconds))")
+        # real fills (idempotent) + tracked positions (average cost)
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS fills ("
+            "fill_id TEXT PRIMARY KEY, user TEXT, token TEXT, side TEXT, qty REAL, "
+            "usdc REAL, block INTEGER, ts INTEGER)")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS positions ("
+            "user TEXT, token TEXT, qty REAL, cost REAL, realized REAL, last_block INTEGER, "
+            "PRIMARY KEY (user, token))")
         self.conn.commit()
 
     def subscribe(self, chat_id, tokens=(), wallets=(), kinds=()) -> None:
@@ -290,6 +299,52 @@ class SubscriptionStore:
             (token, kind, int(now_ts)))
         self.conn.commit()
         return True
+
+    # --- real fills + positions (idempotent, average cost) ---
+    def record_fill(self, fill_id, user, token, side, qty, usdc, block=0, ts=0) -> bool:
+        """Record a CONFIRMED fill once (idempotent by fill_id) and update the position.
+        Returns True if it was new, False if it was a duplicate (no double count)."""
+        cur = self.conn.execute(
+            "INSERT OR IGNORE INTO fills(fill_id,user,token,side,qty,usdc,block,ts) "
+            "VALUES(?,?,?,?,?,?,?,?)",
+            (str(fill_id), str(user).lower(), str(token).lower(), side, float(qty),
+             float(usdc), int(block), int(ts)))
+        if cur.rowcount == 0:
+            self.conn.commit()
+            return False
+        from execution.positions import Position, apply_fill
+        p = self.get_position(user, token)
+        pos = Position(token=str(token).lower(), qty=p["qty"], cost=p["cost"],
+                       realized=p["realized"], last_block=p["last_block"])
+        apply_fill(pos, side, float(qty), float(usdc), int(block))
+        self.conn.execute(
+            "INSERT INTO positions(user,token,qty,cost,realized,last_block) VALUES(?,?,?,?,?,?) "
+            "ON CONFLICT(user,token) DO UPDATE SET qty=excluded.qty, cost=excluded.cost, "
+            "realized=excluded.realized, last_block=excluded.last_block",
+            (str(user).lower(), str(token).lower(), pos.qty, pos.cost, pos.realized, pos.last_block))
+        self.conn.commit()
+        return True
+
+    def get_position(self, user, token) -> dict:
+        cur = self.conn.execute(
+            "SELECT qty,cost,realized,last_block FROM positions WHERE user=? AND token=?",
+            (str(user).lower(), str(token).lower()))
+        r = cur.fetchone()
+        if not r:
+            return {"token": str(token).lower(), "qty": 0.0, "cost": 0.0, "realized": 0.0,
+                    "avg_cost": 0.0, "last_block": 0}
+        qty, cost, realized, lb = r
+        return {"token": str(token).lower(), "qty": float(qty or 0), "cost": float(cost or 0),
+                "realized": float(realized or 0),
+                "avg_cost": (float(cost) / float(qty)) if qty else 0.0, "last_block": int(lb or 0)}
+
+    def list_positions(self, user) -> list:
+        cur = self.conn.execute(
+            "SELECT token,qty,cost,realized,last_block FROM positions WHERE user=? AND qty>0 "
+            "ORDER BY last_block DESC", (str(user).lower(),))
+        return [{"token": r[0], "qty": float(r[1]), "cost": float(r[2]), "realized": float(r[3]),
+                 "avg_cost": (float(r[2]) / float(r[1])) if r[1] else 0.0, "last_block": int(r[4])}
+                for r in cur.fetchall()]
 
     def close(self) -> None:
         self.conn.close()
