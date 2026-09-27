@@ -254,13 +254,13 @@
     }
 
     // ---------------- SIGN VIEW ----------------
-    const t = new URLSearchParams(location.search).get("t");
-    if (t) {
+    const stok = new URLSearchParams(location.search).get("t");
+    if (stok) {
       $("signview").classList.remove("hide");
       const info = $("signinfo"), details = $("signdetails"), out = $("signout"), go = $("signgo");
       let payload = null;
       (async () => {
-        const { status, body } = await api(`/order?t=${encodeURIComponent(t)}`);
+        const { status, body } = await api(`/order?t=${encodeURIComponent(stok)}`);
         if (status !== 200 || !body || body.error) { info.textContent = "Orden no disponible: " + (body && body.error ? body.error : status); return; }
         payload = body.payload;
         const p = body.preorder || {};
@@ -276,7 +276,7 @@
           const sig = await connectSign(payload);
           out.textContent = "Enviando firma…";
           const { status, body } = await api("/sign", { method: "POST",
-            headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t, signature: sig }) });
+            headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t: stok, signature: sig }) });
           out.innerHTML = (status === 200 && body && body.ok)
             ? '<span class="ok">✅ Orden firmada. El keeper la ejecutará al cumplirse la condición.</span>'
             : 'Error: ' + JSON.stringify(body || status);
