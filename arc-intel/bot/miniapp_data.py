@@ -78,14 +78,25 @@ def load_token_card(storage, token, head_block=None) -> dict:
         risk = analyze_token(token, holders=holders_for(storage, token))
     except Exception:
         risk = {}
-    card = miniapp_api.build_token_card(
-        address=token, symbol=symbol or "", name=name or "", launchpad=launchpad or "",
-        creator=creator or "", created_block=created_block, head_block=head, swaps=n, wallets=w,
-        vol24=vol24, price=price, supply=supply_h, thin_reason=thin, creator_rep=rep, risk=risk)
     try:
         dex = tokenmeta.dex_info(token)
     except Exception:
         dex = {}
+    top10 = None
+    try:
+        from indexer.safety import holders_top10_pct
+        top10 = holders_top10_pct(storage, token, supply)
+    except Exception:
+        top10 = None
+    from indexer.safety import safety_score
+    safety = safety_score(risk=risk, creator_rep=rep, liquidity_usd=(dex.get("liquidity_usd") or 0),
+                          age_blocks=age, thin_market=thin, holders_top10_pct=top10)
+    safety["holders_top10_pct"] = top10
+    card = miniapp_api.build_token_card(
+        address=token, symbol=symbol or "", name=name or "", launchpad=launchpad or "",
+        creator=creator or "", created_block=created_block, head_block=head, swaps=n, wallets=w,
+        vol24=vol24, price=price, supply=supply_h, thin_reason=thin, creator_rep=rep, risk=risk,
+        safety=safety)
     card["dex"] = dex
     if dex:
         if not card.get("symbol") and dex.get("symbol"):

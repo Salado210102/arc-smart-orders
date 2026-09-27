@@ -469,6 +469,16 @@ def check_token(storage, token: str) -> str:
                          f"<i>heuristic</i>")
     except Exception:
         pass
+    try:
+        from indexer.safety import safety_score, holders_top10_pct
+        dex = tokenmeta.dex_info(token)
+        top10 = holders_top10_pct(storage, token, tokenmeta.rpc_total_supply(token))
+        sf = safety_score(risk=rk, creator_rep=rep, liquidity_usd=(dex.get("liquidity_usd") or 0),
+                          age_blocks=age, thin_market=thin, holders_top10_pct=top10)
+        em = {"SAFE": "\U0001F7E2", "WARN": "\U0001F7E0", "DANGER": "\U0001F534"}.get(sf["verdict"], "\u26AA")
+        lines.append(f"{em} Safety: <b>{sf['score']}/100 \u00B7 {sf['verdict']}</b>")
+    except Exception:
+        pass
     lines.append(f'\U0001F517 <a href="https://explorer.arc.io/address/{_h.escape(token)}">view on explorer</a>')
     return "\n".join(lines)
 

@@ -395,6 +395,7 @@
              ${logo ? `<img src="${esc(logo)}" style="width:44px;height:44px;border-radius:10px" onerror="this.style.display='none'">` : ""}
              <div><b>${esc(body.symbol || "?")}</b> <span class="mut">${esc(body.name || "")}</span></div>
            </div>
+           ${(body.safety && body.safety.verdict) ? `<div class="kv"><span>Safety</span><b class="${body.safety.verdict === "SAFE" ? "ok" : body.safety.verdict === "DANGER" ? "bad" : "warn"}">${body.safety.score}/100 · ${esc(body.safety.verdict)}</b></div>` : ""}
            <div class="kv"><span>${t("price")}</span><b>${esc(body.price_text)}${chg(pc.h24)}</b></div>
            <div class="kv"><span>${t("mcap")}</span><b>${d.market_cap ? money(d.market_cap) : esc(body.market_cap_text)}</b></div>
            <div class="kv"><span>${t("liq")}</span><b>${money(d.liquidity_usd)}</b></div>
