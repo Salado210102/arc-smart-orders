@@ -43,7 +43,7 @@ DOMAIN_NAME = "Permit2"
 
 
 def new_nonce() -> int:
-    return secrets.randbits(64)
+    return secrets.randbits(62)  # fits a signed 64-bit SQLite INTEGER; unique enough per user
 
 
 def min_out_from_floor(price: float, qty: float, floor_pct: float) -> int:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+import time
 
 
 class SubscriptionStore:
@@ -70,6 +71,12 @@ class SubscriptionStore:
             "CREATE TABLE IF NOT EXISTS positions ("
             "user TEXT, token TEXT, qty REAL, cost REAL, realized REAL, last_block INTEGER, "
             "PRIMARY KEY (user, token))")
+        # pre-signed protective orders (arm -> fires on trigger)
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS preorders ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, chat TEXT, user TEXT, token TEXT, pct REAL, "
+            "floor_pct REAL, min_out REAL, deadline INTEGER, order_nonce INTEGER, status TEXT, "
+            "created_ts INTEGER)")
         self.conn.commit()
 
     def subscribe(self, chat_id, tokens=(), wallets=(), kinds=()) -> None:
@@ -345,6 +352,42 @@ class SubscriptionStore:
         return [{"token": r[0], "qty": float(r[1]), "cost": float(r[2]), "realized": float(r[3]),
                  "avg_cost": (float(r[2]) / float(r[1])) if r[1] else 0.0, "last_block": int(r[4])}
                 for r in cur.fetchall()]
+
+    # --- pre-signed protective orders ---
+    def create_preorder(self, chat, user, token, pct, floor_pct, min_out, deadline,
+                        order_nonce, status="armed", created_ts=None) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO preorders(chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,"
+            "status,created_ts) VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (str(chat), str(user).lower(), str(token).lower(), float(pct), float(floor_pct),
+             float(min_out), int(deadline), int(order_nonce), status,
+             int(created_ts if created_ts is not None else time.time())))
+        self.conn.commit()
+        return int(cur.lastrowid)
+
+    def _po_row(self, r) -> dict:
+        return {"id": r[0], "chat": r[1], "user": r[2], "token": r[3], "pct": r[4],
+                "floor_pct": r[5], "min_out": r[6], "deadline": r[7], "order_nonce": r[8],
+                "status": r[9], "created_ts": r[10]}
+
+    def preorders_for_token(self, token, active_only=True) -> list:
+        q = ("SELECT id,chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,status,created_ts "
+             "FROM preorders WHERE token=?")
+        if active_only:
+            q += " AND status='armed'"
+        return [self._po_row(r) for r in self.conn.execute(q, (str(token).lower(),)).fetchall()]
+
+    def list_preorders(self, chat, active_only=True) -> list:
+        q = ("SELECT id,chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,status,created_ts "
+             "FROM preorders WHERE chat=?")
+        if active_only:
+            q += " AND status='armed'"
+        q += " ORDER BY id DESC"
+        return [self._po_row(r) for r in self.conn.execute(q, (str(chat),)).fetchall()]
+
+    def set_preorder_status(self, pid, status) -> None:
+        self.conn.execute("UPDATE preorders SET status=? WHERE id=?", (status, int(pid)))
+        self.conn.commit()
 
     def close(self) -> None:
         self.conn.close()

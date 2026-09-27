@@ -190,6 +190,82 @@ class CommandTests(unittest.TestCase):
         self.assertIsInstance(r, dict)
         self.assertTrue(any("url" in b for row in r["inline"] for b in row))
 
+    def test_check_has_buy_sell_buttons(self):
+        r = command_reply_rich(f"/check {ADDR}", 1, self.store, self.exists, self.check, 1000)
+        self.assertIsInstance(r, dict)
+        datas = [b.get("data", "") for row in r["inline"] for b in row]
+        self.assertTrue(any("buymenu:" in d for d in datas))
+
+    def test_buy_menu_and_amount(self):
+        price_fn = lambda t: [(1, 0.5)]
+        r = _handle_callback(f"buymenu:{ADDR}", 1, self.store, self.exists, self.check, 1000,
+                             paper_price_fn=price_fn)
+        self.assertIsInstance(r, dict)
+        _handle_callback(f"buyamt:{ADDR}:50", 1, self.store, self.exists, self.check, 1000,
+                         paper_price_fn=price_fn)
+        self.assertGreater(self.store.get_position(1, ADDR)["qty"], 0)
+
+    def test_sell_pct_buttons(self):
+        price_fn = lambda t: [(1, 1.0)]
+        _handle_callback(f"buyamt:{ADDR}:50", 1, self.store, self.exists, self.check, 1000,
+                         paper_price_fn=price_fn)
+        r = _handle_callback(f"sellpct:{ADDR}:25", 1, self.store, self.exists, self.check, 1000,
+                             paper_price_fn=price_fn)
+        self.assertIn("25%", r)
+        self.assertAlmostEqual(self.store.get_position(1, ADDR)["qty"], 37.5)
+
+    def test_buy_custom_amount_flow(self):
+        price_fn = lambda t: [(1, 2.0)]
+        _handle_callback(f"buycustom:{ADDR}", 1, self.store, self.exists, self.check, 1000,
+                         paper_price_fn=price_fn)
+        self.assertEqual(str(self.store.get_state("awaiting_amount:1")), ADDR)
+        r = command_reply("30", 1, self.store, self.exists, self.check, 1000, paper_price_fn=price_fn)
+        self.assertIn("Bought", r)
+        self.assertAlmostEqual(self.store.get_position(1, ADDR)["qty"], 15.0)
+
+    def test_paper_buy_then_sell(self):
+        price_fn = lambda t: [(1, 0.5)]
+        r1 = _handle_callback(f"buy:{ADDR}", 1, self.store, self.exists, self.check, 1000,
+                              paper_price_fn=price_fn)
+        self.assertIn("Bought", r1)
+        self.assertGreater(self.store.get_position(1, ADDR)["qty"], 0)
+        r2 = _handle_callback(f"sell:{ADDR}", 1, self.store, self.exists, self.check, 1000,
+                              paper_price_fn=price_fn)
+        self.assertIn("Sold", r2)
+        self.assertAlmostEqual(self.store.get_position(1, ADDR)["qty"], 0.0)
+
+    def test_protect_flow_arms_preorder(self):
+        price_fn = lambda t: [(1, 1.0)]
+        _handle_callback(f"buyamt:{ADDR}:100", 1, self.store, self.exists, self.check, 1000,
+                         paper_price_fn=price_fn)
+        r = _handle_callback(f"protectfloor:{ADDR}:50:30", 1, self.store, self.exists, self.check,
+                             1000, paper_price_fn=price_fn)
+        self.assertIn("ARMED", r)
+        pos = self.store.preorders_for_token(ADDR)
+        self.assertEqual(len(pos), 1)
+        self.assertEqual(pos[0]["pct"], 50.0)
+
+    def test_fire_preorders_sells_on_alert(self):
+        from bot.commands import fire_preorders
+        price_fn = lambda t: [(1, 1.0)]
+        _handle_callback(f"buyamt:{ADDR}:100", 1, self.store, self.exists, self.check, 1000,
+                         paper_price_fn=price_fn)
+        _handle_callback(f"protectfloor:{ADDR}:100:30", 1, self.store, self.exists, self.check,
+                         1000, paper_price_fn=price_fn)
+
+        class T:
+            def send(self, *a, **k):
+                pass
+
+        class Th:
+            def wait(self, *a, **k):
+                pass
+
+        n = fire_preorders(self.store, [{"kind": "dev_sell", "token": ADDR}], T(), Th(), price_fn)
+        self.assertEqual(n, 1)
+        self.assertAlmostEqual(self.store.get_position(1, ADDR)["qty"], 0.0)
+        self.assertEqual(self.store.preorders_for_token(ADDR), [])
+
     def test_settings_screen_has_toggles(self):
         r = command_reply_rich("/settings", 1, self.store, self.exists, self.check, 1000)
         self.assertIsInstance(r, dict)

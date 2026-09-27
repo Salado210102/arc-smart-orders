@@ -158,9 +158,48 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
         return {"text": reply, "inline": btns, "parse_mode": "HTML"}
     if cmd in ("/start", "/menu"):
         return {"text": reply, "inline": i18n.menu_buttons(lang), "parse_mode": "HTML"}
-    if cmd in ("/list", "/stats", "/wallet", "/connect", "/check"):
+    if cmd == "/check":
+        parts2 = norm.split()
+        if len(parts2) > 1 and _valid_addr(parts2[1]):
+            card = _token_card(store, chat_id, parts2[1], reply, lang, paper_price_fn)
+            card["parse_mode"] = "HTML"
+            return card
+        return {"text": reply, "parse_mode": "HTML"}
+    if cmd in ("/list", "/stats", "/wallet", "/connect"):
         return {"text": reply, "parse_mode": "HTML"}
     return reply
+
+
+def _paper_trade(data, chat, store, lang, price_fn) -> str:
+    side, token = data.split(":", 1)
+    token = token.lower()
+    price = 0.0
+    if price_fn:
+        try:
+            series = price_fn(token) or []
+            price = float(series[-1][1]) if series else 0.0
+        except Exception:
+            price = 0.0
+    if price <= 0:
+        return "[PAPER] No price available for this token right now."
+    notional = 10.0
+    if side == "buy":
+        qty = notional / price
+        store.record_fill(f"paperbuy:{chat}:{token}:{int(time.time() * 1000)}",
+                          chat, token, "buy", qty, notional)
+        p = store.get_position(chat, token)
+        return (f"\U0001F7E2 [PAPER] Bought ~{qty:.4g} tokens for ${notional:.0f} "
+                f"(simulated at ${price:.8g}).\nPosition: {p['qty']:.4g} · avg ${p['avg_cost']:.8g}")
+    p = store.get_position(chat, token)
+    if p["qty"] <= 0:
+        return "\U0001F534 [PAPER] No position to sell. Use \U0001F7E2 Buy first."
+    qty = p["qty"]
+    proceeds = qty * price
+    store.record_fill(f"papersell:{chat}:{token}:{int(time.time() * 1000)}",
+                      chat, token, "sell", qty, proceeds)
+    p2 = store.get_position(chat, token)
+    return (f"\U0001F534 [PAPER] Sold {qty:.4g} tokens for ${proceeds:.2f} (simulated).\n"
+            f"Realized: ${p2['realized']:.2f}")
 
 
 def is_authorized(store, chat_id) -> bool:
@@ -200,8 +239,128 @@ def wallet_screen(store, chat, lang) -> dict:
     return {"text": text, "inline": rows, "parse_mode": "HTML"}
 
 
+def _paper_price(price_fn, token) -> float:
+    if not price_fn:
+        return 0.0
+    try:
+        s = price_fn(token) or []
+        return float(s[-1][1]) if s else 0.0
+    except Exception:
+        return 0.0
+
+
+def _paper_buy(store, chat, token, notional, price_fn) -> str:
+    token = str(token).lower()
+    price = _paper_price(price_fn, token)
+    if price <= 0:
+        return "[PAPER] No price available for this token right now."
+    qty = float(notional) / price
+    store.record_fill(f"paperbuy:{chat}:{token}:{int(time.time() * 1000)}",
+                      chat, token, "buy", qty, float(notional))
+    p = store.get_position(chat, token)
+    return (f"\U0001F7E2 [PAPER] Bought ~{qty:.4g} for ${float(notional):.2f} "
+            f"(at ${price:.8g}).\nPosition: {p['qty']:.4g} \u00B7 avg ${p['avg_cost']:.8g}")
+
+
+def _paper_sell_pct(store, chat, token, pct, price_fn) -> str:
+    from execution.positions import Position, sell_quantity
+    token = str(token).lower()
+    p = store.get_position(chat, token)
+    if p["qty"] <= 0:
+        return "\U0001F534 [PAPER] No position to sell."
+    price = _paper_price(price_fn, token)
+    if price <= 0:
+        return "[PAPER] No price available right now."
+    sell_qty = sell_quantity(Position(token, qty=p["qty"], cost=p["cost"]), pct)
+    proceeds = sell_qty * price
+    store.record_fill(f"papersell:{chat}:{token}:{int(time.time() * 1000)}",
+                      chat, token, "sell", sell_qty, proceeds)
+    p2 = store.get_position(chat, token)
+    return (f"\U0001F534 [PAPER] Sold {int(pct * 100)}% (~{sell_qty:.4g}) for ${proceeds:.2f}.\n"
+            f"Realized: ${p2['realized']:.2f} \u00B7 left {p2['qty']:.4g}")
+
+
+def _arm_protect(store, chat, token, pct, floor_pct, price_fn) -> str:
+    from execution.eip712 import min_out_from_floor, new_nonce
+    token = str(token).lower()
+    pos = store.get_position(chat, token)
+    if pos["qty"] <= 0:
+        return "\U0001F6E1\uFE0F [PAPER] No position to protect. Buy first."
+    price = _paper_price(price_fn, token)
+    if price <= 0:
+        return "\U0001F6E1\uFE0F No price available right now."
+    qty = pos["qty"] * pct / 100.0
+    min_out = min_out_from_floor(price, qty, floor_pct)
+    deadline = int(time.time()) + 30 * 24 * 3600
+    nonce = new_nonce()
+    pid = store.create_preorder(chat, chat, token, pct, floor_pct, min_out, deadline, nonce,
+                                status="armed")
+    return (f"\U0001F6E1\uFE0F [PAPER] Protection <b>#{pid}</b> ARMED \u2014 sell <b>{pct:.0f}%</b> "
+            f"(~{qty:.4g}) if a dev-sell/rug trigger fires (floor ${min_out:.2f}, ~30 days).\n"
+            f"<i>The real (signed, non-custodial) version arrives with the signing UX (Opción 2).</i>")
+
+
+def fire_preorders(store, alerts, transport, thr, price_fn) -> int:
+    """On a matching alert, fire armed pre-orders (PAPER: simulated sell + notify)."""
+    fired = 0
+    seen = set()
+    for a in alerts:
+        kind = getattr(a, "kind", None) or (a.get("kind") if isinstance(a, dict) else None)
+        token = getattr(a, "token", None) or (a.get("token") if isinstance(a, dict) else None)
+        if kind not in ("dev_sell", "compound", "volume_collapse") or not token:
+            continue
+        for po in store.preorders_for_token(token):
+            if po["id"] in seen:
+                continue
+            seen.add(po["id"])
+            if store.get_position(po["chat"], token)["qty"] <= 0:
+                store.set_preorder_status(po["id"], "no_position")
+                continue
+            _paper_sell_pct(store, po["chat"], token, po["pct"] / 100.0, price_fn)
+            store.set_preorder_status(po["id"], "executed")
+            try:
+                thr.wait(po["chat"])
+                transport.send(po["chat"], f"\U0001F6E1\uFE0F [PAPER] PROTECTION #{po['id']} FIRED "
+                                           f"({kind}): sold {po['pct']:.0f}% of {token}.")
+            except Exception:
+                pass
+            fired += 1
+    return fired
+
+
+def _token_card(store, chat, token, base_text, lang, price_fn) -> dict:
+    """Token card + live-ish PnL + buy-size / sell-% buttons."""
+    price = _paper_price(price_fn, token)
+    p = store.get_position(chat, token)
+    lines = [base_text]
+    if p["qty"] > 0 and price > 0:
+        unreal = p["qty"] * price - p["cost"]
+        pct = (unreal / p["cost"] * 100) if p["cost"] else 0.0
+        lines.append("")
+        lines.append(f"\U0001F4BC <b>Position</b>: {p['qty']:.4g} \u00B7 avg ${p['avg_cost']:.8g}")
+        lines.append(f"\U0001F4C8 <b>PnL</b>: {'+' if unreal >= 0 else ''}${unreal:.2f} "
+                     f"({pct:+.1f}%) \u00B7 realized ${p['realized']:.2f}")
+        btns = [[{"text": "\U0001F534 25%", "data": f"sellpct:{token}:25"},
+                 {"text": "\U0001F534 50%", "data": f"sellpct:{token}:50"},
+                 {"text": "\U0001F534 75%", "data": f"sellpct:{token}:75"},
+                 {"text": "\U0001F534 100%", "data": f"sellpct:{token}:100"}],
+                [{"text": "\U0001F7E2 Buy more", "data": f"buymenu:{token}"},
+                 {"text": "\U0001F6E1\uFE0F Protect", "data": f"protect:{token}"}],
+                [{"text": "\U0001F504 Refresh", "data": f"pos:{token}"}]]
+    else:
+        btns = [[{"text": "\U0001F7E2 Buy", "data": f"buymenu:{token}"},
+                 {"text": "\U0001F6E1\uFE0F Protect", "data": f"protect:{token}"}],
+                [{"text": "\U0001F504 Refresh", "data": f"pos:{token}"}]]
+    return {"text": "\n".join(lines), "inline": btns}
+
+
 def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: int,
                   recent_fn=None, paper_price_fn=None, symbol_fn=None) -> str:
+    raw = (text or "").strip()
+    amt_tok = store.get_state(f"awaiting_amount:{chat_id}", "")
+    if amt_tok and re.fullmatch(r"\d+(?:\.\d+)?", raw):
+        store.set_state(f"awaiting_amount:{chat_id}", "")
+        return _paper_buy(store, chat_id, amt_tok, float(raw), paper_price_fn)
     text = _route(text, chat_id, store)
     parts = (text or "").strip().split()
     if not parts:
@@ -461,6 +620,59 @@ def _handle_callback(data, chat, store, token_exists, check_fn, now_block,
         screen = wallet_screen(store, chat, lang)
         screen["edit"] = True
         return screen
+    if data.startswith("buymenu:"):
+        tok = data.split(":", 1)[1]
+        btns = [[{"text": "$10", "data": f"buyamt:{tok}:10"},
+                 {"text": "$20", "data": f"buyamt:{tok}:20"},
+                 {"text": "$50", "data": f"buyamt:{tok}:50"},
+                 {"text": "$100", "data": f"buyamt:{tok}:100"}],
+                [{"text": "\u270F\uFE0F Other", "data": f"buycustom:{tok}"}],
+                [{"text": "\u2B05\uFE0F Back", "data": f"pos:{tok}"}]]
+        return {"text": "\U0001F7E2 <b>Buy</b> \u2014 choose amount (USD, [PAPER]):",
+                "parse_mode": "HTML", "inline": btns, "edit": True}
+    if data.startswith("buyamt:"):
+        _, tok, amt = data.split(":")
+        return _paper_buy(store, chat, tok, float(amt), paper_price_fn)
+    if data.startswith("buycustom:"):
+        tok = data.split(":", 1)[1]
+        store.set_state(f"awaiting_amount:{chat}", tok)
+        return "\u270F\uFE0F Type the amount in USD to buy (e.g. 25):"
+    if data.startswith("sellpct:"):
+        _, tok, pct = data.split(":")
+        return _paper_sell_pct(store, chat, tok, float(pct) / 100.0, paper_price_fn)
+    if data.startswith("pos:"):
+        tok = data.split(":", 1)[1]
+        try:
+            base = check_fn(tok)
+        except Exception:
+            base = ""
+        card = _token_card(store, chat, tok, base, lang, paper_price_fn)
+        card["parse_mode"] = "HTML"
+        card["edit"] = True
+        return card
+    if data.startswith("protect:"):
+        tok = data.split(":", 1)[1]
+        btns = [[{"text": "25%", "data": f"protectpct:{tok}:25"},
+                 {"text": "50%", "data": f"protectpct:{tok}:50"},
+                 {"text": "75%", "data": f"protectpct:{tok}:75"},
+                 {"text": "100%", "data": f"protectpct:{tok}:100"}],
+                [{"text": "\u2B05\uFE0F Back", "data": f"pos:{tok}"}]]
+        return {"text": "\U0001F6E1\uFE0F <b>Protect</b> \u2014 how much to sell when a dev-sell fires?",
+                "parse_mode": "HTML", "inline": btns, "edit": True}
+    if data.startswith("protectpct:"):
+        _, tok, pct = data.split(":")
+        btns = [[{"text": "\u221220%", "data": f"protectfloor:{tok}:{pct}:20"},
+                 {"text": "\u221230%", "data": f"protectfloor:{tok}:{pct}:30"},
+                 {"text": "\u221250%", "data": f"protectfloor:{tok}:{pct}:50"},
+                 {"text": "Any price", "data": f"protectfloor:{tok}:{pct}:99"}],
+                [{"text": "\u2B05\uFE0F Back", "data": f"protect:{tok}"}]]
+        return {"text": "\U0001F6E1\uFE0F Floor price (worst acceptable):",
+                "parse_mode": "HTML", "inline": btns, "edit": True}
+    if data.startswith("protectfloor:"):
+        _, tok, pct, floor = data.split(":")
+        return _arm_protect(store, chat, tok, float(pct), float(floor), paper_price_fn)
+    if data.startswith("buy:") or data.startswith("sell:"):
+        return _paper_trade(data, chat, store, lang, paper_price_fn)
     if data == "cmd:/connect":
         store.set_state(f"awaiting_wallet:{chat}", "1")
         return {"text": i18n.t("connect_paste", lang), "parse_mode": "HTML"}

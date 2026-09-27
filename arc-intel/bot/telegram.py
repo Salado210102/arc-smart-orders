@@ -670,6 +670,13 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
                 if a.kind in ("dev_sell", "compound", "volume_collapse"):
                     store.add_paper_alert(a.kind, a.token, a.block, now_ts)
             store.enqueue_alert_many([a.__dict__ for a in alerts])
+            try:
+                from .commands import fire_preorders
+                fired = fire_preorders(store, alerts, transport, thr, price_fn)
+                if fired:
+                    logger({"cycle": k, "preorders_fired": fired})
+            except Exception:
+                pass
             batch = store.dequeue(2000)
             n = dispatch(batch, store, transport, throttle=thr, logo_fn=logo_fn)
             from .approvals import propose as ap_propose
