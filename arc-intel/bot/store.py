@@ -93,7 +93,7 @@ class SubscriptionStore:
             "CREATE TABLE IF NOT EXISTS auto_subs ("
             "chat_id TEXT, token TEXT, PRIMARY KEY (chat_id, token))")
         for _col in ("signature TEXT", "sign_token TEXT", "sig_payload TEXT",
-                     "kind TEXT DEFAULT 'sell'"):
+                     "kind TEXT DEFAULT 'sell'", "tx_hash TEXT", "attempts INTEGER DEFAULT 0"):
             try:
                 self.conn.execute(f"ALTER TABLE preorders ADD COLUMN {_col}")
             except sqlite3.OperationalError:
@@ -479,6 +479,58 @@ class SubscriptionStore:
     def set_preorder_status(self, pid, status) -> None:
         self.conn.execute("UPDATE preorders SET status=? WHERE id=?", (status, int(pid)))
         self.conn.commit()
+
+    def list_orders(self, kind=None, status=None, limit: int = 200) -> list:
+        q = ("SELECT id,chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,status,created_ts "
+             "FROM preorders")
+        conds, params = [], []
+        if kind:
+            conds.append("coalesce(kind,'sell')=?")
+            params.append(str(kind))
+        if status:
+            conds.append("status=?")
+            params.append(str(status))
+        if conds:
+            q += " WHERE " + " AND ".join(conds)
+        q += " ORDER BY id DESC LIMIT ?"
+        params.append(int(limit))
+        return [self._po_row(r) for r in self.conn.execute(q, params).fetchall()]
+
+    def orders_due(self, kind, now: int, limit: int = 50) -> list:
+        """Signed orders of `kind`, not executed and not expired (ready for the keeper)."""
+        rows = self.conn.execute(
+            "SELECT id,chat,user,token,pct,floor_pct,min_out,deadline,order_nonce,status,created_ts,"
+            "signature,sign_token,sig_payload,kind FROM preorders "
+            "WHERE coalesce(kind,'sell')=? AND status='signed' AND deadline > ? ORDER BY id LIMIT ?",
+            (str(kind), int(now), int(limit))).fetchall()
+        return [self._po_full(r) for r in rows]
+
+    def claim_order(self, pid) -> bool:
+        """Atomically move 'signed' -> 'submitting' so two keepers can't submit the same order."""
+        cur = self.conn.execute(
+            "UPDATE preorders SET status='submitting' WHERE id=? AND status='signed'", (int(pid),))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def mark_executed(self, pid, tx_hash: str = "") -> None:
+        self.conn.execute("UPDATE preorders SET status='executed', tx_hash=? WHERE id=?",
+                          (str(tx_hash), int(pid)))
+        self.conn.commit()
+
+    def bump_attempt(self, pid) -> None:
+        self.conn.execute("UPDATE preorders SET attempts=coalesce(attempts,0)+1 WHERE id=?",
+                          (int(pid),))
+        self.conn.commit()
+
+    def cancel_preorder(self, pid, user) -> bool:
+        """Cancel by owner: `user` may be the telegram chat (chat column) or the wallet."""
+        u = str(user).lower()
+        cur = self.conn.execute(
+            "UPDATE preorders SET status='cancelled' WHERE id=? AND (chat=? OR user=?) "
+            "AND status IN ('armed','signed','submitting')",
+            (int(pid), u, u))
+        self.conn.commit()
+        return cur.rowcount > 0
 
     # --- wallet tracking (read-only public address) ---
     def link_wallet(self, chat_id, address: str) -> None:

@@ -740,6 +740,21 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
                     logger({"cycle": k, "preorders_fired": fired})
             except Exception:
                 pass
+            try:
+                from execution.keeper import run_keeper
+
+                def _on_exec(po, txh):
+                    try:
+                        thr.wait(po["chat"])
+                        transport.send(po["chat"],
+                                       f"\u2705 BUY #{po['id']} executed on-chain "
+                                       f"({po['token']}): {txh}")
+                    except Exception:
+                        pass
+
+                run_keeper(store, logger=logger, on_executed=_on_exec)
+            except Exception:
+                pass
             batch = store.dequeue(2000)
             n = dispatch(batch, store, transport, throttle=thr, logo_fn=logo_fn)
             from .approvals import propose as ap_propose

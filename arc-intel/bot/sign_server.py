@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -128,6 +129,82 @@ class Handler(BaseHTTPRequestHandler):
             resp.update({"id": pid, "sign_token": po["sign_token"],
                          "sign_url": f"/?t={po['sign_token']}"})
         return 200, resp
+
+    def _kick_keeper(self):
+        """Fire-and-forget: submit any signed buy order now (only if a relayer is configured)."""
+        def _run():
+            try:
+                from execution.keeper import run_keeper
+                s = SubscriptionStore(DB)
+                try:
+                    run_keeper(s)
+                finally:
+                    s.close()
+            except Exception:
+                pass
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _plan(self, uid, addr, pct, floor_pct):
+        """Create a protective/limit SELL pre-order (EIP-712 payload) for a % of the position."""
+        if not ADDR_RE.match(addr or ""):
+            return 400, {"error": "bad_address"}
+        try:
+            pct = float(pct)
+            floor = float(floor_pct)
+        except (TypeError, ValueError):
+            return 400, {"error": "bad_amount"}
+        if not (0 < pct <= 100) or floor < 0 or floor > 99:
+            return 400, {"error": "bad_amount"}
+        executor = os.environ.get("ARC_INTEL_EXECUTOR")
+        if not executor:
+            return 503, {"error": "no_executor"}
+        st = _storage()
+        if st is None:
+            return 503, {"error": "no_storage"}
+        from . import tokenmeta
+        from .miniapp_data import load_pool, latest_price
+        from execution.quotes import sell_quote, build_sell_payload
+        from execution.eip712 import new_nonce
+        stable = os.environ.get("ARC_INTEL_STABLE", "0x3600000000000000000000000000000000000000")
+        pool = load_pool(st, addr)
+        if not pool:
+            return 404, {"error": "no_pool"}
+        price = latest_price(st, addr)
+        if price <= 0:
+            return 409, {"error": "no_price"}
+        store = SubscriptionStore(DB)
+        try:
+            recipient = store.get_linked_wallet(uid)
+            pos = store.get_position(uid, addr)
+        finally:
+            store.close()
+        if not recipient:
+            return 409, {"error": "link_wallet"}
+        if pos["qty"] <= 0:
+            return 409, {"error": "no_position"}
+        qty = pos["qty"] * pct / 100.0
+        quote = sell_quote(qty=qty, price=price, token_decimals=tokenmeta.rpc_decimals(addr),
+                           floor_pct=floor)
+        import time as _t
+        chain_id = int(os.environ.get("ARC_INTEL_CHAIN_ID", "5042"))
+        deadline = int(_t.time()) + 30 * 24 * 3600
+        order_nonce = new_nonce()
+        permit_nonce = new_nonce()
+        payload = build_sell_payload(
+            chain_id=chain_id, executor=executor, pool=pool, stable=stable, token=addr,
+            amount_in_base=quote["amount_in_base"], min_out_base=quote["min_out_base"],
+            recipient=recipient, order_nonce=order_nonce, permit_nonce=permit_nonce,
+            deadline=deadline)
+        store = SubscriptionStore(DB)
+        try:
+            pid = store.create_preorder(uid, recipient, addr, pct, floor, quote["min_out_base"],
+                                        deadline, order_nonce, status="armed", kind="sell")
+            store.save_sig_payload(pid, json.dumps(payload))
+            po = store.get_preorder(pid)
+        finally:
+            store.close()
+        return 200, {"id": pid, "sign_token": po["sign_token"], "sign_url": f"/?t={po['sign_token']}",
+                     "qty": qty, "quote": quote}
 
     def do_OPTIONS(self):  # CORS preflight
         self._send(204, {})
@@ -251,6 +328,37 @@ class Handler(BaseHTTPRequestHandler):
             code, resp = self._buy(uid, data.get("token") or "", data.get("amount_usdc") or 0,
                                    data.get("slippage", 1), persist=True)
             return self._send(code, resp)
+        if u.path == "/plan":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send(400, {"error": "bad_json"})
+            code, resp = self._plan(uid, data.get("token") or "", data.get("pct") or 0,
+                                    data.get("floor_pct", 30))
+            return self._send(code, resp)
+        if u.path == "/cancel":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send(400, {"error": "bad_json"})
+            try:
+                pid = int(data.get("id"))
+            except (TypeError, ValueError):
+                return self._send(400, {"error": "bad_id"})
+            store = SubscriptionStore(DB)
+            try:
+                ok = store.cancel_preorder(pid, uid)
+            finally:
+                store.close()
+            return self._send(200 if ok else 404, {"ok": ok})
         if u.path != "/sign":
             return self._send(404, {"error": "not_found"})
         n = int(self.headers.get("Content-Length") or 0)
@@ -270,7 +378,9 @@ class Handler(BaseHTTPRequestHandler):
             if po["status"] == "executed":
                 return self._send(409, {"error": "already_executed"})
             store.attach_signature(po["id"], sig)
-            return self._send(200, {"ok": True, "id": po["id"]})
+            if po.get("kind") == "buy":
+                self._kick_keeper()   # execute a signed buy immediately (no-op if no relayer)
+            return self._send(200, {"ok": True, "id": po["id"], "kind": po.get("kind")})
         finally:
             store.close()
 

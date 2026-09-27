@@ -197,6 +197,15 @@
   **gráfico SVG** al tocar: **sparkline de precio + barras de volumen** con **línea de la alerta**.
   E2E por HTTPS público OK (`/alerts` 401 sin auth / 200 con auth; `/series` con serie real). Tests
   **269 passed** (1 fallo ambiental local).
+- **2026-09-27 (keeper + plan/cancel + catálogo)** — **Keeper** `execution/keeper.py`: envía on-chain
+  las órdenes **de compra firmadas** (permissionless; **dormido** hasta que exista
+  `ARC_INTEL_RELAYER_KEY`); `claim_order` atómico evita doble envío; en fallo vuelve a `signed` para
+  reintento. Disparo rápido tras firmar (hilo) + red de seguridad en el bucle. Endpoints **`POST /plan`**
+  (crea venta condicional EIP-712 por %) y **`POST /cancel`** (reposo del keeper; la cancelación
+  on-chain la firma el usuario con `cancelOrder`). `quotes`: `sell_quote` + `build_sell_payload`.
+  Creado **`docs/ARC_AI_FEATURES.md`**: catálogo COMPLETO de funcionalidades + hooks de marketing (EN)
+  + límites + disclaimers. Tests **281 passed** (1 fallo ambiental local). Pendiente real: relayer con
+  gas (§7) y auditoría mainnet.
 
 ---
 

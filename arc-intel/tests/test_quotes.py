@@ -1,6 +1,7 @@
 import unittest
 
-from execution.quotes import build_buy_payload, buy_quote, stable_side
+from execution.quotes import (build_buy_payload, build_sell_payload, buy_quote, sell_quote,
+                              stable_side)
 
 USDC = "0x3600000000000000000000000000000000000000"
 TOK = "0x" + "a" * 40
@@ -53,6 +54,25 @@ class QuoteTests(unittest.TestCase):
         self.assertEqual(msg["witness"]["poolId"], POOL["pool_id"])
         self.assertEqual(p["typedData"]["domain"]["verifyingContract"],
                          "0x000000000022D473030F116dDEE9F6B43aC78BA3")
+
+    def test_sell_quote(self):
+        q = sell_quote(qty=1000.0, price=0.002, token_decimals=18, floor_pct=30)
+        self.assertEqual(q["amount_in_base"], 1000 * 10 ** 18)
+        self.assertEqual(q["min_out_base"], 1_400_000)   # 1000*0.002*0.7 USDC * 1e6
+
+    def test_sell_quote_bad(self):
+        with self.assertRaises(ValueError):
+            sell_quote(qty=0, price=1, token_decimals=18, floor_pct=10)
+        with self.assertRaises(ValueError):
+            sell_quote(qty=1, price=0, token_decimals=18, floor_pct=10)
+
+    def test_build_sell_payload_sides(self):
+        p = build_sell_payload(chain_id=5042002, executor=EXEC, pool=POOL, stable=USDC, token=TOK,
+                               amount_in_base=1000 * 10 ** 18, min_out_base=1_400_000,
+                               recipient=TOK, order_nonce=1, permit_nonce=2, deadline=9)
+        self.assertFalse(p["zeroForOne"])   # token is currency1 -> input is currency1
+        self.assertEqual(p["typedData"]["message"]["permitted"]["token"], TOK)
+        self.assertEqual(p["typedData"]["message"]["witness"]["minOut"], 1_400_000)
 
     def test_build_buy_payload_rejects_foreign_stable(self):
         with self.assertRaises(ValueError):

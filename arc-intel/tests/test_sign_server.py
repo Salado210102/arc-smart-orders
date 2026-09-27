@@ -193,6 +193,52 @@ class SignServerTests(unittest.TestCase):
         self.assertEqual(only[0]["kind"], "dev_sell")
         s.close()
 
+    def test_plan_requires_auth(self):
+        body = json.dumps({"token": "0x" + "1" * 40, "pct": 50}).encode()
+        req = urllib.request.Request(self._url("/plan"), data=body,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 401")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 401)
+
+    def test_cancel_requires_auth(self):
+        body = json.dumps({"id": 1}).encode()
+        req = urllib.request.Request(self._url("/cancel"), data=body,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 401")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 401)
+
+    def test_cancel_bad_id(self):
+        body = json.dumps({"id": "x"}).encode()
+        req = urllib.request.Request(self._url("/cancel"), data=body,
+                                     headers={"Content-Type": "application/json",
+                                              "X-Telegram-Init-Data": init_data(1)})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 400")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
+
+    def test_cancel_marks_order(self):
+        s = SubscriptionStore(self.db)
+        pid = s.create_preorder(1, "0x" + "a" * 40, TOK, 50, 30, 0, 9999999999, 3,
+                                status="armed", kind="sell")
+        s.close()
+        body = json.dumps({"id": pid}).encode()
+        req = urllib.request.Request(self._url("/cancel"), data=body,
+                                     headers={"Content-Type": "application/json",
+                                              "X-Telegram-Init-Data": init_data(1)})
+        r = json.load(urllib.request.urlopen(req))
+        self.assertTrue(r["ok"])
+        s = SubscriptionStore(self.db)
+        self.assertEqual(s.get_preorder(pid)["status"], "cancelled")
+        s.close()
+
     def test_buy_order_requires_auth(self):
         body = json.dumps({"token": "0x" + "1" * 40, "amount_usdc": 10}).encode()
         req = urllib.request.Request(self._url("/buy_order"), data=body,

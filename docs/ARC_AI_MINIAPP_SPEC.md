@@ -289,6 +289,8 @@ firma rechazada → volver a Paso 3 sin perder datos; `deadline` vencido → rec
 | POST | `/buy_order` | **sí** | crea y **persiste** una orden de compra; devuelve `sign_token`/`sign_url` | `store.create_preorder(kind='buy')`, `execution.quotes` |
 | GET | `/alerts` | **sí** | alertas recientes de **tus tokens** (persistidas en el bucle) | `store.recent_alerts` |
 | GET | `/series?token=` | **sí** | precio + volumen por bucket (para el gráfico) | `miniapp_data.load_series` |
+| POST | `/plan` | **sí** | crea venta condicional (protect/límite) por % y devuelve `sign_url` | `execution.quotes.build_sell_payload` |
+| POST | `/cancel` | **sí** | cancela una orden (reposo del keeper) | `store.cancel_preorder` |
 
 > `/buy_quote` devuelve `{token, pool, quote, payload}` con `preview:true, persisted:false` (vista
 > previa). `POST /buy_order` persiste la orden (`kind='buy'`, estado `armed`) y devuelve un
@@ -300,8 +302,6 @@ firma rechazada → volver a Paso 3 sin perder datos; `deadline` vencido → rec
 | Método | Ruta | Devuelve | Reutiliza |
 |---|---|---|---|
 | GET | `/token` | liquidez USD (estimación) | `pools_v4`, `v4_liquidity` |
-| POST | `/plan` | crea `ExitPlan` + nº de pre-órdenes a firmar | `strategy.ExitPlan`, `store.create_preorder` |
-| POST | `/cancel` | cancela una pre-orden (on-chain) | `preorders` + `cancelOrder` |
 
 Regla transversal: endpoints **de lectura** no requieren firma; endpoints que **crean órdenes**
 devuelven el payload a firmar y **nunca** ejecutan sin `POST /sign` posterior.

@@ -64,3 +64,29 @@ def build_buy_payload(*, chain_id: int, executor: str, pool: dict, stable: str,
         tick_spacing=int(pool["tick_spacing"]), hooks=pool["hooks"], token_in=stable,
         amount_in=int(amount_in_base), min_out=int(min_out_base), recipient=recipient,
         order_nonce=int(order_nonce), permit_nonce=int(permit_nonce), deadline=int(deadline))
+
+
+def sell_quote(*, qty: float, price: float, token_decimals: int, floor_pct: float) -> dict:
+    """A protective/limit SELL of `qty` tokens: amount_in (token base) and minOut (stable base)."""
+    if float(qty) <= 0:
+        raise ValueError("bad_qty")
+    if float(price) <= 0:
+        raise ValueError("bad_price")
+    amount_in_base = int(float(qty) * (10 ** int(token_decimals)))
+    min_out_base = int(float(qty) * float(price) * max(0.0, 1.0 - float(floor_pct) / 100.0)
+                       * (10 ** STABLE_DECIMALS))
+    return {"amount_in_base": amount_in_base, "min_out_base": min_out_base,
+            "floor_pct": float(floor_pct)}
+
+
+def build_sell_payload(*, chain_id: int, executor: str, pool: dict, stable: str, token: str,
+                       amount_in_base: int, min_out_base: int, recipient: str,
+                       order_nonce: int, permit_nonce: int, deadline: int) -> dict:
+    """Assemble the EIP-712 payload to SELL `token` (token_in = the token; tokenOut = stable)."""
+    stable_side(pool, stable)  # validates the pool has the stable (raises otherwise)
+    return build_sign_payload(
+        chain_id=int(chain_id), executor=executor, pool_id=pool["pool_id"],
+        currency0=pool["currency0"], currency1=pool["currency1"], fee=int(pool["fee"]),
+        tick_spacing=int(pool["tick_spacing"]), hooks=pool["hooks"], token_in=token,
+        amount_in=int(amount_in_base), min_out=int(min_out_base), recipient=recipient,
+        order_nonce=int(order_nonce), permit_nonce=int(permit_nonce), deadline=int(deadline))
