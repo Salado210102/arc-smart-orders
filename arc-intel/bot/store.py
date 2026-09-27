@@ -1,0 +1,357 @@
+"""Subscription store for the alert bot (chat_id -> tokens/wallets/kinds)."""
+from __future__ import annotations
+
+import sqlite3
+
+
+class SubscriptionStore:
+    MAX_TOKENS = 30
+
+    def __init__(self, path: str = "bot_subs.db"):
+        self.conn = sqlite3.connect(path, check_same_thread=False)
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=5000")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS subscribers ("
+            "chat_id TEXT PRIMARY KEY, tokens TEXT, wallets TEXT, kinds TEXT, "
+            "since_block INTEGER DEFAULT 0)")
+        try:
+            self.conn.execute("ALTER TABLE subscribers ADD COLUMN since_block INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        # one-time migration: drop the legacy wildcard '*' (users subscribe explicitly)
+        try:
+            rows = self.conn.execute(
+                "SELECT chat_id, tokens FROM subscribers WHERE tokens LIKE '%*%'").fetchall()
+            for chat, toks in rows:
+                newt = ",".join(t for t in (toks or "").split(",") if t and t != "*")
+                self.conn.execute("UPDATE subscribers SET tokens=? WHERE chat_id=?", (newt, chat))
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS delivered ("
+            "chat_id TEXT, token TEXT, kind TEXT, block INTEGER, "
+            "PRIMARY KEY (chat_id, token, kind, block))")
+        self.conn.execute("CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value TEXT)")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS aqueue (token TEXT, kind TEXT, block INTEGER, "
+            "severity TEXT, message TEXT, context TEXT, "
+            "PRIMARY KEY (token, kind, block))")
+        self.conn.execute("CREATE TABLE IF NOT EXISTS allowlist (chat_id TEXT PRIMARY KEY)")
+        self.conn.execute("CREATE TABLE IF NOT EXISTS requests (chat_id TEXT PRIMARY KEY, ts INTEGER)")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS cooldowns (token TEXT, kind TEXT, ts INTEGER, "
+            "PRIMARY KEY (token, kind))")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS approvals ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, chat_id TEXT, token TEXT, kind TEXT, side TEXT, "
+            "notional REAL, alert_block INTEGER, created_ts INTEGER, cancel_until INTEGER, "
+            "expires_ts INTEGER, requires_2fa INTEGER, code TEXT, status TEXT, history TEXT, "
+            "UNIQUE(chat_id, token, kind, alert_block))")
+        try:
+            self.conn.execute("ALTER TABLE approvals ADD COLUMN alert_block INTEGER")
+        except sqlite3.OperationalError:
+            pass
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS paper_alerts ("
+            "kind TEXT, token TEXT, alert_block INTEGER, detected_ts INTEGER, "
+            "PRIMARY KEY (kind, token, alert_block))")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS paper_outcomes ("
+            "kind TEXT, token TEXT, alert_block INTEGER, delay_seconds INTEGER, computed_ts INTEGER, "
+            "horizons_json TEXT, PRIMARY KEY (kind, token, alert_block, delay_seconds))")
+        self.conn.commit()
+
+    def subscribe(self, chat_id, tokens=(), wallets=(), kinds=()) -> None:
+        self.conn.execute(
+            "INSERT INTO subscribers(chat_id,tokens,wallets,kinds) VALUES(?,?,?,?) "
+            "ON CONFLICT(chat_id) DO UPDATE SET tokens=excluded.tokens, wallets=excluded.wallets, "
+            "kinds=excluded.kinds",
+            (str(chat_id), ",".join(tokens), ",".join(wallets), ",".join(kinds)))
+        self.conn.commit()
+
+    def list(self) -> list[dict]:
+        cur = self.conn.execute("SELECT chat_id,tokens,wallets,kinds,since_block FROM subscribers")
+        out = []
+        for chat_id, tokens, wallets, kinds, since in cur.fetchall():
+            out.append({"chat_id": chat_id,
+                        "tokens": (set((tokens or "").split(",")) - {""}) - {"*"},
+                        "wallets": set((wallets or "").split(",")) - {""},
+                        "kinds": set((kinds or "").split(",")) - {""},
+                        "since_block": int(since or 0)})
+        return out
+
+    def get(self, chat_id) -> dict | None:
+        cur = self.conn.execute(
+            "SELECT chat_id,tokens,wallets,kinds,since_block FROM subscribers WHERE chat_id=?",
+            (str(chat_id),))
+        row = cur.fetchone()
+        if not row:
+            return None
+        chat_id, tokens, wallets, kinds, since = row
+        return {"chat_id": chat_id, "tokens": (set((tokens or "").split(",")) - {""}) - {"*"},
+                "wallets": set((wallets or "").split(",")) - {""},
+                "kinds": set((kinds or "").split(",")) - {""},
+                "since_block": int(since or 0)}
+
+    def ensure_subscriber(self, chat_id, since_block: int = 0) -> None:
+        self.conn.execute(
+            "INSERT OR IGNORE INTO subscribers(chat_id,tokens,wallets,kinds,since_block) "
+            "VALUES(?,?,?,?,?)", (str(chat_id), "", "", "", int(since_block)))
+        self.conn.commit()
+
+    def add_token(self, chat_id, token: str, now_block: int = 0) -> tuple[bool, str]:
+        row = self.get(chat_id)
+        if row is None:
+            self.ensure_subscriber(chat_id, since_block=now_block)
+            row = self.get(chat_id)
+        tokens = set(row["tokens"])
+        token = token.lower()
+        if token in tokens:
+            return True, "already"
+        if len(tokens) >= self.MAX_TOKENS:
+            return False, f"limit_{self.MAX_TOKENS}"
+        tokens.add(token)
+        since = row["since_block"] or now_block
+        self.conn.execute("UPDATE subscribers SET tokens=?, since_block=? WHERE chat_id=?",
+                          (",".join(sorted(tokens)), int(since), str(chat_id)))
+        self.conn.commit()
+        return True, "added"
+
+    def remove_token(self, chat_id, token: str) -> tuple[bool, str]:
+        row = self.get(chat_id)
+        if row is None:
+            return False, "not_subscribed"
+        tokens = set(row["tokens"])
+        token = token.lower()
+        if token not in tokens:
+            return False, "not_found"
+        tokens.discard(token)
+        self.conn.execute("UPDATE subscribers SET tokens=? WHERE chat_id=?",
+                          (",".join(sorted(tokens)), str(chat_id)))
+        self.conn.commit()
+        return True, "removed"
+
+    def set_wallet(self, chat_id, wallet: str) -> None:
+        if self.get(chat_id) is None:
+            self.ensure_subscriber(chat_id)
+        self.conn.execute("UPDATE subscribers SET wallets=? WHERE chat_id=?",
+                          (wallet.lower(), str(chat_id)))
+        self.conn.commit()
+
+    def get_wallet(self, chat_id) -> str:
+        row = self.get(chat_id)
+        if not row or not row["wallets"]:
+            return ""
+        return sorted(row["wallets"])[0]
+
+    def set_kinds(self, chat_id, kinds) -> None:
+        row = self.get(chat_id)
+        if row is None:
+            self.ensure_subscriber(chat_id)
+        self.conn.execute("UPDATE subscribers SET kinds=? WHERE chat_id=?",
+                          (",".join(sorted(kinds)), str(chat_id)))
+        self.conn.commit()
+
+    def purge_queue(self, before_block: int) -> int:
+        cur = self.conn.execute("DELETE FROM aqueue WHERE block < ?", (int(before_block),))
+        self.conn.commit()
+        return cur.rowcount
+
+    # --- closed-beta allowlist ---
+    def add_allow(self, chat_id) -> None:
+        self.conn.execute("INSERT OR IGNORE INTO allowlist(chat_id) VALUES(?)", (str(chat_id),))
+        self.conn.commit()
+
+    def remove_allow(self, chat_id) -> bool:
+        cur = self.conn.execute("DELETE FROM allowlist WHERE chat_id=?", (str(chat_id),))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def is_allowed(self, chat_id) -> bool:
+        cur = self.conn.execute("SELECT 1 FROM allowlist WHERE chat_id=?", (str(chat_id),))
+        return cur.fetchone() is not None
+
+    def list_allow(self) -> list:
+        return [r[0] for r in self.conn.execute("SELECT chat_id FROM allowlist ORDER BY chat_id")]
+
+    def add_request(self, chat_id, ts: int) -> None:
+        self.conn.execute("INSERT OR IGNORE INTO requests(chat_id,ts) VALUES(?,?)",
+                          (str(chat_id), int(ts)))
+        self.conn.commit()
+
+    def list_requests(self) -> list:
+        return [{"chat_id": r[0], "ts": r[1]} for r in
+                self.conn.execute("SELECT chat_id,ts FROM requests ORDER BY ts")]
+
+    # --- approvals (persistent) ---
+    def create_approval(self, chat_id, token, kind, side, notional, alert_block, created_ts,
+                        cancel_until, expires_ts, requires_2fa, code):
+        import json as _json
+        cur = self.conn.execute(
+            "INSERT OR IGNORE INTO approvals(chat_id,token,kind,side,notional,alert_block,"
+            "created_ts,cancel_until,expires_ts,requires_2fa,code,status,history) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (str(chat_id), token, kind, side, float(notional), int(alert_block), int(created_ts),
+             int(cancel_until), int(expires_ts), 1 if requires_2fa else 0, code, "pending",
+             _json.dumps([["created", int(created_ts)]])))
+        self.conn.commit()
+        return int(cur.lastrowid) if cur.lastrowid else self._approval_id(chat_id, token, kind, alert_block)
+
+    def _approval_id(self, chat_id, token, kind, alert_block):
+        cur = self.conn.execute(
+            "SELECT id FROM approvals WHERE chat_id=? AND token=? AND kind=? AND alert_block=?",
+            (str(chat_id), token, kind, int(alert_block)))
+        r = cur.fetchone()
+        return int(r[0]) if r else 0
+
+    def get_approval(self, approval_id) -> dict | None:
+        import json as _json
+        cur = self.conn.execute(
+            "SELECT id,chat_id,token,kind,side,notional,alert_block,created_ts,cancel_until,"
+            "expires_ts,requires_2fa,code,status,history FROM approvals WHERE id=?", (int(approval_id),))
+        r = cur.fetchone()
+        if not r:
+            return None
+        return {"id": r[0], "chat_id": r[1], "token": r[2], "kind": r[3], "side": r[4],
+                "notional": r[5], "alert_block": r[6], "created_ts": r[7], "cancel_until": r[8],
+                "expires_ts": r[9], "requires_2fa": bool(r[10]), "code": r[11], "status": r[12],
+                "history": _json.loads(r[13] or "[]")}
+
+    def list_open_approvals(self, chat_id, now: int) -> list:
+        cur = self.conn.execute(
+            "SELECT id FROM approvals WHERE chat_id=? AND status='pending' AND expires_ts>=? "
+            "ORDER BY id", (str(chat_id), int(now)))
+        return [self.get_approval(r[0]) for r in cur.fetchall()]
+
+    def list_approvals(self, chat_id, limit: int = 10) -> list:
+        cur = self.conn.execute(
+            "SELECT id FROM approvals WHERE chat_id=? ORDER BY id DESC LIMIT ?",
+            (str(chat_id), int(limit)))
+        return [self.get_approval(r[0]) for r in cur.fetchall()]
+
+    def approval_exists(self, chat_id, token, kind, alert_block) -> bool:
+        cur = self.conn.execute(
+            "SELECT 1 FROM approvals WHERE chat_id=? AND token=? AND kind=? AND alert_block=? LIMIT 1",
+            (str(chat_id), token, kind, int(alert_block)))
+        return cur.fetchone() is not None
+
+    def update_approval(self, approval_id, status: str, ts: int, note: str) -> None:
+        import json as _json
+        row = self.get_approval(approval_id)
+        hist = row["history"] if row else []
+        hist.append([note, int(ts)])
+        self.conn.execute("UPDATE approvals SET status=?, history=? WHERE id=?",
+                          (status, _json.dumps(hist), int(approval_id)))
+        self.conn.commit()
+
+    # --- paper (live) alerts + outcomes ---
+    def add_paper_alert(self, kind, token, alert_block, detected_ts) -> None:
+        self.conn.execute(
+            "INSERT OR IGNORE INTO paper_alerts(kind,token,alert_block,detected_ts) VALUES(?,?,?,?)",
+            (kind, token, int(alert_block or 0), int(detected_ts)))
+        self.conn.commit()
+
+    def list_pending_paper_alerts(self, ready_before_block, delay_seconds) -> list:
+        cur = self.conn.execute(
+            "SELECT kind,token,alert_block FROM paper_alerts pa WHERE alert_block <= ? "
+            "AND NOT EXISTS (SELECT 1 FROM paper_outcomes po WHERE po.kind=pa.kind "
+            "AND po.token=pa.token AND po.alert_block=pa.alert_block AND po.delay_seconds=?)",
+            (int(ready_before_block), int(delay_seconds)))
+        return [(r[0], r[1], int(r[2])) for r in cur.fetchall()]
+
+    def save_paper_outcome(self, kind, token, alert_block, delay_seconds, computed_ts,
+                           horizons_json) -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO paper_outcomes(kind,token,alert_block,delay_seconds,computed_ts,"
+            "horizons_json) VALUES(?,?,?,?,?,?)",
+            (kind, token, int(alert_block), int(delay_seconds), int(computed_ts), horizons_json))
+        self.conn.commit()
+
+    def list_paper_outcomes(self, delay_seconds) -> list:
+        import json as _json
+        cur = self.conn.execute(
+            "SELECT kind,token,alert_block,horizons_json FROM paper_outcomes WHERE delay_seconds=?",
+            (int(delay_seconds),))
+        return [{"kind": r[0], "token": r[1], "alert_block": r[2],
+                 "horizons": _json.loads(r[3] or "{}")} for r in cur.fetchall()]
+
+    # --- per-token cooldowns (e.g. volume_collapse spam control) ---
+    def cooldown_ok(self, token, kind, now_ts: int, window_s: int) -> bool:
+        cur = self.conn.execute("SELECT ts FROM cooldowns WHERE token=? AND kind=?",
+                                (token, kind))
+        row = cur.fetchone()
+        if row and (int(now_ts) - int(row[0])) < int(window_s):
+            return False
+        self.conn.execute(
+            "INSERT INTO cooldowns(token,kind,ts) VALUES(?,?,?) "
+            "ON CONFLICT(token,kind) DO UPDATE SET ts=excluded.ts",
+            (token, kind, int(now_ts)))
+        self.conn.commit()
+        return True
+
+    def close(self) -> None:
+        self.conn.close()
+
+    # --- persistent dedup (delivered alerts) ---
+    def is_delivered(self, chat_id, token, kind, block) -> bool:
+        cur = self.conn.execute(
+            "SELECT 1 FROM delivered WHERE chat_id=? AND token=? AND kind=? AND block=? LIMIT 1",
+            (str(chat_id), token, kind, int(block or 0)))
+        return cur.fetchone() is not None
+
+    def mark_delivered(self, chat_id, token, kind, block) -> None:
+        self.conn.execute(
+            "INSERT OR IGNORE INTO delivered(chat_id,token,kind,block) VALUES(?,?,?,?)",
+            (str(chat_id), token, kind, int(block or 0)))
+        self.conn.commit()
+
+    def get_state(self, key: str, default=None):
+        cur = self.conn.execute("SELECT value FROM state WHERE key=?", (key,))
+        row = cur.fetchone()
+        return row[0] if row else default
+
+    def set_state(self, key: str, value) -> None:
+        self.conn.execute(
+            "INSERT INTO state(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, str(value)))
+        self.conn.commit()
+
+    # --- alert queue (no alert is ever discarded by the per-cycle cap) ---
+    def enqueue_alert(self, a: dict) -> None:
+        import json as _json
+        self.conn.execute(
+            "INSERT OR IGNORE INTO aqueue(token,kind,block,severity,message,context) VALUES(?,?,?,?,?,?)",
+            (a.get("token"), a.get("kind"), int(a.get("block") or 0), a.get("severity"),
+             a.get("message"), _json.dumps(a.get("context") or {})))
+        self.conn.commit()
+
+    def enqueue_alert_many(self, alerts: list) -> None:
+        import json as _json
+        rows = [(a.get("token"), a.get("kind"), int(a.get("block") or 0), a.get("severity"),
+                 a.get("message"), _json.dumps(a.get("context") or {})) for a in alerts]
+        if rows:
+            self.conn.executemany(
+                "INSERT OR IGNORE INTO aqueue(token,kind,block,severity,message,context) "
+                "VALUES(?,?,?,?,?,?)", rows)
+            self.conn.commit()
+
+    def queue_size(self) -> int:
+        return int(self.conn.execute("SELECT COUNT(*) FROM aqueue").fetchone()[0])
+
+    def dequeue(self, limit: int = 30) -> list:
+        import json as _json
+        cur = self.conn.execute(
+            "SELECT token,kind,block,severity,message,context FROM aqueue "
+            "ORDER BY (kind IN ('dev_sell','compound')) DESC, block, rowid LIMIT ?", (int(limit),))
+        out = []
+        for token, kind, block, severity, message, context in cur.fetchall():
+            out.append({"token": token, "kind": kind, "block": block, "severity": severity,
+                        "message": message, "context": _json.loads(context or "{}")})
+        return out
+
+    def remove_from_queue(self, token, kind, block) -> None:
+        self.conn.execute("DELETE FROM aqueue WHERE token=? AND kind=? AND block=?",
+                          (token, kind, int(block or 0)))
+        self.conn.commit()

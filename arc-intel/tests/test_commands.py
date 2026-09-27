@@ -1,0 +1,199 @@
+import json
+import unittest
+
+from bot.store import SubscriptionStore
+from bot.commands import command_reply, command_reply_rich, _handle_callback
+
+ADDR = "0x" + "a" * 40
+ADDR2 = "0x" + "b" * 40
+
+
+class CommandTests(unittest.TestCase):
+    def setUp(self):
+        self.store = SubscriptionStore(":memory:")
+        self.exists = lambda t: t in (ADDR, ADDR2)
+        self.check = lambda t: f"check {t} ok"
+
+    def reply(self, text, chat=1, now=1000):
+        return command_reply(text, chat, self.store, self.exists, self.check, now)
+
+    def tearDown(self):
+        self.store.close()
+
+    def test_help(self):
+        self.assertIn("SNIPER IA", self.reply("/help"))
+
+    def test_start_onboarding_and_disclaimer(self):
+        r = self.reply("/start")
+        self.assertIn("SNIPER IA", r)
+        self.assertIn("Not financial advice", r)
+
+    def test_new_user_has_no_subscriptions(self):
+        self.reply("/start")
+        self.assertEqual(self.store.get(1)["tokens"], set())
+
+    def test_subscribe_valid(self):
+        r = self.reply(f"/subscribe {ADDR}")
+        self.assertIn("Subscribed", r)
+        self.assertIn(ADDR, self.store.get(1)["tokens"])
+        self.assertEqual(self.store.get(1)["since_block"], 1000)
+
+    def test_subscribe_invalid_address(self):
+        self.assertIn("Invalid address", self.reply("/subscribe 0x123"))
+
+    def test_subscribe_unknown_token(self):
+        self.assertIn("not found", self.reply("/subscribe 0x" + "f" * 40))
+
+    def test_subscribe_usage(self):
+        self.assertIn("Usage", self.reply("/subscribe"))
+
+    def test_unsubscribe(self):
+        self.reply(f"/subscribe {ADDR}")
+        r = self.reply(f"/unsubscribe {ADDR}")
+        self.assertIn("Unsubscribed", r)
+        self.assertEqual(self.store.get(1)["tokens"], set())
+
+    def test_settings(self):
+        self.assertIn("Kinds set", self.reply("/settings dev_sell,compound"))
+        self.assertEqual(self.store.get(1)["kinds"], {"dev_sell", "compound"})
+        self.assertIn("Allowed kinds", self.reply("/settings bad_kind"))
+
+    def test_list(self):
+        self.reply(f"/subscribe {ADDR}")
+        self.assertIn(ADDR, self.reply("/list"))
+
+    def test_limit_per_user(self):
+        for i in range(SubscriptionStore.MAX_TOKENS):
+            self.store.add_token(1, "0x" + f"{i:040x}", now_block=0)
+        r = self.reply(f"/subscribe {ADDR}")
+        self.assertIn("limit", r.lower())
+
+    def test_unknown_command(self):
+        self.assertIn("Unknown", self.reply("/nonsense"))
+
+    def test_stats_two_faces_and_low_n(self):
+        for i in range(12):
+            h = {"1h": {"benefit_delayed": 0.03, "benefit_instant": 0.04, "stale": False},
+                 "6h": {"benefit_delayed": 0.05, "benefit_instant": 0.06, "stale": False},
+                 "24h": {"benefit_delayed": 0.05, "benefit_instant": 0.06, "stale": False}}
+            self.store.save_paper_outcome("dev_sell", f"0xt{i}", i, 45, 1000 + i, json.dumps(h))
+        # one big adverse (token pumped ~11x after alert -> missed upside, not capital loss)
+        h = {"1h": {"benefit_delayed": -10.0, "benefit_instant": -10.0, "stale": False}}
+        self.store.save_paper_outcome("dev_sell", "0xtpump", 99, 45, 1100, json.dumps(h))
+        for i in range(2):
+            h = {"1h": {"benefit_delayed": 0.01, "benefit_instant": 0.01, "stale": False}}
+            self.store.save_paper_outcome("compound", f"0xc{i}", i, 45, 2000 + i, json.dumps(h))
+        r = self.reply("/stats")
+        self.assertIn("dev_sell", r)
+        self.assertIn("CI", r)
+        self.assertIn("opportunity cost", r)
+        self.assertIn("not a capital loss", r)
+        self.assertIn("upside", r)
+        self.assertNotIn("-1048", r)          # never the raw scary number
+        self.assertIn("compound", r)
+        self.assertIn("not enough data", r)
+
+    def test_subscribe_recent(self):
+        def recent(n, window_blocks=None):
+            return [ADDR, ADDR2]
+
+        r = command_reply("/subscribe_recent 2", 1, self.store, self.exists, self.check, 1000,
+                          recent_fn=recent)
+        self.assertIn("Subscribed to 2", r)
+        self.assertEqual(self.store.get(1)["tokens"], {ADDR, ADDR2})
+
+    def test_subscribe_recent_respects_limit(self):
+        for i in range(SubscriptionStore.MAX_TOKENS):
+            self.store.add_token(1, "0x" + f"{i:040x}", now_block=0)
+
+        def recent(n, window_blocks=None):
+            return [ADDR]
+
+        r = command_reply("/subscribe_recent", 1, self.store, self.exists, self.check, 0,
+                          recent_fn=recent)
+        self.assertIn("skipped", r.lower())
+
+
+    # --- UI enhancements: keyboard labels, CA paste, menu, positions, disclaimer ---
+
+    def test_label_my_alerts_maps_to_list(self):
+        self.reply(f"/subscribe {ADDR}")
+        self.assertIn(ADDR, self.reply("\U0001F4CB My alerts"))
+
+    def test_paste_address_triggers_check(self):
+        self.assertIn("check", self.reply(ADDR))
+
+    def test_check_prompt_when_no_arg(self):
+        self.assertIn("Paste a token CA", self.reply("/check"))
+
+    def test_disclaimer(self):
+        self.assertIn("Not financial advice", self.reply("/disclaimer"))
+
+    def test_positions_empty(self):
+        self.assertIn("[PAPER]", self.reply("/positions"))
+
+    def test_positions_lists_approvals(self):
+        aid = self.store.create_approval(1, ADDR, "dev_sell", "sell", 10.0, 5, 1000, 1300, 2000,
+                                         False, None)
+        r = self.reply("/positions")
+        self.assertIn(f"#{aid}", r)
+        self.assertIn(ADDR, r)
+
+    def test_rich_start_carries_inline_grid(self):
+        r = command_reply_rich("/start", 1, self.store, self.exists, self.check, 1000)
+        self.assertIsInstance(r, dict)
+        self.assertTrue(r["inline"])
+        # Maestro-style grid: 8 rows, first rows with 2 buttons each
+        self.assertEqual(len(r["inline"]), 8)
+        self.assertEqual(len(r["inline"][0]), 2)
+        self.assertIn("SNIPER IA", r["text"])
+
+    def test_wallet_panel_non_custodial(self):
+        self.assertIn("custodial", self.reply("/wallet"))
+
+    def test_connect_wallet(self):
+        self.assertIn("No wallet", self.reply("/wallet"))
+        r = self.reply(f"/connect {ADDR}")
+        self.assertIn(ADDR, r)
+        self.assertEqual(self.store.get_wallet(1), ADDR)
+        self.assertIn(ADDR, self.reply("/wallet"))
+
+    def test_connect_bad_address(self):
+        self.assertIn("/connect", self.reply("/connect 0x123"))
+
+    def test_soon_callback(self):
+        r = _handle_callback("soon:Signals", 1, self.store, self.exists, self.check, 1000)
+        self.assertIn("soon", r.lower())
+
+    def test_list_shows_symbol(self):
+        self.reply(f"/subscribe {ADDR}")
+        r = command_reply("/list", 1, self.store, self.exists, self.check, 1000,
+                          symbol_fn=lambda t: "PEPE")
+        self.assertIn("PEPE", r)
+        self.assertIn(ADDR, r)
+
+    def test_rich_non_menu_is_plain_string(self):
+        self.assertIsInstance(self.reply("/stats"), str)
+        self.assertIsInstance(command_reply_rich("/disclaimer", 1, self.store, self.exists,
+                                                 self.check, 1000), str)
+
+    def test_language_command_returns_three_options(self):
+        r = command_reply_rich("/language", 1, self.store, self.exists, self.check, 1000)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(len(r["inline"][0]), 3)  # English / Español / 中文
+
+    def test_language_callback_sets_lang_and_menu(self):
+        r = _handle_callback("lang:es", 1, self.store, self.exists, self.check, 1000)
+        self.assertIsInstance(r, dict)
+        self.assertEqual(self.store.get_state("lang:1"), "es")
+        self.assertIn("Idioma", r["text"])
+
+    def test_welcome_is_localized(self):
+        _handle_callback("lang:zh", 1, self.store, self.exists, self.check, 1000)
+        r = command_reply_rich("/start", 1, self.store, self.exists, self.check, 1000)
+        self.assertIn("SNIPER IA", r["text"])
+        self.assertIn("\u6b22\u8fce", r["text"])  # "欢迎"
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -1,0 +1,3 @@
+# Core indexer uses ONLY the Python standard library.
+# Optional, only if you enable the Bitquery WebSocket source:
+websockets>=12.0
