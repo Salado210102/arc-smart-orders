@@ -130,6 +130,33 @@ class SignServerTests(unittest.TestCase):
         except urllib.error.HTTPError as e:
             self.assertEqual(e.code, 503)
 
+    def test_buy_quote_requires_auth(self):
+        try:
+            urllib.request.urlopen(self._url("/buy_quote?token=" + "0x" + "1" * 40))
+            self.fail("expected 401")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 401)
+
+    def test_buy_quote_bad_address(self):
+        req = urllib.request.Request(self._url("/buy_quote?token=0x123"),
+                                     headers={"X-Telegram-Init-Data": init_data(1)})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 400")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 400)
+
+    def test_buy_quote_no_storage(self):
+        os.environ.pop("ARC_INTEL_DSN", None)
+        req = urllib.request.Request(
+            self._url("/buy_quote?token=" + "0x" + "1" * 40 + "&amount_usdc=10"),
+            headers={"X-Telegram-Init-Data": init_data(1)})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 503")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 503)
+
 
 if __name__ == "__main__":
     unittest.main()

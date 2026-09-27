@@ -151,6 +151,14 @@
   (BCAT), `/positions` y `/wallet` con `initData` firmado con el token real del bot; `/positions` sin
   auth → **401**, token inválido → **400**. Suite Python **244 passed** (1 fallo ambiental local de
   Mini App). Pendiente: `/alerts` con gráfico, `/plan`, `/cancel`, rate-limit y UI.
+- **2026-09-27 (Parte C, entregable 3 — C2 Compra, backend)** — `execution/quotes.py` (**puro**,
+  7 tests): resuelve el lado estable del pool, calcula `expected_out`/`minOut` (precio + slippage) y
+  arma el payload firmable reutilizando `preorders.build_sign_payload` (el contrato es **agnóstico a
+  la dirección**: compra = `token_in` estable). `miniapp_data.load_pool` (PG) + endpoint
+  **`GET /buy_quote`** (auth). Desplegado y **verificado por HTTPS público** con un pool v4 real
+  (token *Tower*): $10 → 2,434,291 tokens, `minOut` 2,385,606 con 2%; payload con executor testnet
+  (`0x89dF…35E8`, chainId 5042002), `zeroForOne:true`, `typedData` correcto. Suite **254 passed**.
+  Pendiente C2: **persistir la orden** (compra) + keeper, y la **UI** de los 4 pasos.
 
 ---
 

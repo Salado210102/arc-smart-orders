@@ -285,6 +285,11 @@ firma rechazada → volver a Paso 3 sin perder datos; `deadline` vencido → rec
 | GET | `/token?address=` | no | ficha (precio/mcap/vol24/thin/creador) | `miniapp_data.load_token_card` |
 | GET | `/positions` | **sí** | posiciones + PnL no realizado + resumen | `miniapp_api.position_views`, `positions.reconcile` |
 | GET | `/wallet` | **sí** | wallet enlazada + auto-subs | `miniapp_api.wallet_view` |
+| GET | `/buy_quote?token=&amount_usdc=&slippage=` | **sí** | quote de compra + payload firmable (preview) | `execution.quotes`, `preorders.build_sign_payload` |
+
+> `/buy_quote` devuelve `{token, pool, quote, payload}` con `preview:true, persisted:false`:
+> es una **vista previa** (payload con nonces efímeros). La **creación real de la orden** (persistir
+> + keeper) es el siguiente paso de C2.
 
 **Propuestos [FALTA]:**
 

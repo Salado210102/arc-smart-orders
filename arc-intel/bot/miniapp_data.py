@@ -78,6 +78,25 @@ def load_token_card(storage, token, head_block=None) -> dict:
         vol24=vol24, price=price, supply=supply_h, thin_reason=thin, creator_rep=rep)
 
 
+def load_pool(storage, token) -> dict | None:
+    """The v4 pool whose currency0 or currency1 is `token`, or None."""
+    token = (token or "").lower()
+    conn = storage.pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT pool_id, currency0, currency1, fee, tick_spacing, hooks "
+                        "FROM pools_v4 WHERE lower(currency0)=%s OR lower(currency1)=%s LIMIT 1",
+                        (token, token))
+            r = cur.fetchone()
+            if not r:
+                return None
+            return {"pool_id": r[0], "currency0": (r[1] or "").lower(),
+                    "currency1": (r[2] or "").lower(), "fee": int(r[3]),
+                    "tick_spacing": int(r[4]), "hooks": (r[5] or "").lower()}
+    finally:
+        storage.pool.putconn(conn)
+
+
 def price_fn(storage):
     return lambda token: latest_price(storage, token)
 
