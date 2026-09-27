@@ -174,6 +174,22 @@ class SignServerTests(unittest.TestCase):
         except urllib.error.HTTPError as e:
             self.assertEqual(e.code, 401)
 
+    def test_custody_requires_auth(self):
+        try:
+            urllib.request.urlopen(self._url("/custody"))
+            self.fail("expected 401")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 401)
+
+    def test_custody_create_requires_auth(self):
+        req = urllib.request.Request(self._url("/custody/create"), data=b"{}",
+                                     headers={"Content-Type": "application/json"})
+        try:
+            urllib.request.urlopen(req)
+            self.fail("expected 401")
+        except urllib.error.HTTPError as e:
+            self.assertEqual(e.code, 401)
+
     def test_sell_order_requires_auth(self):
         body = json.dumps({"token": "0x" + "1" * 40, "pct": 50}).encode()
         req = urllib.request.Request(self._url("/sell_order"), data=body,

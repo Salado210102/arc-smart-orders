@@ -79,6 +79,10 @@ class SubscriptionStore:
             "floor_pct REAL, min_out REAL, deadline INTEGER, order_nonce INTEGER, status TEXT, "
             "created_ts INTEGER, signature TEXT, sign_token TEXT, sig_payload TEXT, "
             "kind TEXT DEFAULT 'sell')")
+        # custodial quick wallet (Modo Maestro/Banana): bot-held key per user (encrypted)
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS custody ("
+            "chat TEXT PRIMARY KEY, address TEXT, enc_secret TEXT, created_ts INTEGER, status TEXT)")
         # session keys (Opción 3): scoped hot keys the user authorizes once
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS sessions ("
@@ -334,6 +338,25 @@ class SubscriptionStore:
             (token, kind, int(now_ts)))
         self.conn.commit()
         return True
+
+    # --- custodial quick wallet ---
+    def save_custody(self, chat, address, enc_secret, status="active") -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO custody(chat,address,enc_secret,created_ts,status) VALUES(?,?,?,?,?)",
+            (str(chat), str(address).lower(), enc_secret, int(time.time()), status))
+        self.conn.commit()
+
+    def get_custody(self, chat) -> dict | None:
+        r = self.conn.execute("SELECT chat,address,enc_secret,created_ts,status FROM custody WHERE chat=?",
+                              (str(chat),)).fetchone()
+        if not r:
+            return None
+        return {"chat": r[0], "address": r[1], "enc_secret": r[2], "created_ts": int(r[3] or 0),
+                "status": r[4]}
+
+    def delete_custody(self, chat) -> None:
+        self.conn.execute("DELETE FROM custody WHERE chat=?", (str(chat),))
+        self.conn.commit()
 
     # --- session keys (Opción 3) ---
     def save_session(self, chat, session_key, enc_secret, executor, pool_id, token_in,

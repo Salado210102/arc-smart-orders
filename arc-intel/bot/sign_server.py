@@ -318,6 +318,167 @@ class Handler(BaseHTTPRequestHandler):
             return True
         return None if allp is None else False
 
+    def _custody_of(self, uid):
+        store = SubscriptionStore(DB)
+        try:
+            return store.get_custody(uid)
+        finally:
+            store.close()
+
+    def _custody_create(self, uid, data):
+        from execution import custody as C
+        from execution.sessions import encrypt_secret
+        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
+        if not enc:
+            return 503, {"error": "no_enc_key"}
+        pk = (data.get("private_key") or "").strip()
+        try:
+            if pk:
+                addr = C.address_of(pk)
+            else:
+                w = C.new_wallet()
+                pk, addr = w["private_key"], w["address"]
+        except Exception:
+            return 400, {"error": "bad_key"}
+        store = SubscriptionStore(DB)
+        try:
+            store.save_custody(uid, addr, encrypt_secret(pk, enc))
+        finally:
+            store.close()
+        return 200, {"address": addr}
+
+    def _custody_view(self, uid):
+        from execution import custody as C
+        c = self._custody_of(uid)
+        if not c:
+            return 200, {"exists": False}
+        addr = c["address"]
+        stable = os.environ.get("ARC_INTEL_STABLE", "0x3600000000000000000000000000000000000000")
+        return 200, {"exists": True, "address": addr,
+                     "usdc": C.erc20_balance(stable, addr) / 1e6,
+                     "native": C.native_balance(addr) / 1e18}
+
+    def _custody_withdraw(self, uid, data):
+        from execution import custody as C
+        from execution.sessions import decrypt_secret
+        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
+        c = self._custody_of(uid)
+        if not c:
+            return 409, {"error": "no_custody"}
+        to = (data.get("to") or "").lower()
+        if not ADDR_RE.match(to):
+            return 400, {"error": "bad_address"}
+        token = (data.get("token") or os.environ.get("ARC_INTEL_STABLE",
+                   "0x3600000000000000000000000000000000000000")).lower()
+        if not ADDR_RE.match(token):
+            return 400, {"error": "bad_token"}
+        try:
+            amount = int(str(data.get("amount_raw") or "0"))
+        except (TypeError, ValueError):
+            return 400, {"error": "bad_amount"}
+        try:
+            pk = decrypt_secret(c["enc_secret"], enc)
+            txh = C.withdraw(pk, token, to, amount)
+        except Exception as e:
+            return 502, {"error": "withdraw_failed", "detail": str(e)[:120]}
+        return 200, {"ok": True, "tx": txh}
+
+    def _custody_buy(self, uid, data):
+        import time
+        from execution import custody as C
+        from execution import sessions as S
+        from execution.quotes import buy_quote
+        from execution.eip712 import new_nonce
+        from execution.sessions import decrypt_secret
+        from . import tokenmeta
+        from .miniapp_data import load_pool, load_token_card
+        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
+        tok = (data.get("token") or "").lower()
+        if not ADDR_RE.match(tok):
+            return 400, {"error": "bad_address"}
+        c = self._custody_of(uid)
+        if not c:
+            return 409, {"error": "no_custody"}
+        st = _storage()
+        if st is None:
+            return 503, {"error": "no_storage"}
+        pool = load_pool(st, tok)
+        if not pool:
+            return 404, {"error": "no_pool"}
+        if self._allowed(S.pool_id(pool), pool.get("hooks")) is False:
+            return 409, {"error": "pool_not_allowed", "pool_id": S.pool_id(pool)}
+        stable = os.environ.get("ARC_INTEL_STABLE", "0x3600000000000000000000000000000000000000")
+        card = load_token_card(st, tok)
+        amount_in = int(round(float(data.get("amount_usdc") or 0) * 1e6))
+        try:
+            quote = buy_quote(amount_in_base=amount_in, token_price=card["price"],
+                              token_decimals=tokenmeta.rpc_decimals(tok),
+                              slippage_pct=float(data.get("slippage") or 3))
+        except ValueError as e:
+            return 400, {"error": str(e)}
+        try:
+            pk = decrypt_secret(c["enc_secret"], enc)
+            C.ensure_permit2_approval(pk, stable)
+            txh = C.swap(pk, pool=pool, token_in=stable, amount_in=amount_in,
+                         min_out=quote["min_out_base"], recipient=c["address"],
+                         order_nonce=new_nonce(), deadline=int(time.time()) + 600)
+        except Exception as e:
+            return 502, {"error": "swap_failed", "detail": str(e)[:160]}
+        return 200, {"executing": True, "tx": txh, "quote": quote}
+
+    def _custody_sell(self, uid, data):
+        import time
+        from execution import custody as C
+        from execution import sessions as S
+        from execution.quotes import sell_quote
+        from execution.eip712 import new_nonce
+        from execution.sessions import decrypt_secret
+        from . import tokenmeta
+        from .miniapp_data import load_pool, latest_price
+        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
+        tok = (data.get("token") or "").lower()
+        if not ADDR_RE.match(tok):
+            return 400, {"error": "bad_address"}
+        c = self._custody_of(uid)
+        if not c:
+            return 409, {"error": "no_custody"}
+        try:
+            pct = float(data.get("pct") or 0)
+        except (TypeError, ValueError):
+            return 400, {"error": "bad_amount"}
+        if not (0 < pct <= 100):
+            return 400, {"error": "bad_pct"}
+        st = _storage()
+        if st is None:
+            return 503, {"error": "no_storage"}
+        pool = load_pool(st, tok)
+        if not pool:
+            return 404, {"error": "no_pool"}
+        if self._allowed(S.pool_id(pool), pool.get("hooks")) is False:
+            return 409, {"error": "pool_not_allowed", "pool_id": S.pool_id(pool)}
+        bal = C.erc20_balance(tok, c["address"])
+        if bal <= 0:
+            return 409, {"error": "no_position"}
+        amount_in = int(bal * pct / 100.0)
+        price = latest_price(st, tok)
+        if price <= 0:
+            return 409, {"error": "no_price"}
+        dec = tokenmeta.rpc_decimals(tok)
+        try:
+            quote = sell_quote(qty=amount_in / (10 ** dec), price=price, token_decimals=dec,
+                               floor_pct=float(data.get("floor_pct") or 0))
+        except ValueError as e:
+            return 400, {"error": str(e)}
+        try:
+            pk = decrypt_secret(c["enc_secret"], enc)
+            C.ensure_permit2_approval(pk, tok)
+            txh = C.swap(pk, pool=pool, token_in=tok, amount_in=amount_in,
+                         min_out=quote["min_out_base"], recipient=c["address"],
+                         order_nonce=new_nonce(), deadline=int(time.time()) + 600)
+        except Exception as e:
+            return 502, {"error": "swap_failed", "detail": str(e)[:160]}
+        return 200, {"executing": True, "tx": txh, "quote": quote}
+
     def _kick_session_keeper(self):
         """Fire-and-forget: execute armed session buys with the user's session key."""
         def _run():
@@ -490,6 +651,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, load_series(st, tok))
             except Exception:
                 return self._send(502, {"error": "series_failed"})
+        if u.path == "/custody":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            code, resp = self._custody_view(uid)
+            return self._send(code, resp)
         if u.path == "/sessions":
             uid = self._auth_user()
             if uid is None:
@@ -583,6 +750,24 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 return self._send(400, {"error": "bad_json"})
             code, resp = self._sell(uid, data)
+            return self._send(code, resp)
+        if u.path in ("/custody/create", "/custody/withdraw", "/custody/buy", "/custody/sell"):
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send(400, {"error": "bad_json"})
+            if u.path == "/custody/create":
+                code, resp = self._custody_create(uid, data)
+            elif u.path == "/custody/withdraw":
+                code, resp = self._custody_withdraw(uid, data)
+            elif u.path == "/custody/buy":
+                code, resp = self._custody_buy(uid, data)
+            else:
+                code, resp = self._custody_sell(uid, data)
             return self._send(code, resp)
         if u.path == "/session/authorize":
             uid = self._auth_user()

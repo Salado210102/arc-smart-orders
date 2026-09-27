@@ -112,6 +112,26 @@
         <div class="mut" style="margin-top:8px">Para enlazar/cambiar wallet: comando <b>/link_wallet</b> en el bot.</div>
       </div>
       <div class="card">
+        <div class="mut">👛 Mi wallet del bot (custodia) — deposita y tradea al instante (estilo Maestro)</div>
+        <div id="custout" style="margin-top:8px"></div>
+        <div id="custform" class="hide" style="margin-top:8px">
+          <input id="custto" placeholder="0x destino (retirar)" style="width:100%">
+          <div class="row" style="margin-top:6px">
+            <input id="custamt" placeholder="monto USDC" style="flex:1">
+            <button class="ghost" id="custwithdraw">Retirar</button>
+          </div>
+          <div class="mut" style="margin-top:10px">Vender token de tu wallet del bot:</div>
+          <div class="row" style="margin-top:6px">
+            <input id="custsellca" placeholder="0x token CA" style="flex:1">
+            <button class="ghost custsell" data-p="25">25%</button>
+            <button class="ghost custsell" data-p="50">50%</button>
+            <button class="ghost custsell" data-p="75">75%</button>
+            <button class="ghost custsell" data-p="100">100%</button>
+          </div>
+          <div id="custsellout" class="mut" style="margin-top:6px"></div>
+        </div>
+      </div>
+      <div class="card">
         <div class="mut">⚡ Trading 1-toque (session key) — autoriza una vez y compra sin firmar cada vez</div>
         <div class="row" style="margin-top:8px">
           <input id="sessca" placeholder="0x token CA" style="flex:1">
@@ -227,7 +247,7 @@
           $("tab-" + k).classList.toggle("on", k === name);
         }
         if (name === "pos") loadPositions();
-        if (name === "wal") loadWallet();
+        if (name === "wal") { loadWallet(); loadCustody(); }
         if (name === "alr") loadAlerts();
       }
       $("tab-buy").onclick = () => tab("buy");
@@ -336,6 +356,15 @@
       $("arm").onclick = async () => {
         const amt = parseFloat($("amount").value || "0");
         const slip = parseFloat($("slippage").value || "3");
+        if (CUSTODY && CUSTODY.exists) {
+          $("armout").textContent = "Comprando al instante…";
+          const r = await api("/custody/buy", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: token.address, amount_usdc: amt, slippage: slip }) });
+          $("armout").innerHTML = (r.status === 200 && r.body && r.body.executing)
+            ? '<span class="ok">✅ Comprado al instante (el bot firmó).</span>'
+            : `<span class="bad">Error: ${esc((r.body && r.body.error) || r.status)}</span>`;
+          return;
+        }
         $("armout").textContent = "Creando orden…";
         const { status, body } = await api("/buy_order", { method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -355,6 +384,8 @@
           $("armout").innerHTML = 'Primero enlaza tu wallet: envía <b>/link_wallet 0xTuDireccion</b> en el chat del bot y vuelve a intentar.';
         } else if (body && body.error === "no_pool") {
           $("armout").innerHTML = '<span class="warn">Ese token no tiene pool v4 en Arc todavía; no se puede operar aquí.</span>';
+        } else if (body && body.error === "pool_not_allowed") {
+          $("armout").innerHTML = '<span class="warn">El pool no está habilitado en el contrato. Pásale al admin este poolId para allowlistear:<br><code>' + esc(body.pool_id) + '</code></span>';
         } else if (body && body.error) {
           $("armout").innerHTML = `<span class="bad">No se pudo crear la orden: ${esc(body.error)}</span>`;
         } else {
@@ -404,6 +435,54 @@
            <div class="kv"><span>Auto-seguidos</span><b>${body.count}</b></div>` +
           (body.auto_subs.length ? `<div class="mut" style="margin-top:6px">${body.auto_subs.map(esc).join("<br>")}</div>` : "");
         loadSessions().catch(() => {});
+      }
+
+      let CUSTODY = null;
+      async function loadCustody() {
+        const { status, body } = await api("/custody");
+        if (status !== 200 || !body) { $("custout").innerHTML = ""; return; }
+        CUSTODY = body;
+        if (!body.exists) {
+          $("custout").innerHTML = 'Sin wallet del bot. ';
+          const b = document.createElement("button");
+          b.className = "primary"; b.textContent = "Crear wallet del bot";
+          b.onclick = async () => {
+            b.disabled = true; b.textContent = "Creando…";
+            const r = await api("/custody/create", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+            if (r.status === 200) loadCustody(); else b.textContent = "error";
+          };
+          $("custout").appendChild(b);
+          $("custform").classList.add("hide");
+          return;
+        }
+        $("custout").innerHTML = `Dirección: <code>${esc(body.address)}</code><br>` +
+          `USDC: <b>${(body.usdc || 0).toFixed(2)}</b> · nativo: <b>${(body.native || 0).toFixed(4)}</b><br>` +
+          '<span class="mut" style="font-size:12px">Deposita USDC a esa dirección; el bot opera por ti al instante. Retíralo cuando quieras.</span>';
+        $("custform").classList.remove("hide");
+        $("custwithdraw").onclick = async () => {
+          const to = ($("custto").value || "").trim();
+          const amt = parseFloat($("custamt").value || "0");
+          if (!/^0x[0-9a-fA-F]{40}$/.test(to) || amt <= 0) { $("custout").innerHTML += '<br><span class="bad">destino/monto inválido</span>'; return; }
+          $("custwithdraw").textContent = "Retirando…";
+          const r = await api("/custody/withdraw", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ to, amount_raw: Math.round(amt * 1e6).toString() }) });
+          $("custwithdraw").textContent = "Retirar";
+          $("custout").innerHTML += (r.status === 200 && r.body && r.body.ok)
+            ? '<br><span class="ok">✅ Retirado.</span>' : `<br><span class="bad">Error: ${esc((r.body && r.body.error) || r.status)}</span>`;
+        };
+        document.querySelectorAll(".custsell").forEach(b => {
+          b.onclick = async () => {
+            const ca = ($("custsellca").value || "").trim().toLowerCase();
+            if (!/^0x[0-9a-f]{40}$/.test(ca)) { $("custsellout").textContent = "CA inválida."; return; }
+            $("custsellout").textContent = "Vendiendo…";
+            const r = await api("/custody/sell", { method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token: ca, pct: parseFloat(b.dataset.p) }) });
+            $("custsellout").innerHTML = (r.status === 200 && r.body && r.body.executing)
+              ? '<span class="ok">✅ Vendido al instante.</span>'
+              : `<span class="bad">Error: ${esc((r.body && r.body.error) || r.status)}</span>`;
+            loadCustody();
+          };
+        });
       }
 
       async function activateSessionThenBuy(tok, amt, slip) {
@@ -473,6 +552,7 @@
           $("sessout").textContent = "Cancelado/error: " + (e && e.message ? e.message : e);
         }
       };
+      loadCustody().catch(() => {});
       if ($("ca").value) $("check").click();
     }
   </script>

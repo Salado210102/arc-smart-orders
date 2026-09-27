@@ -66,6 +66,7 @@ Leyenda de estado: **[LIVE]** ya operativo · **[TESTNET]** probado en testnet, 
 | Seguridad del contrato | `paused`, **allowlist de pools** (fail-closed), nonce de orden (**single-use**), `deadline`, `minOut`, **cancelOrder** | [TESTNET] |
 | **Compra** (4 pasos) | pegar CA → ficha → monto/slippage → **firmar** | [TESTNET] |
 | **Venta por %** | 25 / 50 / 75 / 100 % sobre la posición real (`sell_quantity`) | [TESTNET] |
+| **Wallet del bot (custodia, estilo Maestro/Banana)** | el bot crea/custodia una wallet por usuario (clave cifrada); **depositar → tradear al instante** (el bot firma); **retirar** cuando quieras | [TESTNET] |
 | **Órdenes pre-firmadas** (Opción 2) | el usuario firma **una vez**; el **keeper** ejecuta sola — sin hot keys del usuario | [TESTNET] |
 | **Session keys** (Opción 3) | el usuario autoriza **una vez** una llave **acotada** (token/topes/expiry/revocable); **compras de un toque** sin popup | [TESTNET] |
 | **Pago/gas sin fricción** (base) | el **relayer** paga el gas (el usuario no necesita gas para operar) | [TESTNET] |
