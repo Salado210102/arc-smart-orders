@@ -40,7 +40,26 @@ venden".
 - Revisar que **% positivos** y **mediana** sean buenos antes de promocionar una señal.
 - Mostrar **ambas caras** (también la cola de riesgo).
 
+## Medición (backtest real) — 2026-09-27
+`indexer/backtest_spike.py` (replay de `legs` + retornos forward). Ventana desde bloque 22,700,000:
+
+| Señal | 1h mediana / %pos | 4h | 24h |
+|---|---|---|---|
+| **volume_spike** | −3.6% / **30%** (n=44) | −3.9% / 36% | +9.3% / 62% (n=8) |
+| **price_surge** | −4.1% / 38% (n=539) | −7.5% / 34% | −15.5% / 38% |
+| **whale_buy** | −1.2% / 33% (n=21) | −1.8% / 33% | −4.4% / 33% |
+
+**Veredicto: las señales de compra NO tienen edge** (mediana negativa, %positivos < 50%). **NO deben
+empujarse como "Comprar"** — haría perder dinero al usuario. El valor defendible del producto es el
+**riesgo** (dev-sell, rug; validado).
+
+## Decisión
+- **Desactivar el feed público de "compra"** (volume_spike / price_surge / whale_buy) salvo que se
+  demuestre edge con research serio.
+- Mantener **alertas de RIESGO** (validadas) como núcleo del producto + **escáner de seguridad**.
+- Si algún día hay una señal con edge medido, se promociona; mientras, **honestidad**: no vender
+  señales de compra que no funcionan.
+
 ## Pendiente de calidad
-- Backtest de `volume_spike` con los nuevos filtros (precio+flow) para medir precisión.
-- Umbrales por liquidez (tokens ilíquidos → más estricto).
-- `new_token`, `liquidity_add` (estudio en `ARC_AI_DISCOVERY_ALERTS.md`).
+- Umbrales por liquidez; `new_token`/`liquidity_add` (solo si se miden con edge).
+- Mostrar siempre las dos caras y el disclaimer.
