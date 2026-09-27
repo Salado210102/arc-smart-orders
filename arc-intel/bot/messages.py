@@ -13,7 +13,7 @@ EXPLORER = "https://explorer.arc.io/address/"
 _RICH_EMOJI = {"high": "🔴", "medium": "🟠", "low": "🟡"}
 _RICH_LABEL = {"dev_sell": "DEV-SELL", "volume_collapse": "VOLUME COLLAPSE",
                "compound": "COMPOSITE RISK", "liquidity_removal": "LIQUIDITY REMOVAL",
-               "thin_market": "THIN MARKET"}
+               "thin_market": "THIN MARKET", "volume_spike": "VOLUME SPIKE"}
 
 
 def _esc(s) -> str:

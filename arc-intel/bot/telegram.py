@@ -527,11 +527,11 @@ def is_transient_poll_error(exc: BaseException) -> bool:
 
 
 def apply_collapse_cooldown(alerts: list, store, now_ts: int, window_s: int) -> list:
-    """Suppress repeated volume_collapse alerts for the same token within `window_s`."""
+    """Suppress repeated volume_collapse/volume_spike alerts for the same token in `window_s`."""
     kept = []
     for a in alerts:
-        if a.kind == "volume_collapse" and not store.cooldown_ok(
-                a.token, "volume_collapse", now_ts, window_s):
+        if a.kind in ("volume_collapse", "volume_spike") and not store.cooldown_ok(
+                a.token, a.kind, now_ts, window_s):
             continue
         kept.append(a)
     return kept

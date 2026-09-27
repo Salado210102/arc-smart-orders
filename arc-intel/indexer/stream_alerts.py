@@ -24,10 +24,14 @@ class IncrementalState:
     lookback: int = 12
     z_threshold: float = -2.0
     window_blocks: int = 6000            # compound window
+    spike_z: float = 2.5                 # volume spike: z >= +2.5
+    min_spike_usdc: float = 500.0        # ...and >= $500 in the bucket (avoid noise)
+    min_confirm_usdc: float = 500.0      # recent volume that confirms a dev-sell
     positions: dict = field(default_factory=dict)        # (wallet, token) -> [qty, cost, entry]
     volume: dict = field(default_factory=dict)           # token -> {bucket: vol}
     last_dev_sell_block: dict = field(default_factory=dict)
     last_collapse_bucket: dict = field(default_factory=dict)
+    last_spike_bucket: dict = field(default_factory=dict)
 
     def apply_leg(self, leg: dict, creators: dict, emit: bool = True) -> list[Alert]:
         token = (leg.get("token") or "").lower()
@@ -62,11 +66,19 @@ class IncrementalState:
                 proceeds = sv * frac
                 if emit and is_significant_sell(sell_qty, pos[0], proceeds):
                     pct = pct_of_position(sell_qty, pos[0])
-                    a = Alert(token=token, kind="dev_sell", severity=severity_for(pct, proceeds),
+                    sev = severity_for(pct, proceeds)
+                    vol_recent = sum(v for b, v in vols.items() if b >= buck - 6)
+                    confirmed = vol_recent >= self.min_confirm_usdc
+                    if confirmed and sev != "high":
+                        sev = "medium" if sev == "low" else "high"
+                    a = Alert(token=token, kind="dev_sell", severity=sev,
                               block=block, wallet=wallet, role="creator", amount_usdc=proceeds,
-                              pct_position=pct, context={"pos_before": pos[0]})
+                              pct_position=pct, context={"pos_before": pos[0],
+                                                         "vol_recent": round(vol_recent, 0),
+                                                         "vol_confirmed": confirmed})
                     a.message = (f"{wallet} (creator) sold {pct * 100:.0f}% of its {token} "
-                                 f"position (~${proceeds:,.0f}) at block {block}")
+                                 f"position (~${proceeds:,.0f})"
+                                 + (" [high volume]" if confirmed else "") + f" at block {block}")
                     alerts.append(a)
                     self.last_dev_sell_block[token] = block
                 cogs = (pos[1] / pos[0]) * sell_qty
@@ -94,6 +106,20 @@ class IncrementalState:
                     c.message = (f"{token}: dev-sell at block {sb} followed by volume collapse "
                                  f"at {block} (z={val})")
                     alerts.append(c)
+
+        if (z and z[-1][1] is not None and z[-1][0] == buck and z[-1][1] >= self.spike_z
+                and vols.get(buck, 0.0) >= self.min_spike_usdc
+                and self.last_spike_bucket.get(token) != buck):
+            self.last_spike_bucket[token] = buck
+            val = round(z[-1][1], 3)
+            if emit:
+                a = Alert(token=token, kind="volume_spike",
+                          severity="high" if val >= self.spike_z + 1.0 else "medium", block=block,
+                          context={"z": val, "vol_usdc": round(vols.get(buck, 0.0), 0)})
+                a.message = (f"{token}: volume spike at block {block} "
+                             f"(z={val}, ~${vols.get(buck, 0.0):,.0f} this bucket). "
+                             "A surge is two-faced: it can precede a pump or a rug — verify.")
+                alerts.append(a)
         return alerts
 
     def apply_legs(self, legs: list, creators: dict, emit: bool = True) -> list[Alert]:

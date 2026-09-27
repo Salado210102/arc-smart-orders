@@ -18,10 +18,10 @@ from . import i18n
 from .sender import DirectSender
 
 ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
-ALLOWED_KINDS = {"dev_sell", "volume_collapse", "compound"}
-ALL_KINDS = ["dev_sell", "volume_collapse", "compound"]
+ALLOWED_KINDS = {"dev_sell", "volume_collapse", "compound", "volume_spike"}
+ALL_KINDS = ["dev_sell", "volume_collapse", "compound", "volume_spike"]
 KIND_LABELS = {"dev_sell": "Dev-sell", "volume_collapse": "Volume collapse",
-               "compound": "Compound risk"}
+               "compound": "Compound risk", "volume_spike": "Volume spike"}
 
 
 def _enabled_kinds(store, chat) -> set:
@@ -73,7 +73,7 @@ ONBOARDING = ("ARC AI — on-chain risk alerts for Arc.\n"
               "/pending             — your [PAPER] proposals\n"
               "/approve <id> [code]   /cancel <id>\n"
               "/stats               — signal value (with both faces)\n"
-              "/settings dev_sell,volume_collapse,compound\n\n"
+              "/settings dev_sell,volume_collapse,compound,volume_spike\n\n"
               + DISCLAIMER)
 HELP = ONBOARDING
 
@@ -572,10 +572,10 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
             return "Could not check that token right now."
     if cmd == "/settings":
         if not arg:
-            return "Usage: /settings dev_sell,volume_collapse,compound"
+            return "Usage: /settings dev_sell,volume_collapse,compound,volume_spike"
         kinds = {k.strip() for k in arg.split(",") if k.strip()}
         if not kinds or not kinds <= ALLOWED_KINDS:
-            return "Allowed kinds: dev_sell, volume_collapse, compound"
+            return "Allowed kinds: dev_sell, volume_collapse, compound, volume_spike"
         store.set_kinds(chat_id, kinds)
         return "Kinds set: " + ",".join(sorted(kinds))
     return "Unknown command. /help"

@@ -9,8 +9,10 @@ Read-only por diseño: **no** firma, **no** custodia, **no** mueve fondos de usu
   gaps = 0. Argus `TokenCreated` → `tokens` (nombre/símbolo/creator/pool_id). Uniswap **v4** PoolManager
   `0x8366…0951` (Initialize/ModifyLiquidity/Swap/Donate). v3/v2 también capturados.
 - **Detección de riesgo (validada, NO predictiva)**: **dev-sell** (FP ~1%), **colapso de volumen**
-  (z-score), **alerta compuesta**. El **score de wallets se INVALIDÓ** en el walk-forward (Fase 2.2,
-  no le ganó al azar) → **descartado y eliminado del código**.
+  (z-score), **alerta compuesta**, **señal de volumen** (spike z≥+2.5 con suelo de $500 por bucket;
+  "dos caras": puede preceder un pump *o* un rug) y **confirmación por volumen** (un dev-sell con
+  volumen reciente alto sube de severidad). El **score de wallets se INVALIDÓ** en el walk-forward
+  (Fase 2.2, no le ganó al azar) → **descartado y eliminado del código**.
 - **Bot de Telegram 24/7** (beta cerrada, allowlist): `/check`, `/list`, `/subscribe*`, `/settings`,
   `/wallet`, `/pending`, `/positions`, `/stats`, `/help`; menú inline estilo Maestro; **i18n EN/ES/中文**.
   - `/check`: nombre, launchpad, **reputación del creador** (tokens creados / cuántos volcó), antigüedad,

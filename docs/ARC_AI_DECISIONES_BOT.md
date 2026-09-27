@@ -127,6 +127,14 @@
   **Documentación**. Comandos registrados EN/ES/ZH (botón “/” en web y móvil) y **teclado fijo eliminado**.
   Pendiente: URL de documentación propia, botones "pronto" (Signals/Copytrade/Bridge/Premium + TMA),
   trading real (mainnet + firma + auditoría).
+- **2026-09-27 (señal de volumen)** — Nueva señal **`volume_spike`** (z ≥ +2.5 sobre `lookback` **y**
+  ≥ **$500** en el bucket; el suelo absoluto evita ruido). Se muestra con **doble cara** explícita (puede
+  preceder un pump *o* un rug). Además, **confirmación por volumen**: un **dev-sell** con volumen reciente
+  (≤6 buckets) ≥ $500 **sube de severidad** y se marca `[high volume]` (hace las alertas de riesgo más
+  precisas). Integrada en `/settings` (interruptor `volume_spike`), etiquetas i18n, cooldown anti-spam y
+  dispatch existentes. El **kill-switch `Protect` NO** se dispara con un spike (solo con riesgo:
+  dev_sell / compound / volume_collapse). Tests: +3 nuevos (61 en módulos tocados; total 220, con 1 fallo
+  **ambiental** de la Mini App en local, no regresión).
 
 ---
 
