@@ -18,6 +18,7 @@ import threading
 import time
 
 from . import tokenmeta
+from .sender import SenderPool
 from .messages import format_alert, format_alert_rich
 from .store import SubscriptionStore
 from .throttle import Throttle
@@ -137,7 +138,7 @@ class ConsoleTransport:
     send_html = False
 
     def send(self, chat_id, text: str, parse_mode=None, keyboard=None, inline=None,
-             remove_keyboard=False) -> None:
+             remove_keyboard=False, timeout: int = 30) -> None:
         print(f"----- Telegram -> chat {chat_id} -----")
         print(text)
         if keyboard:
@@ -152,7 +153,8 @@ class ConsoleTransport:
         print(caption)
         print("-------------------------------------------")
 
-    def edit_message(self, chat_id, message_id, text, parse_mode=None, inline=None) -> None:
+    def edit_message(self, chat_id, message_id, text, parse_mode=None, inline=None,
+                     timeout: int = 30) -> None:
         print(f"----- Telegram EDIT -> chat {chat_id} msg {message_id} -----")
         print(text)
         print("-------------------------------------------")
@@ -169,7 +171,7 @@ class TelegramTransport:
         self.token = token
 
     def send(self, chat_id, text: str, parse_mode=None, keyboard=None,
-             inline=None, remove_keyboard=False) -> None:  # pragma: no cover (needs network)
+             inline=None, remove_keyboard=False, timeout: int = 30) -> None:  # noqa (needs network)
         # Direct HTTP call: no per-message client/event-loop setup -> much lower latency.
         import urllib.request
         payload = {"chat_id": chat_id, "text": text, "disable_web_page_preview": True}
@@ -195,7 +197,7 @@ class TelegramTransport:
         url = f"https://api.telegram.org/bot{self.token}/sendMessage"
         req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                      headers={"Content-Type": "application/json"})
-        urllib.request.urlopen(req, timeout=30).read()
+        urllib.request.urlopen(req, timeout=timeout).read()
 
     def send_photo(self, chat_id, photo_url, caption="", parse_mode=None,
                    inline=None) -> None:  # pragma: no cover (needs network)
@@ -219,7 +221,7 @@ class TelegramTransport:
         urllib.request.urlopen(req, timeout=30).read()
 
     def edit_message(self, chat_id, message_id, text, parse_mode=None,
-                     inline=None) -> None:  # pragma: no cover (needs network)
+                     inline=None, timeout: int = 30) -> None:  # noqa (needs network)
         import urllib.request
         payload = {"chat_id": chat_id, "message_id": message_id, "text": text,
                    "disable_web_page_preview": True}
@@ -238,7 +240,7 @@ class TelegramTransport:
         url = f"https://api.telegram.org/bot{self.token}/editMessageText"
         req = urllib.request.Request(url, data=json.dumps(payload).encode(),
                                      headers={"Content-Type": "application/json"})
-        urllib.request.urlopen(req, timeout=30).read()
+        urllib.request.urlopen(req, timeout=timeout).read()
 
 
 def matches(sub: dict, alert: dict) -> bool:
@@ -346,7 +348,7 @@ def check_token(storage, token: str) -> str:
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT symbol,name,creator,launchpad,pool_id FROM tokens "
-                        "WHERE address=%s OR lower(address)=%s LIMIT 1", (token, token))
+                        "WHERE address=%s LIMIT 1", (token,))
             row = cur.fetchone()
             symbol = name = creator = launchpad = pool_id = None
             if row:
@@ -538,6 +540,7 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
     store = SubscriptionStore(db)
     thr = Throttle(global_per_sec=20, per_chat_per_sec=1.0)
     transport = TelegramTransport(tok)
+    sender = SenderPool(transport, workers=2, timeout=10)  # command replies only
     storage = PostgresStorage(dsn)
     source = None
     if ingest:
@@ -570,6 +573,14 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
         try:
             with open("/root/arc-intel/loop.log", "a", encoding="utf-8") as fh:
                 fh.write(line + "\n")
+        except OSError:
+            pass
+
+    def _activity(start, end):
+        try:
+            with open("/root/arc-intel/loop_activity.log", "a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"start": int(start * 1000), "end": int(end * 1000),
+                                     "cycle": k}) + "\n")
         except OSError:
             pass
 
@@ -619,7 +630,8 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
         while not stop.is_set():
             try:
                 poll_once(tok, cmd_store, transport, token_exists, check_fn, clock["block"],
-                          recent_fn=recent_fn, paper_price_fn=price_fn, symbol_fn=symbol_fn, timeout=25)
+                          recent_fn=recent_fn, paper_price_fn=price_fn, symbol_fn=symbol_fn,
+                          sender=sender, timeout=25)
             except Exception as exc:
                 if is_transient_poll_error(exc):
                     # expected long-poll idle / transient network: retry quietly
@@ -634,6 +646,7 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
     try:
         while cycles <= 0 or k < cycles:
             k += 1
+            t_cycle0 = time.time()
             ingest_note = "ok"
             if ingest and source is not None:
                 r, err = safe_call(lambda: ingest_new(storage, source))
@@ -693,10 +706,12 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
             if ingest_note == "ok" or not ingest:
                 logger({"cycle": k, "new_legs": len(legs), "alerts": len(alerts),
                         "queue": store.queue_size(), "dispatched": n, "cursor": cursor})
+            _activity(t_cycle0, time.time())
             if cycles <= 0 or k < cycles:
                 time.sleep(interval)
     finally:
         stop.set()
+        sender.close()
         store.close()
         cmd_store.close()
         storage.close()

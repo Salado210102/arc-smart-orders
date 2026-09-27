@@ -14,6 +14,7 @@ import time
 import urllib.request
 
 from . import i18n
+from .sender import DirectSender
 
 ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
 ALLOWED_KINDS = {"dev_sell", "volume_collapse", "compound"}
@@ -389,22 +390,19 @@ def _get_updates(bot_token: str, offset: int, timeout: int = 25):
     return json.load(urllib.request.urlopen(req, timeout=timeout + 10)).get("result", [])
 
 
-def _emit(transport, chat, reply) -> str:
-    """Send a reply. Never raise: if the formatted (HTML) send fails, retry as plain text."""
+def _emit(sender, chat, reply) -> str:
+    """Send a reply via the sender (pool or direct). Never raises here."""
     if isinstance(reply, dict):
         text = reply["text"]
-        kw = {"keyboard": reply.get("keyboard"), "inline": reply.get("inline"),
-              "remove_keyboard": reply.get("remove_keyboard", False)}
         try:
-            transport.send(chat, text, parse_mode=reply.get("parse_mode"), **kw)
+            sender.send(chat, text, parse_mode=reply.get("parse_mode"),
+                        keyboard=reply.get("keyboard"), inline=reply.get("inline"),
+                        remove_keyboard=reply.get("remove_keyboard", False))
         except Exception:
-            try:
-                transport.send(chat, text, parse_mode=None, **kw)
-            except Exception:
-                pass
+            pass
         return text
     try:
-        transport.send(chat, reply)
+        sender.send(chat, reply)
     except Exception:
         pass
     return reply
@@ -458,6 +456,20 @@ def _handle_callback(data, chat, store, token_exists, check_fn, now_block,
     return "Unknown action."
 
 
+def _log_latency(kind, data, msg_date, t_recv) -> None:
+    try:
+        now = time.time()
+        rec = {"kind": kind, "data": str(data)[:40], "recv_ms": int(t_recv * 1000),
+               "sent_ms": int(now * 1000), "handle_ms": int((now - t_recv) * 1000)}
+        if msg_date:
+            rec["msg_date"] = int(msg_date)
+            rec["pickup_ms"] = int((t_recv - msg_date) * 1000)
+        with open("/root/arc-intel/cmd_latency.log", "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec) + "\n")
+    except OSError:
+        pass
+
+
 def _log_command(chat, cmd, reply) -> None:
     try:
         with open("/root/arc-intel/command.log", "a", encoding="utf-8") as fh:
@@ -468,7 +480,10 @@ def _log_command(chat, cmd, reply) -> None:
 
 
 def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
-              recent_fn=None, paper_price_fn=None, symbol_fn=None, timeout: int = 25) -> int:
+              recent_fn=None, paper_price_fn=None, symbol_fn=None, sender=None,
+              timeout: int = 25) -> int:
+    if sender is None:
+        sender = DirectSender(transport)
     try:
         with open("/root/arc-intel/poll.log", "a", encoding="utf-8") as fh:
             fh.write(str(int(time.time())) + "\n")
@@ -487,6 +502,7 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
     updates = _get_updates(bot_token, offset, timeout)
     n = 0
     for u in updates:
+        t_recv = time.time()
         offset = max(offset, int(u.get("update_id", 0)) + 1)
 
         # --- inline button press ---
@@ -501,7 +517,7 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
             data = cb.get("data") or ""
             if not is_authorized(store, chat):
                 store.add_request(chat, int(time.time()))
-                log_reply = _emit(transport, chat, CLOSED_BETA)
+                log_reply = _emit(sender, chat, CLOSED_BETA)
             else:
                 try:
                     reply = _handle_callback(data, chat, store, token_exists, check_fn, now_block,
@@ -511,15 +527,16 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
                     reply = f"Error handling action: {type(exc).__name__}"
                 if isinstance(reply, dict) and reply.get("edit") and message_id is not None:
                     try:
-                        transport.edit_message(chat, message_id, reply["text"],
-                                               parse_mode=reply.get("parse_mode"),
-                                               inline=reply.get("inline"))
+                        sender.edit(chat, message_id, reply["text"],
+                                    parse_mode=reply.get("parse_mode"),
+                                    inline=reply.get("inline"))
                     except Exception:
-                        _emit(transport, chat, reply)
+                        _emit(sender, chat, reply)
                     log_reply = reply["text"]
                 else:
-                    log_reply = _emit(transport, chat, reply)
+                    log_reply = _emit(sender, chat, reply)
             _log_command(chat, f"cb:{data}", log_reply)
+            _log_latency("cb", data, None, t_recv)
             n += 1
             continue
 
@@ -531,7 +548,7 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
             continue
         if not is_authorized(store, chat):
             store.add_request(chat, int(time.time()))
-            log_reply = _emit(transport, chat, CLOSED_BETA)
+            log_reply = _emit(sender, chat, CLOSED_BETA)
         else:
             try:
                 reply = command_reply_rich(text, chat, store, token_exists, check_fn, now_block,
@@ -539,8 +556,9 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
                                            symbol_fn=symbol_fn)
             except Exception as exc:
                 reply = f"Error handling command: {type(exc).__name__}"
-            log_reply = _emit(transport, chat, reply)
+            log_reply = _emit(sender, chat, reply)
         _log_command(chat, text, log_reply)
+        _log_latency("msg", text, msg.get("date"), t_recv)
         n += 1
     store.set_state("tg_offset", str(offset))
     return n

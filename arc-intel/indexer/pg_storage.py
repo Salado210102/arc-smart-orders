@@ -123,6 +123,8 @@ class PostgresStorage:
                     cur.execute(stmt)
                 cur.execute("ALTER TABLE swaps ADD COLUMN IF NOT EXISTS trader TEXT")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_tx_senders_block ON tx_senders(block_number)")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_lp_events_token "
+                            "ON launchpad_events(token, event_name)")
                 cur.execute("SELECT to_regclass('public.legs')")
                 if cur.fetchone()[0] is not None:
                     cur.execute("CREATE INDEX IF NOT EXISTS idx_legs_token_block ON legs(token, block)")
