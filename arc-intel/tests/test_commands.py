@@ -170,6 +170,16 @@ class CommandTests(unittest.TestCase):
         self.assertIsInstance(r, dict)
         self.assertTrue(r["inline"])
 
+    def test_connect_button_then_paste_address(self):
+        # pressing "Connect wallet" arms connect mode
+        _handle_callback("cmd:/connect", 1, self.store, self.exists, self.check, 1000)
+        self.assertEqual(str(self.store.get_state("awaiting_wallet:1")), "1")
+        # pasting a bare address connects it (no /connect typed)
+        r = command_reply(ADDR, 1, self.store, self.exists, self.check, 1000)
+        self.assertIn(ADDR, r)
+        self.assertEqual(self.store.get_wallet(1), ADDR)
+        self.assertEqual(str(self.store.get_state("awaiting_wallet:1")), "0")
+
     def test_wallet_disconnect(self):
         self.store.set_wallet(1, ADDR)
         _handle_callback("disconnect", 1, self.store, self.exists, self.check, 1000)

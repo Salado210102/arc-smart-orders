@@ -10,6 +10,7 @@ import html as _html
 import json
 import os
 import re
+import threading
 import time
 import urllib.request
 
@@ -125,12 +126,22 @@ def _lang(store, chat_id) -> str:
     return i18n.normalize_lang(store.get_state(f"lang:{chat_id}", i18n.DEFAULT))
 
 
+def _route(text: str, chat_id, store) -> str:
+    """If the chat is in 'connect wallet' mode and a bare address arrives, treat it as the
+    wallet to connect (so the user just pastes + sends, no /connect needed)."""
+    raw = (text or "").strip()
+    if _valid_addr(raw) and str(store.get_state(f"awaiting_wallet:{chat_id}", "0")) == "1":
+        store.set_state(f"awaiting_wallet:{chat_id}", "0")
+        return "/connect " + raw
+    return _normalize(raw)
+
+
 def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_block: int,
                        recent_fn=None, paper_price_fn=None, symbol_fn=None):
     """Like `command_reply`, but returns a dict {text, inline} for menu commands.
 
     Kept separate so `command_reply` stays a pure str (existing tests/consumers unchanged)."""
-    norm = _normalize(text)
+    norm = _route(text, chat_id, store)
     lang = _lang(store, chat_id)
     cmd = (norm.split() or [""])[0].lower().split("@")[0]
     if cmd == "/language":
@@ -191,7 +202,7 @@ def wallet_screen(store, chat, lang) -> dict:
 
 def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: int,
                   recent_fn=None, paper_price_fn=None, symbol_fn=None) -> str:
-    text = _normalize(text)
+    text = _route(text, chat_id, store)
     parts = (text or "").strip().split()
     if not parts:
         return HELP
@@ -387,7 +398,7 @@ def _get_updates(bot_token: str, offset: int, timeout: int = 25):
     body = json.dumps({"offset": offset, "timeout": timeout,
                        "allowed_updates": ["message", "callback_query"]}).encode()
     req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
-    return json.load(urllib.request.urlopen(req, timeout=timeout + 10)).get("result", [])
+    return json.load(urllib.request.urlopen(req, timeout=timeout + 4)).get("result", [])
 
 
 def _emit(sender, chat, reply) -> str:
@@ -450,6 +461,9 @@ def _handle_callback(data, chat, store, token_exists, check_fn, now_block,
         screen = wallet_screen(store, chat, lang)
         screen["edit"] = True
         return screen
+    if data == "cmd:/connect":
+        store.set_state(f"awaiting_wallet:{chat}", "1")
+        return {"text": i18n.t("connect_paste", lang), "parse_mode": "HTML"}
     if data.startswith("cmd:"):
         return command_reply_rich(data[4:], chat, store, token_exists, check_fn, now_block,
                                   recent_fn=recent_fn, paper_price_fn=paper_price_fn, symbol_fn=symbol_fn)
@@ -508,7 +522,9 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
         # --- inline button press ---
         cb = u.get("callback_query")
         if cb:
-            _answer_callback(bot_token, cb.get("id"))
+            # Non-blocking: never let answerCallbackQuery hang the poller (it was the 10s stall).
+            threading.Thread(target=_answer_callback, args=(bot_token, cb.get("id")),
+                             daemon=True).start()
             cm = cb.get("message") or {}
             chat = (cm.get("chat") or {}).get("id")
             message_id = cm.get("message_id")

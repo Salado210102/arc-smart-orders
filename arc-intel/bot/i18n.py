@@ -102,6 +102,13 @@ TEXTS: dict[str, dict[str, str]] = {
         "es": "Envía tu dirección de cartera para conectarla (solo lectura, sin claves):\n/connect 0x\u2026",
         "zh": "发送你的钱包地址以连接（只读，无私钥）：\n/connect 0x\u2026",
     },
+    "connect_paste": {
+        "en": "\U0001F517 <b>Paste your wallet address</b> in the message bar and hit send "
+              "(watch-only, no keys).",
+        "es": "\U0001F517 <b>Pega tu dirección de cartera</b> en la barra de mensajes y envía "
+              "(solo lectura, sin claves).",
+        "zh": "\U0001F517 <b>在消息栏粘贴你的钱包地址</b>并发送（只读，无私钥）。",
+    },
     "connect_ok": {
         "en": "\u2705 Wallet connected (watch-only): <code>{addr}</code>",
         "es": "\u2705 Cartera conectada (solo lectura): <code>{addr}</code>",

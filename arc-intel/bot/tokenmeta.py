@@ -26,7 +26,7 @@ def _decode_string(hexstr: str) -> str:
 _RPC_CACHE: dict[tuple, int] = {}
 
 
-def _eth_call(token: str, selector: str, retries: int = 3):
+def _eth_call(token: str, selector: str, retries: int = 2):
     """eth_call with retry/backoff (the Arc RPC rate-limits and is flaky). None on failure."""
     t = (token or "").lower()
     if not t:
@@ -38,7 +38,7 @@ def _eth_call(token: str, selector: str, retries: int = 3):
             req = urllib.request.Request(ARC_RPC, data=json.dumps(payload).encode(),
                                          headers={"Content-Type": "application/json",
                                                   "User-Agent": "sniper-ia/1.0"})
-            return json.load(urllib.request.urlopen(req, timeout=8)).get("result")
+            return json.load(urllib.request.urlopen(req, timeout=6)).get("result")
         except Exception:
             time.sleep(0.4 * (i + 1))
     return None
@@ -73,14 +73,14 @@ def rpc_total_supply(token: str) -> int:
 USDC = "0x3600000000000000000000000000000000000000"
 
 
-def _rpc(method: str, params: list, retries: int = 3):
+def _rpc(method: str, params: list, retries: int = 2):
     for i in range(retries):
         try:
             payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
             req = urllib.request.Request(ARC_RPC, data=json.dumps(payload).encode(),
                                          headers={"Content-Type": "application/json",
                                                   "User-Agent": "sniper-ia/1.0"})
-            return json.load(urllib.request.urlopen(req, timeout=8)).get("result")
+            return json.load(urllib.request.urlopen(req, timeout=6)).get("result")
         except Exception:
             time.sleep(0.4 * (i + 1))
     return None

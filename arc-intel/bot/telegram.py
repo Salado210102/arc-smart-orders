@@ -540,7 +540,7 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
     store = SubscriptionStore(db)
     thr = Throttle(global_per_sec=20, per_chat_per_sec=1.0)
     transport = TelegramTransport(tok)
-    sender = SenderPool(transport, workers=2, timeout=10)  # command replies only
+    sender = SenderPool(transport, workers=3, timeout=8)  # command replies only
     storage = PostgresStorage(dsn)
     source = None
     if ingest:
@@ -629,17 +629,20 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
     def worker():
         while not stop.is_set():
             try:
-                poll_once(tok, cmd_store, transport, token_exists, check_fn, clock["block"],
-                          recent_fn=recent_fn, paper_price_fn=price_fn, symbol_fn=symbol_fn,
-                          sender=sender, timeout=25)
+                # Short polling: a stalled connection can't hold delivery for long; updates are
+                # picked up within ~poll interval instead of waiting on a hung long-poll.
+                n = poll_once(tok, cmd_store, transport, token_exists, check_fn, clock["block"],
+                              recent_fn=recent_fn, paper_price_fn=price_fn, symbol_fn=symbol_fn,
+                              sender=sender, timeout=2)
+                if not n:
+                    time.sleep(0.3)
             except Exception as exc:
                 if is_transient_poll_error(exc):
-                    # expected long-poll idle / transient network: retry quietly
-                    time.sleep(1)
+                    time.sleep(0.5)
                 else:
                     import traceback
                     print("command poll error:\n" + traceback.format_exc(), flush=True)
-                    time.sleep(2)
+                    time.sleep(1)
 
     threading.Thread(target=worker, daemon=True).start()
 
