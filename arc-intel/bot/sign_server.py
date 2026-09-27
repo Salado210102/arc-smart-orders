@@ -688,15 +688,14 @@ class Handler(BaseHTTPRequestHandler):
             from .telegram import RISK_KINDS
             store = SubscriptionStore(DB)
             try:
-                row = store.get(uid)
-                toks = sorted(row["tokens"]) if row else []
                 holds = store.list_holdings(uid)
-                subs = store.recent_alerts(tokens=toks, limit=40) if toks else []
+                # volume spikes = PUBLIC discovery feed (any token, so people can buy)
+                spikes = store.recent_alerts(kinds=["volume_spike"], limit=40)
+                # risk alerts (dev-sell, ...) ONLY for tokens the user holds
                 risk = store.recent_alerts(tokens=holds, kinds=list(RISK_KINDS), limit=30) if holds else []
             finally:
                 store.close()
-            others = [a for a in subs if a.get("kind") not in RISK_KINDS
-                      and a.get("kind") not in ("volume_collapse", "thin_market")]
+            others = spikes
             seen = set()
             merged = []
             for a in sorted(risk + others, key=lambda x: x.get("block", 0), reverse=True):
