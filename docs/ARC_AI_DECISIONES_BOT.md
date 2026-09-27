@@ -144,6 +144,13 @@
   en **Porkbun** (`*.basepump.dev` → parking) → queda **pendiente** el registro A `app` → `2.29.24.106`.
   Creado el **spec funcional completo** de la Mini App: `docs/ARC_AI_MINIAPP_SPEC.md` (Parte B; sin
   construir UI todavía).
+- **2026-09-27 (Parte C, entregables 1–2)** — Capa de datos de solo lectura (`bot/miniapp_api.py`,
+  **pura**, 11 tests) y **auth `initData`** (`bot/telegram_auth.py`, HMAC-SHA256, 6 tests) + endpoints
+  en `sign_server.py`: `/health`, `/token` (público), `/positions` y `/wallet` (con
+  `X-Telegram-Init-Data`). Desplegado y **verificado por HTTPS público**: `/token` con un token real
+  (BCAT), `/positions` y `/wallet` con `initData` firmado con el token real del bot; `/positions` sin
+  auth → **401**, token inválido → **400**. Suite Python **244 passed** (1 fallo ambiental local de
+  Mini App). Pendiente: `/alerts` con gráfico, `/plan`, `/cancel`, rate-limit y UI.
 
 ---
 

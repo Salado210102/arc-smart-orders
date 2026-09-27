@@ -276,19 +276,30 @@ firma rechazada → volver a Paso 3 sin perder datos; `deadline` vencido → rec
 | GET | `/order?t=<sign_token>` | token de un solo uso | `{preorder:{id,token,pct,status}, payload}` o 404/409 |
 | POST | `/sign` | `{t, signature}` | `{ok:true,id}` o 404/409 |
 
-**Propuestos [FALTA] (solo lectura, para la UI):**
+**De lectura — IMPLEMENTADOS y verificados por HTTPS** (auth del usuario con `initData`,
+[`bot/telegram_auth.py`], cabecera `X-Telegram-Init-Data`):
+
+| Método | Ruta | Auth | Devuelve | Reutiliza |
+|---|---|---|---|---|
+| GET | `/health` | no | `{ok:true}` | — |
+| GET | `/token?address=` | no | ficha (precio/mcap/vol24/thin/creador) | `miniapp_data.load_token_card` |
+| GET | `/positions` | **sí** | posiciones + PnL no realizado + resumen | `miniapp_api.position_views`, `positions.reconcile` |
+| GET | `/wallet` | **sí** | wallet enlazada + auto-subs | `miniapp_api.wallet_view` |
+
+**Propuestos [FALTA]:**
 
 | Método | Ruta | Devuelve | Reutiliza |
 |---|---|---|---|
-| GET | `/token?address=` | ficha (precio/mcap/vol24/thin/creador/liquidez) | `check_token` |
-| GET | `/positions?user=` | posiciones + PnL no realizado + reconciliación | `store.list_positions`, `positions.reconcile` |
-| GET | `/alerts?user=&kinds=` | alertas recientes con series para el gráfico | `stream_alerts`, `load_volume_buckets` |
-| GET | `/wallet?user=` | wallets enlazadas + auto-subs | `store.wallet_links/auto_subs` |
+| GET | `/alerts?kinds=&token=` | alertas recientes con series para el gráfico | `stream_alerts`, `load_volume_buckets` |
+| GET | `/token` | liquidez USD (estimación) | `pools_v4`, `v4_liquidity` |
 | POST | `/plan` | crea `ExitPlan` + nº de pre-órdenes a firmar | `strategy.ExitPlan`, `store.create_preorder` |
 | POST | `/cancel` | cancela una pre-orden (on-chain) | `preorders` + `cancelOrder` |
 
 Regla transversal: endpoints **de lectura** no requieren firma; endpoints que **crean órdenes**
 devuelven el payload a firmar y **nunca** ejecutan sin `POST /sign` posterior.
+
+Auth: `initData` (HMAC-SHA256 con el token del bot) — probado end-to-end. **[FALTA]** rate-limit
+por IP y CSP.
 
 ---
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -16,6 +17,28 @@ from .store import SubscriptionStore
 
 DB = os.environ.get("ARC_INTEL_DB", "/root/arc-intel/bot_subs.db")
 ALLOWED_ORIGIN = os.environ.get("ARC_INTEL_ALLOWED_ORIGIN", "https://app.basepump.dev")
+ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
+_STORAGE = None
+
+
+def _storage():
+    """Lazy PG (indexer) connection; None if ARC_INTEL_DSN is not set."""
+    global _STORAGE
+    if _STORAGE is None:
+        dsn = os.environ.get("ARC_INTEL_DSN")
+        if not dsn:
+            return None
+        from indexer.pg_storage import PostgresStorage
+        _STORAGE = PostgresStorage(dsn, minconn=1, maxconn=4)
+    return _STORAGE
+
+
+def _bot_token():
+    try:
+        from .telegram import load_token
+        return load_token()
+    except Exception:
+        return os.environ.get("TELEGRAM_BOT_TOKEN")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -25,10 +48,19 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
         self.send_header("Vary", "Origin")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type,X-Telegram-Init-Data")
         self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
         self.end_headers()
         self.wfile.write(body)
+
+    def _auth_user(self):
+        """Validate Telegram WebApp initData -> user id, or None."""
+        from .telegram_auth import validate_init_data
+        data = validate_init_data(self.headers.get("X-Telegram-Init-Data") or "", _bot_token() or "")
+        if not data:
+            return None
+        u = data.get("user")
+        return u.get("id") if isinstance(u, dict) else None
 
     def do_OPTIONS(self):  # CORS preflight
         self._send(204, {})
@@ -49,6 +81,41 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if u.path == "/health":
+            return self._send(200, {"ok": True})
+        if u.path == "/token":
+            addr = (parse_qs(u.query).get("address") or [""])[0]
+            if not ADDR_RE.match(addr or ""):
+                return self._send(400, {"error": "bad_address"})
+            st = _storage()
+            if st is None:
+                return self._send(503, {"error": "no_storage"})
+            try:
+                from .miniapp_data import load_token_card
+                return self._send(200, load_token_card(st, addr))
+            except Exception:
+                return self._send(502, {"error": "token_failed"})
+        if u.path in ("/positions", "/wallet"):
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            store = SubscriptionStore(DB)
+            try:
+                if u.path == "/wallet":
+                    from .miniapp_api import wallet_view
+                    return self._send(200, wallet_view(store, uid))
+                from .miniapp_api import position_views, portfolio_summary
+                st = _storage()
+                holder = store.get_linked_wallet(uid)
+                pf = bf = None
+                if st is not None:
+                    from .miniapp_data import price_fn, balance_fn_for
+                    pf = price_fn(st)
+                    bf = balance_fn_for(holder) if holder else None
+                views = position_views(store, uid, pf, bf)
+                return self._send(200, {"positions": views, "summary": portfolio_summary(views)})
+            finally:
+                store.close()
         if u.path != "/order":
             return self._send(404, {"error": "not_found"})
         tok = (parse_qs(u.query).get("t") or [""])[0]
