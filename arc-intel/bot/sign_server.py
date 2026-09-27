@@ -718,6 +718,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, load_series(st, tok))
             except Exception:
                 return self._send(502, {"error": "series_failed"})
+        if u.path == "/me":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            store = SubscriptionStore(DB)
+            try:
+                lang = store.get_state(f"lang:{uid}", "")
+            finally:
+                store.close()
+            return self._send(200, {"lang": lang})
         if u.path == "/custody":
             uid = self._auth_user()
             if uid is None:

@@ -52,24 +52,24 @@
   <!-- ================= MAIN APP ================= -->
   <div id="main" class="hide">
     <nav>
-      <button id="tab-buy" class="on">Compra</button>
-      <button id="tab-pos">Posiciones</button>
-      <button id="tab-wal">Cartera</button>
-      <button id="tab-alr">Alertas</button>
+      <button id="tab-buy" class="on" data-i18n="tab_buy">Compra</button>
+      <button id="tab-pos" data-i18n="tab_pos">Posiciones</button>
+      <button id="tab-wal" data-i18n="tab_wal">Cartera</button>
+      <button id="tab-alr" data-i18n="tab_alr">Alertas</button>
     </nav>
 
     <section id="sec-buy">
       <div class="card">
-        <div class="mut">Paso 1 · Pegar la CA del token</div>
+        <div class="mut" data-i18n="step1">Paso 1 · Pegar la CA del token</div>
         <div class="row" style="margin-top:8px">
           <input id="ca" placeholder="0x… (40 hex)" style="flex:1">
-          <button class="ghost" id="check">Consultar</button>
+          <button class="ghost" id="check" data-i18n="check">Consultar</button>
         </div>
         <div id="tokencard" class="hide" style="margin-top:10px"></div>
       </div>
 
       <div class="card hide" id="step2">
-        <div class="mut">Paso 2 · Monto y slippage</div>
+        <div class="mut" data-i18n="step2">Paso 2 · Monto y slippage</div>
         <div class="row" style="margin:8px 0">
           <button class="ghost amt" data-a="10">$10</button>
           <button class="ghost amt" data-a="20">$20</button>
@@ -77,7 +77,7 @@
           <button class="ghost amt" data-a="100">$100</button>
         </div>
         <div class="row">
-          <input id="amount" type="number" placeholder="monto USDC" style="flex:1">
+          <input id="amount" type="number" placeholder="monto USDC" data-i18n-ph="amount" style="flex:1">
           <select id="slippage">
             <option value="0.5">0.5%</option><option value="1">1%</option>
             <option value="3" selected>3%</option><option value="5">5%</option>
@@ -91,8 +91,8 @@
           <span class="mut" style="font-size:12px">Trail %</span>
           <input id="buytr" type="number" placeholder="15" style="width:64px">
         </div>
-        <div class="mut" style="font-size:11px;margin-top:4px">Opcional: se configuran solos al comprar.</div>
-        <button class="primary" id="buynow" style="margin-top:10px">Comprar</button>
+        <div class="mut" style="font-size:11px;margin-top:4px" data-i18n="tp_hint">Opcional: se configuran solos al comprar.</div>
+        <button class="primary" id="buynow" style="margin-top:10px" data-i18n="buy">Comprar</button>
         <div id="armout" class="mut" style="margin-top:8px"></div>
       </div>
     </section>
@@ -100,7 +100,7 @@
     <section id="sec-pos" class="hide">
       <div class="card">
         <div class="row" style="justify-content:space-between">
-          <div class="mut">Tus posiciones (con PnL no realizado)</div>
+          <div class="mut" data-i18n="pos_title">Tus posiciones (con PnL no realizado)</div>
           <button class="ghost" id="posrefresh">↻</button>
         </div>
         <div id="poslist" style="margin-top:8px"></div>
@@ -110,20 +110,20 @@
 
     <section id="sec-wal" class="hide">
       <div class="card">
-        <div class="mut">Wallet enlazada (watch-only) y tokens auto-seguidos</div>
+        <div class="mut" data-i18n="wal_title">Wallet enlazada (watch-only) y tokens auto-seguidos</div>
         <div id="walletinfo" style="margin-top:8px"></div>
-        <div class="mut" style="margin-top:8px">Para enlazar/cambiar wallet: comando <b>/link_wallet</b> en el bot.</div>
+        <div class="mut" style="margin-top:8px" data-i18n="wal_hint">Para enlazar/cambiar wallet: comando /link_wallet en el bot.</div>
       </div>
       <div class="card">
-        <div class="mut">👛 Mi wallet del bot (custodia) — deposita y tradea al instante (estilo Maestro)</div>
+        <div class="mut" data-i18n="cust_title">👛 Mi wallet del bot (custodia) — deposita y tradea al instante (estilo Maestro)</div>
         <div id="custout" style="margin-top:8px"></div>
         <div id="custform" class="hide" style="margin-top:8px">
           <input id="custto" placeholder="0x destino (retirar)" style="width:100%">
           <div class="row" style="margin-top:6px">
             <input id="custamt" placeholder="monto USDC" style="flex:1">
-            <button class="ghost" id="custwithdraw">Retirar</button>
+            <button class="ghost" id="custwithdraw" data-i18n="withdraw">Retirar</button>
           </div>
-          <div class="mut" style="margin-top:10px">Vender token de tu wallet del bot:</div>
+          <div class="mut" style="margin-top:10px" data-i18n="cust_sell">Vender token de tu wallet del bot:</div>
           <div class="row" style="margin-top:6px">
             <input id="custsellca" placeholder="0x token CA" style="flex:1">
             <button class="ghost custsell" data-p="25">25%</button>
@@ -139,7 +139,7 @@
     <section id="sec-alr" class="hide">
       <div class="card">
         <div class="row" style="justify-content:space-between">
-          <div class="mut">Alertas de tus tokens</div>
+          <div class="mut" data-i18n="alr_title">Alertas de tus tokens</div>
           <button class="ghost" id="alrrefresh">↻</button>
         </div>
         <div id="alrlist" style="margin-top:8px"></div>
@@ -163,6 +163,58 @@
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+    //  i18n: follow the Telegram / bot language (en / es / zh)
+    let LANG = "en";
+    const TR = {
+      es: { tab_buy: "Compra", tab_pos: "Posiciones", tab_wal: "Cartera", tab_alr: "Alertas",
+        step1: "Paso 1 · Pegar la CA del token", check: "Consultar", step2: "Paso 2 · Monto y slippage",
+        amount: "monto USDC", buy: "Comprar", tp_hint: "Opcional: se configuran solos al comprar.",
+        pos_title: "Tus posiciones (con PnL no realizado)",
+        wal_title: "Wallet enlazada (watch-only) y tokens auto-seguidos",
+        wal_hint: "Para enlazar/cambiar wallet: comando /link_wallet en el bot.",
+        cust_title: "👛 Mi wallet del bot (custodia) — deposita y tradea al instante",
+        withdraw: "Retirar", cust_sell: "Vender token de tu wallet del bot:",
+        alr_title: "Alertas de tus tokens", price: "Precio", mcap: "Market cap", liq: "Liquidez",
+        vol: "Vol 24h", txns: "Txns 24h", holders: "Holders (wallets)", status: "Estado",
+        creator: "Creador", contract: "Contrato", entry: "Entrada", pnl: "PnL", value: "valor",
+        sell: "vender", buy_more: "Comprar", save: "Guardar" },
+      en: { tab_buy: "Buy", tab_pos: "Positions", tab_wal: "Wallet", tab_alr: "Alerts",
+        step1: "Step 1 · Paste the token address", check: "Check", step2: "Step 2 · Amount & slippage",
+        amount: "amount USDC", buy: "Buy", tp_hint: "Optional: set automatically on buy.",
+        pos_title: "Your positions (unrealized PnL)",
+        wal_title: "Linked wallet (watch-only) & auto-followed tokens",
+        wal_hint: "To link/change wallet: /link_wallet command in the bot.",
+        cust_title: "👛 My bot wallet (custody) — deposit and trade instantly",
+        withdraw: "Withdraw", cust_sell: "Sell a token from your bot wallet:",
+        alr_title: "Alerts for your tokens", price: "Price", mcap: "Market cap", liq: "Liquidity",
+        vol: "Vol 24h", txns: "Txns 24h", holders: "Holders (wallets)", status: "Status",
+        creator: "Creator", contract: "Contract", entry: "Entry", pnl: "PnL", value: "Value",
+        sell: "sell", buy_more: "Buy", save: "Save" },
+      zh: { tab_buy: "买入", tab_pos: "持仓", tab_wal: "钱包", tab_alr: "提醒",
+        step1: "步骤 1 · 粘贴代币地址", check: "查询", step2: "步骤 2 · 金额和滑点",
+        amount: "金额 USDC", buy: "买入", tp_hint: "可选：买入时自动设置。",
+        pos_title: "你的持仓（未实现盈亏）", wal_title: "已关联钱包和自动跟单代币",
+        wal_hint: "关联/更换钱包：使用 /link_wallet。", cust_title: "👛 我的机器人钱包（托管）— 存入即可交易",
+        withdraw: "提取", cust_sell: "卖出机器人钱包中的代币：", alr_title: "你的代币提醒",
+        price: "价格", mcap: "市值", liq: "流动性", vol: "24h 量", txns: "24h 交易", holders: "持有者",
+        status: "状态", creator: "创建者", contract: "合约", entry: "成本", pnl: "盈亏", value: "价值",
+        sell: "卖出", buy_more: "买入", save: "保存" }
+    };
+    const t = (k) => (TR[LANG] && TR[LANG][k]) || TR.en[k] || k;
+    function applyI18n() {
+      document.querySelectorAll("[data-i18n]").forEach(e => { e.textContent = t(e.dataset.i18n); });
+      document.querySelectorAll("[data-i18n-ph]").forEach(e => { e.placeholder = t(e.dataset.i18nPh); });
+    }
+    (function detectLang() {
+      try {
+        const u = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+        if (u && u.language_code) LANG = String(u.language_code).slice(0, 2).toLowerCase();
+      } catch (e) {}
+      if (!TR[LANG]) LANG = "en";
+    })();
+    applyI18n();
+
     async function api(path, opts = {}) {
       const headers = Object.assign({}, opts.headers || {});
       if (INIT) headers["X-Telegram-Init-Data"] = INIT;
@@ -233,6 +285,10 @@
     } else {
       // ---------------- MAIN APP ----------------
       $("main").classList.remove("hide");
+      //  Use the language saved in the bot (overrides Telegram's), then re-render labels.
+      api("/me").then(r => {
+        if (r.status === 200 && r.body && r.body.lang && TR[r.body.lang]) { LANG = r.body.lang; applyI18n(); }
+      }).catch(() => {});
       if (!INIT) $("notice").innerHTML = "Abre esta Mini App desde Telegram para operar (se necesita autenticación). ";
       let POS_TIMER = null;
       function tab(name) {
@@ -339,17 +395,17 @@
              ${logo ? `<img src="${esc(logo)}" style="width:44px;height:44px;border-radius:10px" onerror="this.style.display='none'">` : ""}
              <div><b>${esc(body.symbol || "?")}</b> <span class="mut">${esc(body.name || "")}</span></div>
            </div>
-           <div class="kv"><span>Precio</span><b>${esc(body.price_text)}${chg(pc.h24)}</b></div>
-           <div class="kv"><span>Market cap</span><b>${d.market_cap ? money(d.market_cap) : esc(body.market_cap_text)}</b></div>
-           <div class="kv"><span>Liquidez</span><b>${money(d.liquidity_usd)}</b></div>
-           <div class="kv"><span>Vol 24h</span><b>${V.h24 ? money(V.h24) : esc(body.vol24_text)}</b></div>
-           <div class="kv"><span>Txns 24h</span><b>${T.buys != null ? T.buys + " ↑ / " + T.sells + " ↓" : "—"}</b></div>
-           <div class="kv"><span>Holders (wallets)</span><b>${body.wallets}</b></div>
-           <div class="kv"><span>Estado</span><b>${thin}</b></div>
-           <div class="kv"><span>Creador</span><b>${rep}</b></div>
-           <div class="kv"><span>Contrato</span><b class="${rk.level === "high" ? "bad" : rk.level === "medium" ? "warn" : "ok"}">${esc(rk.level || "—")}${rk.honeypot_hint ? " ⚠" : ""}</b></div>
+           <div class="kv"><span>${t("price")}</span><b>${esc(body.price_text)}${chg(pc.h24)}</b></div>
+           <div class="kv"><span>${t("mcap")}</span><b>${d.market_cap ? money(d.market_cap) : esc(body.market_cap_text)}</b></div>
+           <div class="kv"><span>${t("liq")}</span><b>${money(d.liquidity_usd)}</b></div>
+           <div class="kv"><span>${t("vol")}</span><b>${V.h24 ? money(V.h24) : esc(body.vol24_text)}</b></div>
+           <div class="kv"><span>${t("txns")}</span><b>${T.buys != null ? T.buys + " ↑ / " + T.sells + " ↓" : "—"}</b></div>
+           <div class="kv"><span>${t("holders")}</span><b>${body.wallets}</b></div>
+           <div class="kv"><span>${t("status")}</span><b>${thin}</b></div>
+           <div class="kv"><span>${t("creator")}</span><b>${rep}</b></div>
+           <div class="kv"><span>${t("contract")}</span><b class="${rk.level === "high" ? "bad" : rk.level === "medium" ? "warn" : "ok"}">${esc(rk.level || "—")}${rk.honeypot_hint ? " ⚠" : ""}</b></div>
            ${links ? `<div class="row" style="margin-top:6px">${links}</div>` : ""}
-           ${d.embed ? `<iframe src="${esc(d.embed)}" style="width:100%;height:340px;border:0;border-radius:10px;margin-top:8px" loading="lazy"></iframe>` : `<div class="mut" style="margin-top:8px">Sin gráfico de DexScreener.</div>`}
+           ${d.embed ? `<iframe src="${esc(d.embed)}" style="width:100%;height:64vh;min-height:420px;border:0;border-radius:10px;margin-top:8px" loading="lazy"></iframe>` : `<div class="mut" style="margin-top:8px">Sin gráfico de DexScreener.</div>`}
            <div class="mut" style="margin-top:6px;font-size:12px">${esc(body.address)}</div>`;
         $("step2").classList.remove("hide");
       };
@@ -408,27 +464,27 @@
               ${logo ? `<img src="${esc(logo)}" style="width:40px;height:40px;border-radius:10px" onerror="this.style.display='none'">` : ""}
               <div><b>${esc(sym)}</b><div class="mut" style="font-size:12px">${p.qty.toLocaleString(undefined, { maximumFractionDigits: 2 })} · ${p.value ? "$" + p.value.toFixed(2) : "—"}</div></div>
             </div>
-            <div class="kv"><span>PnL</span><b class="${p.unrealized_pct >= 0 ? "ok" : "bad"}">${p.unrealized_pct >= 0 ? "🟢" : "🔴"} ${(p.unrealized_pct * 100).toFixed(1)}% · ${p.unrealized >= 0 ? "+" : "-"}$${Math.abs(p.unrealized || 0).toFixed(2)}</b></div>
-            <div class="kv mut"><span>Precio</span><b>${p.price ? "$" + Number(p.price).toPrecision(4) : "—"}</b></div>
-            <div class="kv mut"><span>Entrada</span><b>${p.avg_cost ? "$" + Number(p.avg_cost).toPrecision(4) : "—"}</b></div>
-            <div class="kv mut"><span>Market cap</span><b>${money(d.market_cap)}</b></div>
-            <div class="kv mut"><span>Liquidez</span><b>${money(d.liquidity_usd)}</b></div>
-            <div class="kv mut"><span>Vol 24h</span><b>${money(V.h24)}</b></div>
-            <div class="kv mut"><span>Txns 24h</span><b>${T.buys != null ? T.buys + " ↑ / " + T.sells + " ↓" : "—"}</b></div>
+            <div class="kv"><span>${t("pnl")}</span><b class="${p.unrealized_pct >= 0 ? "ok" : "bad"}">${p.unrealized_pct >= 0 ? "🟢" : "🔴"} ${(p.unrealized_pct * 100).toFixed(1)}% · ${p.unrealized >= 0 ? "+" : "-"}$${Math.abs(p.unrealized || 0).toFixed(2)}</b></div>
+            <div class="kv mut"><span>${t("price")}</span><b>${p.price ? "$" + Number(p.price).toPrecision(4) : "—"}</b></div>
+            <div class="kv mut"><span>${t("entry")}</span><b>${p.avg_cost ? "$" + Number(p.avg_cost).toPrecision(4) : "—"}</b></div>
+            <div class="kv mut"><span>${t("mcap")}</span><b>${money(d.market_cap)}</b></div>
+            <div class="kv mut"><span>${t("liq")}</span><b>${money(d.liquidity_usd)}</b></div>
+            <div class="kv mut"><span>${t("vol")}</span><b>${money(V.h24)}</b></div>
+            <div class="kv mut"><span>${t("txns")}</span><b>${T.buys != null ? T.buys + " ↑ / " + T.sells + " ↓" : "—"}</b></div>
             <div class="row" style="margin-top:6px;align-items:center">
               <span class="mut" style="font-size:12px">SL %</span><input class="sl" type="number" value="${p.sl_pct || ""}" placeholder="20" style="width:54px">
               <span class="mut" style="font-size:12px">TP %</span><input class="tp" type="number" value="${p.tp_pct || ""}" placeholder="50" style="width:54px">
               <span class="mut" style="font-size:12px">Trail %</span><input class="tr" type="number" value="${p.trailing_pct || ""}" placeholder="15" style="width:54px">
-              <button class="ghost saveplan">Guardar</button>
+              <button class="ghost saveplan">${t("save")}</button>
             </div>
             <div class="row" style="margin-top:6px">
-              ${[25, 50, 75, 100].map(x => `<button class="ghost sellpct" data-p="${x}">vender ${x}%</button>`).join("")}
+              ${[25, 50, 75, 100].map(x => `<button class="ghost sellpct" data-p="${x}">${t("sell")} ${x}%</button>`).join("")}
             </div>
             <div class="row" style="margin-top:6px">
-              <input class="buyamt" type="number" placeholder="monto USDC" style="flex:1">
-              <button class="ghost buyrmore">Comprar</button>
+              <input class="buyamt" type="number" placeholder="${t("amount")}" style="flex:1">
+              <button class="ghost buyrmore">${t("buy_more")}</button>
             </div>
-            ${d.embed ? `<iframe src="${esc(d.embed)}" style="width:100%;height:300px;border:0;border-radius:10px;margin-top:8px" loading="lazy"></iframe>` : ""}
+            ${d.embed ? `<iframe src="${esc(d.embed)}" style="width:100%;height:58vh;min-height:380px;border:0;border-radius:10px;margin-top:8px" loading="lazy"></iframe>` : ""}
           </div>`;
         }).join("");
         document.querySelectorAll("#poslist .saveplan").forEach(b => {
