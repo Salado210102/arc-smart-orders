@@ -685,17 +685,16 @@ class Handler(BaseHTTPRequestHandler):
             uid = self._auth_user()
             if uid is None:
                 return self._send(401, {"error": "unauthorized"})
-            from .telegram import RISK_KINDS
+            from .telegram import RISK_KINDS, DISCOVERY_KINDS
             store = SubscriptionStore(DB)
             try:
                 holds = store.list_holdings(uid)
-                # volume spikes = PUBLIC discovery feed (any token, so people can buy)
-                spikes = store.recent_alerts(kinds=["volume_spike"], limit=40)
+                # discovery signals = PUBLIC feed (any token, so people can buy)
+                others = store.recent_alerts(kinds=list(DISCOVERY_KINDS), limit=40)
                 # risk alerts (dev-sell, ...) ONLY for tokens the user holds
                 risk = store.recent_alerts(tokens=holds, kinds=list(RISK_KINDS), limit=30) if holds else []
             finally:
                 store.close()
-            others = spikes
             seen = set()
             merged = []
             for a in sorted(risk + others, key=lambda x: x.get("block", 0), reverse=True):

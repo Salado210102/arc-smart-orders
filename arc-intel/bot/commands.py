@@ -18,11 +18,13 @@ from . import i18n
 from .sender import DirectSender
 
 ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
-ALLOWED_KINDS = {"dev_sell", "compound", "volume_spike", "liquidity_removal", "large_sell"}
-ALL_KINDS = ["dev_sell", "compound", "volume_spike", "liquidity_removal", "large_sell"]
-KIND_LABELS = {"dev_sell": "Dev-sell", "compound": "Compound risk",
-               "volume_spike": "Volume spike", "liquidity_removal": "Liquidity removal",
-               "large_sell": "Large sell"}
+ALLOWED_KINDS = {"dev_sell", "compound", "volume_spike", "price_surge", "whale_buy",
+                 "liquidity_removal", "large_sell"}
+ALL_KINDS = ["dev_sell", "compound", "volume_spike", "price_surge", "whale_buy",
+             "liquidity_removal", "large_sell"]
+KIND_LABELS = {"dev_sell": "Dev-sell", "compound": "Compound risk", "volume_spike": "Volume spike",
+               "price_surge": "Price surge", "whale_buy": "Whale buy",
+               "liquidity_removal": "Liquidity removal", "large_sell": "Large sell"}
 
 
 def _enabled_kinds(store, chat) -> set:

@@ -25,6 +25,7 @@ from .throttle import Throttle
 
 PUSH_EXCLUDED_KINDS = {"thin_market", "volume_collapse"}  # not pushed (collapse feeds 'compound')
 RISK_KINDS = {"dev_sell", "compound", "liquidity_removal", "large_sell"}  # only if the user HOLDS it
+DISCOVERY_KINDS = {"volume_spike", "price_surge", "whale_buy"}  # public feed (any subscriber)
 
 _IMG_CACHE: dict[str, str] = {}
 
@@ -268,13 +269,19 @@ def dispatch(alerts: list, store: SubscriptionStore, transport, throttle=None,
         for a in alerts:
             if sent >= per_chat_cap:
                 break
-            if a.get("kind") in PUSH_EXCLUDED_KINDS:
+            kind = a.get("kind")
+            if kind in PUSH_EXCLUDED_KINDS:
                 continue
-            if a.get("kind") in RISK_KINDS and a.get("token") not in holds:
-                continue  # risk alerts only for tokens the user holds
             if int(a.get("block") or 0) <= since:
                 continue
-            if not matches(s, a):
+            if kind in DISCOVERY_KINDS:
+                pass  # public discovery feed -> every subscriber
+            elif kind in RISK_KINDS:
+                if a.get("token") not in holds:
+                    continue  # risk alerts only for tokens the user holds
+                if not matches(s, a):
+                    continue
+            elif not matches(s, a):
                 continue
             if store.is_delivered(chat, a.get("token"), a.get("kind"), a.get("block")):
                 continue
@@ -292,7 +299,7 @@ def dispatch(alerts: list, store: SubscriptionStore, transport, throttle=None,
             inline = None
             if tk:
                 from .i18n import MINIAPP_URL
-                danger = a.get("kind") in ("dev_sell", "compound", "liquidity_removal", "large_sell")
+                danger = a.get("kind") in RISK_KINDS
                 label = "\U0001F534 Vender" if danger else "\U0001F7E2 Comprar"
                 inline = [[{"text": label, "web_app": f"{MINIAPP_URL}?token={tk}"}]]
             if logo and hasattr(transport, "send_photo"):

@@ -286,15 +286,17 @@ class CommandTests(unittest.TestCase):
     def test_settings_screen_has_toggles(self):
         r = command_reply_rich("/settings", 1, self.store, self.exists, self.check, 1000)
         self.assertIsInstance(r, dict)
-        self.assertEqual(len(r["inline"]), 5)
+        self.assertEqual(len(r["inline"]), 7)
 
     def test_settings_toggle_off_one(self):
         _handle_callback("setkind:dev_sell", 1, self.store, self.exists, self.check, 1000)
         self.assertEqual(self.store.get(1)["kinds"],
-                         {"compound", "volume_spike", "liquidity_removal", "large_sell"})
+                         {"compound", "volume_spike", "price_surge", "whale_buy",
+                          "liquidity_removal", "large_sell"})
 
     def test_settings_toggle_all_off_mutes(self):
-        for k in ("dev_sell", "compound", "volume_spike", "liquidity_removal", "large_sell"):
+        for k in ("dev_sell", "compound", "volume_spike", "price_surge", "whale_buy",
+                  "liquidity_removal", "large_sell"):
             _handle_callback(f"setkind:{k}", 1, self.store, self.exists, self.check, 1000)
         self.assertEqual(self.store.get(1)["kinds"], {"none"})
 

@@ -31,6 +31,10 @@ class IncrementalState:
     min_confirm_usdc: float = 500.0      # recent volume that confirms a dev-sell
     large_sell_usd: float = 5000.0       # whale/team dump: single sell >= $5k
     large_sell_ratio: float = 0.5        # ...and >= 50% of the token's recent (6-bucket) volume
+    price_surge_pct: float = 50.0        # discovery: price +>=50% vs ~lookback buckets ago
+    whale_buy_usd: float = 2000.0        # discovery: single buy >= $2k dominating recent volume
+    prices: dict = field(default_factory=dict)          # token -> {bucket: price}
+    last_surge_bucket: dict = field(default_factory=dict)
     positions: dict = field(default_factory=dict)        # (wallet, token) -> [qty, cost, entry]
     volume: dict = field(default_factory=dict)           # token -> {bucket: vol}
     last_dev_sell_block: dict = field(default_factory=dict)
@@ -67,6 +71,13 @@ class IncrementalState:
         if len(vols) > keep:
             for b in sorted(vols)[:-keep]:
                 vols.pop(b, None)
+        price = (sv / qty) if qty > 0 else 0.0
+        if price > 0:
+            pr = self.prices.setdefault(token, {})
+            pr[buck] = price
+            if len(pr) > keep:
+                for b in sorted(pr)[:-keep]:
+                    pr.pop(b, None)
 
         creator = (creators.get(token) or "").lower()
         if wallet == creator and creator:
@@ -118,6 +129,31 @@ class IncrementalState:
                 a.message = (f"{wallet} sold ~${sv:,.0f} of {token} "
                              f"({share:.0f}% of recent volume) at block {block}")
                 alerts.append(a)
+
+        # Discovery: whale buy (a large buy dominating recent volume).
+        if emit and side == "buy" and sv >= self.whale_buy_usd:
+            vol_recent = sum(v for b, v in vols.items() if b >= buck - 6)
+            if vol_recent <= 0 or sv >= 0.5 * vol_recent:
+                a = Alert(token=token, kind="whale_buy",
+                          severity="high" if sv >= self.whale_buy_usd * 4 else "medium",
+                          block=block, wallet=wallet, amount_usdc=sv, context={"usd": round(sv, 0)})
+                a.message = f"{wallet} bought ~${sv:,.0f} of {token} at block {block}"
+                alerts.append(a)
+
+        # Discovery: price surge vs ~lookback buckets ago.
+        if emit and price > 0 and self.last_surge_bucket.get(token) != buck:
+            pr = self.prices.get(token, {})
+            past = [b for b in pr if b <= buck - self.lookback]
+            if past:
+                old = pr[max(past)]
+                if old > 0 and (price / old - 1.0) * 100.0 >= self.price_surge_pct:
+                    self.last_surge_bucket[token] = buck
+                    pct = (price / old - 1.0) * 100.0
+                    a = Alert(token=token, kind="price_surge",
+                              severity="high" if pct >= 200 else "medium", block=block,
+                              context={"pct": round(pct, 1)})
+                    a.message = f"{token}: price +{pct:.0f}% (to {price:.2e}) at block {block}"
+                    alerts.append(a)
 
         series = sorted(self.volume[token].items())
         z = rolling_zscore(series, self.lookback)
