@@ -237,6 +237,19 @@ class PostgresStorage:
         finally:
             self.pool.putconn(conn)
 
+    def recent_wallet_legs(self, wallet: str, since_block: int, limit: int = 20) -> list[dict]:
+        """Indexed trades for a wallet after `since_block` (oldest first) — for copy-trading."""
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(
+                    "SELECT token,pool,block,side,token_qty,stable_value,price FROM legs "
+                    "WHERE lower(wallet)=lower(%s) AND block > %s ORDER BY block, log_index LIMIT %s",
+                    (str(wallet), int(since_block), int(limit)))
+                return [dict(r) for r in cur.fetchall()]
+        finally:
+            self.pool.putconn(conn)
+
     def save_wallet_scores(self, rows: list[dict], computed_at: int | None = None) -> int:
         import time as _t
         ts = int(computed_at if computed_at is not None else _t.time())

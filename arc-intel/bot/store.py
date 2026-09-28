@@ -125,6 +125,12 @@ class SubscriptionStore:
             "CREATE TABLE IF NOT EXISTS referral_credits ("
             "fill_id TEXT PRIMARY KEY, owner_chat TEXT, buyer_chat TEXT, token TEXT, "
             "fee_usdc REAL, commission_usdc REAL, created_ts INTEGER, status TEXT DEFAULT 'accrued')")
+        # copy-trading: follow a leader wallet and mirror its trades with the bot wallet
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS copy_subs ("
+            "follower_chat TEXT PRIMARY KEY, leader TEXT, max_per_trade REAL, max_total REAL, "
+            "spent REAL DEFAULT 0, slippage REAL DEFAULT 3, enabled INTEGER DEFAULT 1, "
+            "last_block INTEGER DEFAULT 0, created_ts INTEGER)")
         for _col in ("signature TEXT", "sign_token TEXT", "sig_payload TEXT",
                      "kind TEXT DEFAULT 'sell'", "tx_hash TEXT", "attempts INTEGER DEFAULT 0"):
             try:
@@ -847,6 +853,61 @@ class SubscriptionStore:
                     "SELECT buyer_chat,token,fee_usdc,commission_usdc,created_ts,status "
                     "FROM referral_credits WHERE owner_chat=? ORDER BY created_ts DESC LIMIT ?",
                     (str(owner_chat), int(limit))).fetchall()]
+
+    # --- copy trading (follow a leader wallet; mirror with the bot wallet) ---
+    def add_copy_sub(self, follower, leader, max_per_trade=25.0, max_total=100.0, slippage=3.0,
+                     now_block=0) -> None:
+        self.conn.execute(
+            "INSERT INTO copy_subs(follower_chat,leader,max_per_trade,max_total,spent,slippage,"
+            "enabled,last_block,created_ts) VALUES(?,?,?,?,0,?,1,?,?) "
+            "ON CONFLICT(follower_chat) DO UPDATE SET leader=excluded.leader, "
+            "max_per_trade=excluded.max_per_trade, max_total=excluded.max_total, "
+            "slippage=excluded.slippage, enabled=1",
+            (str(follower), str(leader).lower(), float(max_per_trade), float(max_total),
+             float(slippage), int(now_block or 0), int(time.time())))
+        self.conn.commit()
+
+    def _copy_row(self, r) -> dict | None:
+        if not r:
+            return None
+        return {"follower_chat": r[0], "leader": r[1], "max_per_trade": float(r[2] or 0),
+                "max_total": float(r[3] or 0), "spent": float(r[4] or 0), "slippage": float(r[5] or 0),
+                "enabled": bool(r[6]), "last_block": int(r[7] or 0), "created_ts": int(r[8] or 0)}
+
+    _COPY_COLS = ("follower_chat,leader,max_per_trade,max_total,spent,slippage,enabled,last_block,"
+                  "created_ts")
+
+    def get_copy_sub(self, follower) -> dict | None:
+        return self._copy_row(self.conn.execute(
+            "SELECT " + self._COPY_COLS + " FROM copy_subs WHERE follower_chat=?",
+            (str(follower),)).fetchone())
+
+    def list_copy_subs(self, enabled_only=True) -> list:
+        q = "SELECT " + self._COPY_COLS + " FROM copy_subs"
+        if enabled_only:
+            q += " WHERE enabled=1"
+        return [self._copy_row(r) for r in self.conn.execute(q).fetchall()]
+
+    def remove_copy_sub(self, follower) -> bool:
+        cur = self.conn.execute("DELETE FROM copy_subs WHERE follower_chat=?", (str(follower),))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def set_copy_enabled(self, follower, enabled: bool) -> bool:
+        cur = self.conn.execute("UPDATE copy_subs SET enabled=? WHERE follower_chat=?",
+                                (1 if enabled else 0, str(follower)))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def bump_copy_spent(self, follower, amount: float) -> None:
+        self.conn.execute("UPDATE copy_subs SET spent=coalesce(spent,0)+? WHERE follower_chat=?",
+                          (float(amount), str(follower)))
+        self.conn.commit()
+
+    def set_copy_last_block(self, follower, block: int) -> None:
+        self.conn.execute("UPDATE copy_subs SET last_block=? WHERE follower_chat=?",
+                          (int(block), str(follower)))
+        self.conn.commit()
 
     def close(self) -> None:
         self.conn.close()

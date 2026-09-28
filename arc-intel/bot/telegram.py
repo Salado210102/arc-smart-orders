@@ -100,6 +100,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "unlink_wallet", "description": "Unlink wallet"},
         {"command": "settings", "description": "Alert settings"},
         {"command": "referral", "description": "Referrals (earn 30%)"},
+        {"command": "copytrade", "description": "Copytrade a wallet"},
         {"command": "language", "description": "Language"},
         {"command": "disclaimer", "description": "Disclaimer"},
         {"command": "help", "description": "Help"},
@@ -116,6 +117,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "unlink_wallet", "description": "Desvincular cartera"},
         {"command": "settings", "description": "Ajustes"},
         {"command": "referral", "description": "Referidos (gana 30%)"},
+        {"command": "copytrade", "description": "Copytrade de una cartera"},
         {"command": "language", "description": "Idioma"},
         {"command": "disclaimer", "description": "Aviso legal"},
         {"command": "help", "description": "Ayuda"},
@@ -132,6 +134,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "unlink_wallet", "description": "\u53d6\u6d88\u5173\u8054\u94b1\u5305"},
         {"command": "settings", "description": "\u8bbe\u7f6e"},
         {"command": "referral", "description": "\u63a8\u8350\uff08\u8d5a\u53d6 30%\uff09"},
+        {"command": "copytrade", "description": "\u8ddf\u5355\u94b1\u5305"},
         {"command": "language", "description": "\u8bed\u8a00"},
         {"command": "disclaimer", "description": "\u514d\u8d23\u58f0\u660e"},
         {"command": "help", "description": "\u5e2e\u52a9"},
@@ -721,6 +724,36 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
             stop.wait(180)
 
     threading.Thread(target=wallet_worker, daemon=True).start()
+
+    # Copy-trading engine in its OWN thread (own DB connection): mirror leaders' trades with the
+    # follower's bot wallet. DRY-RUN via ARC_INTEL_COPY_DRY_RUN=1 until mainnet is live.
+    cstore = SubscriptionStore(db)
+
+    def copy_worker():
+        while not stop.is_set():
+            try:
+                from execution.copy_keeper import run_copy_engine
+
+                def _notify(sub, trade, decision, res):
+                    try:
+                        act = "BUY" if decision["action"] == "buy" else "SELL"
+                        thr.wait(sub["follower_chat"])
+                        transport.send(sub["follower_chat"],
+                                       f"\U0001F465 Copy {act} {trade.get('token', '')} "
+                                       f"(${(decision.get('usdc') or 0):.0f}) \u00b7 "
+                                       f"{(res or {}).get('tx', '')}")
+                    except Exception:
+                        pass
+
+                summary = run_copy_engine(cstore, storage, head=clock["block"],
+                                          logger=logger, on_exec=_notify)
+                if summary.get("executed") or summary.get("errors"):
+                    logger({"copy": summary})
+            except Exception:
+                pass
+            stop.wait(30)
+
+    threading.Thread(target=copy_worker, daemon=True).start()
 
     try:
         while cycles <= 0 or k < cycles:

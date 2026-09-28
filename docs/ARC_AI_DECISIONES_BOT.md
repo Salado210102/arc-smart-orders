@@ -383,3 +383,16 @@ auditoría + hot key acotada; no es lo primero).
   devuelve `breakdown`). Además se **corrige el copy de `/wallet`** (decía "non-custodial"): ahora
   describe la **cartera enlazada solo-lectura** y remite al **wallet del bot (custodia)** en la Mini App.
   Suite total **351 passed** (1 fallo ambiental local).
+- **2026-09-27 (copytrading v1)** — **Copytrading funcional** con la wallet **custodial**. Núcleo puro
+  `execution/copy.py` (`CopyConfig`, `plan_buy`, `decide`: copia **compras** por
+  `min(notional, max_por_op, presupuesto_restante)`, ignora polvo <$5, y **vende** cerrando el 100% de
+  la posición). Motor `execution/copy_keeper.py` (`run_copy_engine`): por cada seguidor lee las
+  operaciones **nuevas** del líder (`indexer.pg_storage.recent_wallet_legs` sobre `legs`) y las replica
+  best-effort con la wallet del bot; **self-advancing** de `last_block`, **idempotente** por bloque,
+  con **dry-run** (`ARC_INTEL_COPY_DRY_RUN=1`) y callback de aviso. Store `bot/store.py`: tabla
+  `copy_subs` + `add/get/list/remove/set_enabled/bump_spent/set_last_block`. Bot: comandos
+  **`/copytrade <addr> [max_por_op] [presupuesto]`** y **`/copyoff`**; botón del menú **Copytrade**
+  ahora **funcional** (`cmd:/copytrade`); comando registrado EN/ES/ZH. Thread propio en el loop
+  (`telegram.run_incremental`, cada 30 s) → no frena alertas. Tests **+10** (`tests/test_copy.py`) +
+  1 de comando. Suite **361 passed** (1 fallo ambiental local). **Dormido** sin wallet custodial /
+  `ARC_INTEL_SESSION_ENC_KEY` / pool permitido; el **pago real** espera a mainnet.

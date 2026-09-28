@@ -168,6 +168,33 @@ def referral_screen(store, chat, lang) -> dict:
     return {"text": text, "inline": rows, "parse_mode": "HTML"}
 
 
+def _copy_command(store, chat, args, now_block, lang) -> str:
+    """Add/show a copytrade subscription (follow a leader wallet; mirror with the bot wallet)."""
+    if not args:
+        sub = store.get_copy_sub(chat)
+        if not sub:
+            return i18n.t("copy_none", lang)
+        return i18n.t("copy_added", lang).format(
+            leader=sub["leader"], per=f"{sub['max_per_trade']:.0f}",
+            total=f"{sub['max_total']:.0f}", spent=f"{sub['spent']:.2f}")
+    leader = args[0].lower()
+    if not _valid_addr(leader):
+        return i18n.t("copy_bad", lang)
+    per, total = 25.0, 100.0
+    try:
+        if len(args) > 1:
+            per = max(1.0, float(args[1]))
+        if len(args) > 2:
+            total = max(per, float(args[2]))
+    except (TypeError, ValueError):
+        return i18n.t("copy_bad", lang)
+    store.add_copy_sub(chat, leader, max_per_trade=per, max_total=total,
+                       now_block=int(now_block or 0))
+    sub = store.get_copy_sub(chat)
+    return i18n.t("copy_added", lang).format(
+        leader=leader, per=f"{per:.0f}", total=f"{total:.0f}", spent=f"{sub['spent']:.2f}")
+
+
 def referral_stats_screen(store, chat, lang) -> dict:
     """Per-referred-user breakdown: who traded, how much, and what you earned."""
     s = store.referral_summary(chat)
@@ -219,7 +246,8 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
             card["parse_mode"] = "HTML"
             return card
         return {"text": reply, "parse_mode": "HTML"}
-    if cmd in ("/list", "/stats", "/wallet", "/connect", "/link_wallet", "/unlink_wallet"):
+    if cmd in ("/list", "/stats", "/wallet", "/connect", "/link_wallet", "/unlink_wallet",
+               "/copytrade", "/copy", "/copyoff"):
         return {"text": reply, "parse_mode": "HTML"}
     return reply
 
@@ -451,6 +479,11 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
         return head + "\n\n" + i18n.t("wallet_text", lang)
     if cmd == "/referral":
         return referral_screen(store, chat_id, lang)["text"]
+    if cmd in ("/copytrade", "/copy"):
+        return _copy_command(store, chat_id, parts[1:], now_block, lang)
+    if cmd == "/copyoff":
+        return (i18n.t("copy_off", lang) if store.remove_copy_sub(chat_id)
+                else i18n.t("copy_none", lang))
     if cmd == "/connect":
         if not _valid_addr(arg):
             return i18n.t("connect_prompt", lang)

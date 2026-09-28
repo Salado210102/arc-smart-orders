@@ -93,8 +93,8 @@ TEXTS: dict[str, dict[str, str]] = {
                    "zh": "\U0001F517 连接钱包"},
     "btn_signals": {"en": "\U0001F4C8 Signals \u00B7 soon", "es": "\U0001F4C8 Señales \u00B7 pronto",
                     "zh": "\U0001F4C8 信号 \u00B7 即将"},
-    "btn_copytrade": {"en": "\U0001F465 Copytrade \u00B7 soon", "es": "\U0001F465 Copytrade \u00B7 pronto",
-                      "zh": "\U0001F465 跟单 \u00B7 即将"},
+    "btn_copytrade": {"en": "\U0001F465 Copytrade", "es": "\U0001F465 Copytrade",
+                      "zh": "\U0001F465 跟单"},
     "btn_bridge": {"en": "\U0001F309 Bridge \u00B7 soon", "es": "\U0001F309 Bridge \u00B7 pronto",
                    "zh": "\U0001F309 跨链桥 \u00B7 即将"},
     "btn_premium": {"en": "\U0001F48E Premium \u00B7 soon", "es": "\U0001F48E Premium \u00B7 pronto",
@@ -237,6 +237,41 @@ TEXTS: dict[str, dict[str, str]] = {
         "es": "Aún no hay volumen referido. Comparte tu enlace para empezar a ganar.",
         "zh": "暂无推荐交易量。分享你的链接即可开始赚取。",
     },
+    "copy_none": {
+        "en": ("\U0001F465 <b>Copytrade</b>\nFollow a wallet and the bot mirrors its trades with your "
+               "bot wallet.\n\nUse: <code>/copytrade 0x\u2026 [max_per_trade] [max_total]</code>\n"
+               "Example: <code>/copytrade 0xabc\u2026 25 100</code>"),
+        "es": ("\U0001F465 <b>Copytrade</b>\nSigue una cartera y el bot replica sus operaciones con tu "
+               "wallet del bot.\n\nUso: <code>/copytrade 0x\u2026 [max_por_op] [presupuesto]</code>\n"
+               "Ejemplo: <code>/copytrade 0xabc\u2026 25 100</code>"),
+        "zh": ("\U0001F465 <b>跟单</b>\n关注一个钱包，机器人将用你的机器人钱包复制其交易。\n\n"
+               "用法：<code>/copytrade 0x\u2026 [单笔上限] [总预算]</code>\n"
+               "示例：<code>/copytrade 0xabc\u2026 25 100</code>"),
+    },
+    "copy_added": {
+        "en": ("\u2705 Copytrading <code>{leader}</code>\n"
+               "Max per trade: <b>${per}</b> \u00b7 Budget: <b>${total}</b> \u00b7 Spent: <b>${spent}</b>\n"
+               "Mirrors <b>new</b> trades only. Stop with /copyoff.\n\n"
+               "<i>High risk. Needs a bot wallet (Mini App \u2192 Cartera) with USDC.</i>"),
+        "es": ("\u2705 Copytrade a <code>{leader}</code>\n"
+               "M\u00e1x por operaci\u00f3n: <b>${per}</b> \u00b7 Presupuesto: <b>${total}</b> \u00b7 "
+               "Gastado: <b>${spent}</b>\nReplica solo operaciones <b>nuevas</b>. Para con /copyoff.\n\n"
+               "<i>Alto riesgo. Necesita wallet del bot (Mini App \u2192 Cartera) con USDC.</i>"),
+        "zh": ("\u2705 跟单 <code>{leader}</code>\n"
+               "单笔上限：<b>${per}</b> \u00b7 预算：<b>${total}</b> \u00b7 已用：<b>${spent}</b>\n"
+               "仅复制<b>新</b>交易。使用 /copyoff 停止。\n\n"
+               "<i>高风险。需要机器人钱包（Mini App \u2192 钱包）并有 USDC。</i>"),
+    },
+    "copy_off": {
+        "en": "\U0001F6D1 Copytrading stopped.",
+        "es": "\U0001F6D1 Copytrade detenido.",
+        "zh": "\U0001F6D1 已停止跟单。",
+    },
+    "copy_bad": {
+        "en": "Invalid address. Usage: /copytrade 0x + 40 hex [max_per_trade] [max_total]",
+        "es": "Direcci\u00f3n inv\u00e1lida. Uso: /copytrade 0x + 40 hex [max_por_op] [presupuesto]",
+        "zh": "\u5730\u5740\u65e0\u6548\u3002\u7528\u6cd5\uff1a/copytrade 0x + 40 \u4f4d\u5341\u516d\u8fdb\u5236 [\u5355\u7b14\u4e0a\u9650] [\u603b\u9884\u7b97]",
+    },
 }
 
 
@@ -269,7 +304,7 @@ def menu_buttons(lang: str = DEFAULT) -> list:
         [b("btn_stats", "cmd:/stats"), b("btn_pending", "cmd:/pending")],
         [b("btn_positions", "cmd:/positions"), b("btn_settings", "cmd:/settings")],
         [b("btn_wallet", "cmd:/connect"), b("btn_help", "cmd:/help")],
-        [b("btn_signals", "soon:Signals"), b("btn_copytrade", "soon:Copytrade")],
+        [b("btn_signals", "soon:Signals"), b("btn_copytrade", "cmd:/copytrade")],
         [b("btn_bridge", "soon:Bridge"), b("btn_premium", "soon:Premium")],
         [b("btn_referral", "cmd:/referral")],
         # equal-length, no flags -> identical button widths across clients

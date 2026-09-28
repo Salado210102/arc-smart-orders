@@ -158,6 +158,17 @@ class CommandTests(unittest.TestCase):
         flat = [b for row in r["inline"] for b in row]
         self.assertTrue(any(b.get("data") == "ref:stats" for b in flat))
 
+    def test_copytrade_command_lifecycle(self):
+        self.assertIn("copytrade", self.reply("/copytrade").lower())
+        r = self.reply(f"/copytrade {ADDR} 10 50")
+        self.assertIn("Copytrading", r)
+        sub = self.store.get_copy_sub(1)
+        self.assertEqual(sub["leader"], ADDR)
+        self.assertEqual(sub["max_per_trade"], 10)
+        self.assertEqual(sub["max_total"], 50)
+        self.assertIn("stopped", self.reply("/copyoff").lower())
+        self.assertIsNone(self.store.get_copy_sub(1))
+
     def test_referral_stats_button_and_screen(self):
         code = self.store.ensure_referral_code(1, "ABCDEFGH")
         self.store.bind_referral(2, 1, code)
