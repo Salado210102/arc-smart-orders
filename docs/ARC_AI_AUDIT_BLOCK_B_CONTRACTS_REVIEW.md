@@ -79,8 +79,11 @@
 
 ## Notas de despliegue
 
-- El fix **B1 cambia el bytecode** de V2/V3 ⇒ **requiere redeploy** (nuevas direcciones) para surtir
-  efecto on-chain. **No se ha redeployado**; los ejecutores de testnet siguen con el bytecode previo.
+- B1/B2/B3 **cambian el bytecode** de V2/V3 y B2 **también el witness en Python** (`execution/eip712.py`).
+- **REDEPLOY HECHO (2026-09-27)**: nuevo **V3 en testnet `0xBD1a802da39cf7FcF8437F23e0F63f13BD6e678d`**
+  (owner=relayer, `isTestnet=true`, `allowAllPools=true`). Los servicios apuntan a él
+  (`ARC_INTEL_EXECUTOR` por drop-in) y se desplegó el `eip712.py` nuevo (witness con `deadline`).
+  Verificado por HTTPS (`/health` 200). El V3 antiguo (`0x5e938A…9c14`) queda obsoleto.
 - V1 (`ArcIntelExecutor.sol`) **intacto**.
 
 ## Reproducción

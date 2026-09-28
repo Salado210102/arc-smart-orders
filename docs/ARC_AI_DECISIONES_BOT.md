@@ -478,3 +478,19 @@ auditoría + hot key acotada; no es lo primero).
   (`telegram.run_incremental`, cada 30 s) → no frena alertas. Tests **+10** (`tests/test_copy.py`) +
   1 de comando. Suite **361 passed** (1 fallo ambiental local). **Dormido** sin wallet custodial /
   `ARC_INTEL_SESSION_ENC_KEY` / pool permitido; el **pago real** espera a mainnet.
+- **2026-09-27 (auditoría · Bloque A custodia/Mini App)** — Endurecimiento completo: initData **300 s**
+  en endpoints sensibles, **rate limit**, **TOTP 2FA**, **direcciones de retiro registradas (24 h)**,
+  **tope diario**, **freeze ("No fui yo")**, **kill-switch**; `/custody/create` **rechaza
+  `private_key`**; **XSS/CSP** (`security/urls.py`, `rel=noopener`, CSP con hash); **módulo firmante
+  único** `execution/signer.py` (MultiFernet, auditoría, topes, allowlist); **RPC/chain obligatorios** +
+  `verify_chain`; **CORS sin default**. Informe: `docs/ARC_AI_AUDIT_BLOCK_A_REPORT.md`. Commit `9cc2a60`.
+- **2026-09-27 (auditoría · Bloque B contratos V2/V3)** — `recipient==0` rechazado (v1 `execute`);
+  **`deadline` firmado** en el witness; **`allowAllPools` solo testnet** (V3 `isTestnet`);
+  **`DOMAIN_SEPARATOR` dinámico** (fork-safe). Informe: `docs/ARC_AI_AUDIT_BLOCK_B_CONTRACTS_REVIEW.md`.
+  Commits `35f9466` + `970758c` (forge **51 passed**).
+- **2026-09-27 (redeploy V3 testnet)** — **Nuevo executor V3** en testnet
+  **`0xBD1a802da39cf7FcF8437F23e0F63f13BD6e678d`** (owner=relayer `0x5ce3F7…A98f`, `isTestnet=true`,
+  `allowAllPools=true`, witness con `deadline`). Ambos servicios (`arc-intel-alerts`, `arc-intel-sign`)
+  apuntan a él vía drop-in `Environment=ARC_INTEL_EXECUTOR=…`; desplegado `execution/eip712.py` nuevo.
+  Verificado: `/health` 200, servicios activos, loop limpio. **Nota:** el V3 antiguo
+  (`0x5e938A…9c14`) queda obsoleto; mainnet usará owner=Safe+`isTestnet=false`.
