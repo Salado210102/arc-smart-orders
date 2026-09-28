@@ -668,7 +668,16 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
             storage.pool.putconn(conn)
 
     def check_fn(tok: str) -> str:
-        return check_token(storage, tok)
+        base = check_token(storage, tok)
+        try:
+            st = store.token_risk_status(tok)
+        except Exception:
+            st = ""
+        if st == "rugged":
+            base += "\n\U0001F480 Estado: <b>RUGGED</b> (liquidez retirada)"
+        elif st == "dev_sell":
+            base += "\n\u26A0\uFE0F Estado: <b>dev-sold</b>"
+        return base
 
     def price_fn(token: str):
         from indexer.stream_alerts import load_price_series

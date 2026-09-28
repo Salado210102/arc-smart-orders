@@ -347,7 +347,13 @@ class CommandTests(unittest.TestCase):
     def test_settings_screen_has_toggles(self):
         r = command_reply_rich("/settings", 1, self.store, self.exists, self.check, 1000)
         self.assertIsInstance(r, dict)
-        self.assertEqual(len(r["inline"]), 6)
+        self.assertEqual(len(r["inline"]), 7)   # 6 alert kinds + Auto-Protect
+        self.assertTrue(any(b.get("data") == "setap" for row in r["inline"] for b in row))
+
+    def test_settings_autoprotect_toggle(self):
+        self.assertEqual(self.store.get_state("autoprotect:1", "1"), "1")
+        _handle_callback("setap", 1, self.store, self.exists, self.check, 1000)
+        self.assertEqual(self.store.get_state("autoprotect:1", "1"), "0")
 
     def test_settings_toggle_off_one(self):
         _handle_callback("setkind:dev_sell", 1, self.store, self.exists, self.check, 1000)

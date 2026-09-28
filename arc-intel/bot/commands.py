@@ -44,6 +44,9 @@ def settings_screen(store, chat, lang) -> dict:
     for k in ALL_KINDS:
         mark = "\u2705" if k in enabled else "\u2B1C"
         rows.append([{"text": f"{mark} {KIND_LABELS[k]}", "data": f"setkind:{k}"}])
+    ap = store.get_state(f"autoprotect:{chat}", "1") == "1"
+    rows.append([{"text": i18n.t("btn_autoprotect", lang).format(
+        v=("\U0001F7E2 ON" if ap else "\u26AA OFF")), "data": "setap"}])
     return {"text": i18n.t("settings_text", lang), "inline": rows, "parse_mode": "HTML"}
 
 
@@ -908,6 +911,12 @@ def _handle_callback(data, chat, store, token_exists, check_fn, now_block,
         return {"text": i18n.t("language_choose", lang), "inline": i18n.language_buttons()}
     if data.startswith("soon:"):
         return i18n.t("soon_text", lang)
+    if data == "setap":
+        ap = store.get_state(f"autoprotect:{chat}", "1") == "1"
+        store.set_state(f"autoprotect:{chat}", "0" if ap else "1")
+        screen = settings_screen(store, chat, lang)
+        screen["edit"] = True
+        return screen
     if data.startswith("setkind:"):
         _toggle_kind(store, chat, data.split(":", 1)[1])
         screen = settings_screen(store, chat, lang)

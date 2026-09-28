@@ -444,6 +444,14 @@ auditoría + hot key acotada; no es lo primero).
   **niveles VIP** por volumen 30d (**VIP1 $10k 0.80% · VIP2 $50k 0.70% · VIP3 $250k 0.65%**, suelo 0.65%;
   VIP **anula** bienvenida). `joined:{chat}` al alta; comando `/tier`, `GET /tier`, tarjeta en Cartera.
   Suite **388 passed** (1 fallo ambiental local). Todo desplegado.
+- **2026-09-27 (REGLA: paridad bot ↔ Mini App)** — Se fija como norma que **todo cartel y botón** debe
+  existir en **ambas** interfaces (bot de Telegram **y** Mini App), y que **todo cambio se documenta**
+  (§10). Creado `docs/ARC_AI_UI_PARITY.md` (regla + checklist + "al añadir algo nuevo"). **Auditoría y
+  cierre de huecos**: (1) **estado RUGGED / dev-sold** ahora también en el **`/check` del bot**
+  (`check_fn` consulta `store.token_risk_status`) y en la **ficha de token de la Mini App** (`GET /token`
+  añade `status`, con badge); (2) **toggle de Auto-Protect** añadido al **`/settings` del bot**
+  (callback `setap`, fila nueva) para igualar el toggle de la Mini App; (3) nuevo texto i18n
+  `btn_autoprotect`. Suite **389 passed** (1 fallo ambiental local).
   `copy_subs` + `add/get/list/remove/set_enabled/bump_spent/set_last_block`. Bot: comandos
   **`/copytrade <addr> [max_por_op] [presupuesto]`** y **`/copyoff`**; botón del menú **Copytrade**
   ahora **funcional** (`cmd:/copytrade`); comando registrado EN/ES/ZH. Thread propio en el loop

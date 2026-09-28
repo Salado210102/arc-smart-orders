@@ -76,6 +76,8 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "language_set": {"en": "Language set to English.", "es": "Idioma cambiado a Español.",
                      "zh": "语言已设置为中文。"},
+    "btn_autoprotect": {"en": "\U0001F6E1\uFE0F Auto-Protect: {v}", "es": "\U0001F6E1\uFE0F Auto-Protect: {v}",
+                        "zh": "\U0001F6E1\uFE0F \u81ea\u52a8\u4fdd\u62a4\uff1a{v}"},
     "btn_app": {"en": "\U0001F680 Open app", "es": "\U0001F680 Abrir app",
                 "zh": "\U0001F680 \u6253\u5f00\u5e94\u7528"},
     "btn_alerts": {"en": "\U0001F514 My alerts", "es": "\U0001F514 Mis alertas", "zh": "\U0001F514 我的提醒"},

@@ -666,9 +666,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(503, {"error": "no_storage"})
             try:
                 from .miniapp_data import load_token_card
-                return self._send(200, load_token_card(st, addr))
+                card = load_token_card(st, addr)
             except Exception:
                 return self._send(502, {"error": "token_failed"})
+            try:
+                s2 = SubscriptionStore(DB)
+                try:
+                    card["status"] = s2.token_risk_status(addr)
+                finally:
+                    s2.close()
+            except Exception:
+                pass
+            return self._send(200, card)
         if u.path in ("/positions", "/wallet"):
             uid = self._auth_user()
             if uid is None:
