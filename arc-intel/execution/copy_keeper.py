@@ -21,26 +21,23 @@ STABLE_DEFAULT = "0x3600000000000000000000000000000000000000"
 def default_executor(store, storage, *, logger=None):
     """Real executor using the custodial quick wallet. Callable(chat, wallet, trade, decision, settings)."""
     from execution import custody as C
+    from execution import signer
     from execution.eip712 import new_nonce
     from execution.quotes import buy_quote, sell_quote
-    from execution.sessions import decrypt_secret
     from bot import tokenmeta
     from bot.miniapp_data import load_pool, latest_price
 
-    enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
     stable = os.environ.get("ARC_INTEL_STABLE", STABLE_DEFAULT)
 
     def _exec(chat, wallet, trade, decision, settings):
+        if store.custody_paused() or store.is_frozen(chat):
+            return None
         c = store.get_custody(chat)
-        if not c or not enc:
+        if not c:
             return None
         tok = str(trade.get("token") or "").lower()
         pool = load_pool(storage, tok)
         if not pool:
-            return None
-        try:
-            pk = decrypt_secret(c["enc_secret"], enc)
-        except Exception:
             return None
         dec = tokenmeta.rpc_decimals(tok)
         slip = 3.0
@@ -51,10 +48,11 @@ def default_executor(store, storage, *, logger=None):
             amount_in = int(round(float(decision["usdc"]) * 1e6))
             q = buy_quote(amount_in_base=amount_in, token_price=price, token_decimals=dec,
                           slippage_pct=slip)
-            C.ensure_permit2_approval(pk, stable)
-            txh = C.swap(pk, pool=pool, token_in=stable, amount_in=amount_in,
-                         min_out=q["min_out_base"], recipient=c["address"],
-                         order_nonce=new_nonce(), deadline=int(time.time()) + 600)
+            signer.ensure_approval(chat, c["enc_secret"], stable)
+            txh = signer.swap(chat, c["enc_secret"], pool=pool, token_in=stable,
+                              amount_in=amount_in, min_out=q["min_out_base"],
+                              recipient=c["address"], order_nonce=new_nonce(),
+                              deadline=int(time.time()) + 600)
             store.add_holding(chat, tok)
             store.record_fill(f"{(txh or '')}:copybuy", chat, tok, "buy",
                               float(q.get("expected_out") or 0), float(decision["usdc"]),
@@ -75,10 +73,11 @@ def default_executor(store, storage, *, logger=None):
             qty = int(bal) / (10 ** dec)
             price = latest_price(storage, tok) or 0
             q = sell_quote(qty=qty, price=price, token_decimals=dec, floor_pct=slip)
-            C.ensure_permit2_approval(pk, tok)
-            txh = C.swap(pk, pool=pool, token_in=tok, amount_in=q["amount_in_base"],
-                         min_out=q["min_out_base"], recipient=c["address"],
-                         order_nonce=new_nonce(), deadline=int(time.time()) + 600)
+            signer.ensure_approval(chat, c["enc_secret"], tok)
+            txh = signer.swap(chat, c["enc_secret"], pool=pool, token_in=tok,
+                              amount_in=q["amount_in_base"], min_out=q["min_out_base"],
+                              recipient=c["address"], order_nonce=new_nonce(),
+                              deadline=int(time.time()) + 600)
             store.record_fill(f"{(txh or '')}:copysell", chat, tok, "sell", qty, qty * price,
                               ts=int(time.time()))
             return {"tx": txh, "qty": qty}

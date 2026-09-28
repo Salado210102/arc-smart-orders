@@ -429,7 +429,7 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
             return card
         return {"text": reply, "parse_mode": "HTML"}
     if cmd in ("/list", "/stats", "/wallet", "/connect", "/link_wallet", "/unlink_wallet",
-               "/copytrade", "/copy", "/copyoff", "/pozo"):
+               "/copytrade", "/copy", "/copyoff", "/pozo", "/security", "/addaddr"):
         return {"text": reply, "parse_mode": "HTML"}
     return reply
 
@@ -675,6 +675,53 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
         for w in store.list_copy_wallets(chat_id):
             store.remove_copy_wallet(chat_id, w["leader"])
         return i18n.t("copy_off", lang)
+    if cmd == "/unfreeze":
+        enc = store.get_totp(chat_id)
+        ok = False
+        if enc and arg:
+            try:
+                from execution import signer
+                from . import totp as T
+                ok = T.verify(signer.decrypt(chat_id, enc, "totp"), str(arg))
+            except Exception:
+                ok = False
+        if ok:
+            store.set_frozen(chat_id, False)
+            return i18n.t("unfrozen_ok", lang)
+        return i18n.t("unfreeze_bad", lang)
+    if cmd in ("/pause_custody", "/resume_custody"):
+        if not _is_admin(store, chat_id):
+            return "Not authorized."
+        store.set_custody_paused(cmd == "/pause_custody")
+        return i18n.t("pause_ok" if cmd == "/pause_custody" else "resume_ok", lang)
+    if cmd == "/security":
+        from . import totp as T
+        from execution import signer
+        enc = store.get_totp(chat_id)
+        if not enc:
+            secret = T.new_secret()
+            store.save_totp(chat_id, signer.encrypt_secret(secret))
+            return i18n.t("sec_bot_enroll", lang).format(secret=secret)
+        addrs = store.list_custody_addrs(chat_id)
+        head = i18n.t("sec_bot_title", lang)
+        if not addrs:
+            return head + "\n" + i18n.t("sec_bot_none", lang)
+        now = int(time.time())
+        return head + "\n" + "\n".join(("✅ " if now >= a["usable_ts"] else "⏳ ") + a["address"]
+                                       for a in addrs)
+    if cmd == "/addaddr":
+        if len(parts) < 3:
+            return i18n.t("addaddr_usage", lang)
+        addr, code = parts[1].lower(), parts[2]
+        from . import totp as T
+        from execution import signer
+        enc = store.get_totp(chat_id)
+        if not (enc and T.verify(signer.decrypt(chat_id, enc, "totp"), code)):
+            return i18n.t("totp_bad", lang)
+        if not _valid_addr(addr):
+            return i18n.t("copy_bad", lang)
+        store.add_custody_addr(chat_id, addr)
+        return i18n.t("addaddr_ok", lang).format(addr=addr)
     if cmd == "/connect":
         if not _valid_addr(arg):
             return i18n.t("connect_prompt", lang)
@@ -935,6 +982,9 @@ def _answer_callback(bot_token, callback_id) -> bool:
 def _handle_callback(data, chat, store, token_exists, check_fn, now_block,
                      recent_fn=None, paper_price_fn=None, symbol_fn=None, custsell_fn=None):
     lang = _lang(store, chat)
+    if data == "notme":
+        store.set_frozen(chat, True)
+        return {"text": i18n.t("frozen_ok", lang), "parse_mode": "HTML"}
     if data.startswith("custsell:"):
         try:
             _, tok, pct = data.split(":")

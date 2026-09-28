@@ -183,6 +183,25 @@ class CommandTests(unittest.TestCase):
     def test_portfolio_needs_custody(self):
         self.assertIn("bot wallet", self.reply("/portfolio"))
 
+    def test_security_enroll_and_addaddr(self):
+        import os
+        from cryptography.fernet import Fernet
+        from bot import totp as T
+        from execution import signer
+        old = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
+        os.environ["ARC_INTEL_SESSION_ENC_KEY"] = Fernet.generate_key().decode()
+        try:
+            self.assertIn("2FA", self.reply("/security"))
+            secret = signer.decrypt(1, self.store.get_totp(1), "totp")
+            self.assertIn("registered", self.reply(f"/addaddr {ADDR} {T.code(secret)}"))
+            self.assertIsNotNone(self.store.get_custody_addr(1, ADDR))
+            self.assertIn("Bad", self.reply(f"/addaddr {ADDR2} 000000"))
+        finally:
+            if old is None:
+                os.environ.pop("ARC_INTEL_SESSION_ENC_KEY", None)
+            else:
+                os.environ["ARC_INTEL_SESSION_ENC_KEY"] = old
+
     def test_token_risk_status(self):
         self.store.add_alert({"token": ADDR, "kind": "liquidity_removal", "severity": "high",
                               "block": 5, "message": "lp removed"})

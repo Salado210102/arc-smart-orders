@@ -79,7 +79,8 @@ def load_token_card(storage, token, head_block=None) -> dict:
     except Exception:
         risk = {}
     try:
-        dex = tokenmeta.dex_info(token)
+        from security.urls import sanitize_dex
+        dex = sanitize_dex(tokenmeta.dex_info(token))
     except Exception:
         dex = {}
     top10 = None

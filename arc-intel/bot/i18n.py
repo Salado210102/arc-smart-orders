@@ -418,6 +418,46 @@ TEXTS: dict[str, dict[str, str]] = {
                     "zh": "\u2705 \u5df2\u6309\u5e02\u4ef7\u5356\u51fa\u3002"},
     "custsell_err": {"en": "Could not sell: {err}", "es": "No se pudo vender: {err}",
                      "zh": "\u65e0\u6cd5\u5356\u51fa\uff1a{err}"},
+    "frozen_ok": {
+        "en": "\U0001F6D1 Account frozen. Withdrawals and trading are disabled. Send "
+              "/unfreeze &lt;code&gt; with your 2FA code to unlock.",
+        "es": "\U0001F6D1 Cuenta congelada. Retiros y trading deshabilitados. Env\u00eda "
+              "/unfreeze &lt;c\u00f3digo&gt; con tu c\u00f3digo 2FA para reactivar.",
+        "zh": "\U0001F6D1 \u8d26\u6237\u5df2\u51bb\u7ed3\u3002\u5df2\u7981\u7528\u63d0\u73b0\u548c\u4ea4\u6613\u3002\u53d1\u9001 "
+              "/unfreeze &lt;\u4ee3\u7801&gt; \u4f7f\u7528 2FA \u7801\u89e3\u9501\u3002",
+    },
+    "unfrozen_ok": {"en": "\u2705 Account unlocked.", "es": "\u2705 Cuenta desbloqueada.",
+                    "zh": "\u2705 \u8d26\u6237\u5df2\u89e3\u9501\u3002"},
+    "unfreeze_bad": {"en": "Bad code. Usage: /unfreeze 123456",
+                     "es": "C\u00f3digo incorrecto. Uso: /unfreeze 123456",
+                     "zh": "\u9a8c\u8bc1\u7801\u9519\u8bef\u3002\u7528\u6cd5\uff1a/unfreeze 123456"},
+    "pause_ok": {"en": "\u23F8 Custody trading & withdrawals paused (global).",
+                 "es": "\u23F8 Trading y retiros custodiales en pausa (global).",
+                 "zh": "\u23F8 \u6258\u7ba1\u4ea4\u6613\u4e0e\u63d0\u73b0\u5df2\u5168\u5c40\u6682\u505c\u3002"},
+    "resume_ok": {"en": "\u25B6\uFE0F Custody resumed.", "es": "\u25B6\uFE0F Custodia reactivada.",
+                  "zh": "\u25B6\uFE0F \u6258\u7ba1\u5df2\u6062\u590d\u3002"},
+    "sec_bot_enroll": {
+        "en": ("\U0001F510 <b>2FA setup</b>\n1) Add this secret to your authenticator app:\n"
+               "<code>{secret}</code>\n\n2) Register a withdrawal address (only after 2FA is set):\n"
+               "<code>/addaddr 0x\u2026 123456</code>"),
+        "es": ("\U0001F510 <b>Configura 2FA</b>\n1) A\u00f1ade este secreto a tu app de autenticaci\u00f3n:\n"
+               "<code>{secret}</code>\n\n2) Registra una direcci\u00f3n de retiro (solo con 2FA activo):\n"
+               "<code>/addaddr 0x\u2026 123456</code>"),
+        "zh": ("\U0001F510 <b>2FA \u8bbe\u7f6e</b>\n1) \u5c06\u6b64\u5bc6\u94a5\u6dfb\u52a0\u5230\u9a8c\u8bc1器\uff1a\n"
+               "<code>{secret}</code>\n\n2) \u6ce8\u518c\u63d0\u73b0\u5730\u5740\uff1a\n<code>/addaddr 0x\u2026 123456</code>"),
+    },
+    "sec_bot_title": {"en": "\U0001F510 Registered withdrawal addresses:",
+                      "es": "\U0001F510 Direcciones de retiro registradas:",
+                      "zh": "\U0001F510 \u5df2\u6ce8\u518c\u63d0\u73b0\u5730\u5740\uff1a"},
+    "sec_bot_none": {"en": "none yet.", "es": "ninguna todav\u00eda.", "zh": "\u6682\u65e0\u3002"},
+    "addaddr_usage": {"en": "Usage: /addaddr 0x\u2026 &lt;2FA code&gt;",
+                      "es": "Uso: /addaddr 0x\u2026 &lt;c\u00f3digo 2FA&gt;",
+                      "zh": "\u7528\u6cd5\uff1a/addaddr 0x\u2026 &lt;2FA \u7801&gt;"},
+    "addaddr_ok": {"en": "\u2705 Address <code>{addr}</code> registered (usable in 24h).",
+                   "es": "\u2705 Direcci\u00f3n <code>{addr}</code> registrada (usable en 24h).",
+                   "zh": "\u2705 \u5730\u5740 <code>{addr}</code> \u5df2\u6ce8\u518c\uff0824 \u5c0f\u65f6\u540e\u53ef\u7528\uff09\u3002"},
+    "totp_bad": {"en": "Bad 2FA code.", "es": "C\u00f3digo 2FA incorrecto.",
+                 "zh": "2FA \u7801\u9519\u8bef\u3002"},
 }
 
 

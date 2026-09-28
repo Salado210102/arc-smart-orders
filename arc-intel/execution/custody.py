@@ -11,16 +11,34 @@ from __future__ import annotations
 import os
 import secrets
 
-RPC_DEFAULT = "https://rpc.testnet.arc.io"
+
+def _rpc_url(rpc=None) -> str:
+    url = rpc or os.environ.get("ARC_RPC")
+    if not url:
+        raise RuntimeError("no_rpc: ARC_RPC must be set explicitly (no default)")
+    return url
 
 
 def _rpc(method, params, rpc=None):
     from indexer.token_risk import _jsonrpc
-    return _jsonrpc(rpc or os.environ.get("ARC_RPC", RPC_DEFAULT), method, params, retries=2)
+    return _jsonrpc(_rpc_url(rpc), method, params, retries=2)
 
 
 def chain_id() -> int:
-    return int(os.environ.get("ARC_INTEL_CHAIN_ID", "5042002"))
+    v = os.environ.get("ARC_INTEL_CHAIN_ID")
+    if not v:
+        raise RuntimeError("no_chain_id: ARC_INTEL_CHAIN_ID must be set explicitly (no default)")
+    return int(v)
+
+
+def verify_chain(rpc=None) -> int:
+    """Confirm the RPC's eth_chainId matches ARC_INTEL_CHAIN_ID; refuse to sign otherwise."""
+    hexid = _rpc("eth_chainId", [], rpc)
+    actual = int(hexid, 16) if isinstance(hexid, str) else int(hexid or 0)
+    want = chain_id()
+    if actual != want:
+        raise RuntimeError(f"chain_mismatch: rpc={actual} config={want}")
+    return actual
 
 
 def executor_addr() -> str:
@@ -65,7 +83,8 @@ def native_balance(addr: str, rpc=None) -> int:
 def _send(pk: str, to: str, data: str, value: int = 0, gas: int = 300000, rpc=None) -> str:
     """Sign a tx with the custodied key and broadcast it (raw). Returns the tx hash."""
     from eth_account import Account
-    rpc = rpc or os.environ.get("ARC_RPC", RPC_DEFAULT)
+    verify_chain(rpc)                 # refuse to sign on a mismatched chain
+    rpc = _rpc_url(rpc)
     acct = Account.from_key(pk)
     nonce = int(_rpc("eth_getTransactionCount", [acct.address, "pending"], rpc) or "0x0", 16)
     gp = int(_rpc("eth_gasPrice", [], rpc) or "0x0", 16) or 1_000_000_000

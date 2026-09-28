@@ -1,4 +1,5 @@
 import json
+import os
 import unittest
 
 from bot.store import SubscriptionStore
@@ -17,6 +18,7 @@ class SessionKeeperTests(unittest.TestCase):
     def setUp(self):
         self.store = SubscriptionStore(":memory:")
         self.enckey = S.new_enc_key()
+        os.environ["ARC_INTEL_SESSION_ENC_KEY"] = self.enckey   # signer reads the process env
         self.sk = S.new_session_key()
         self.store.save_session(1, self.sk["address"],
                                 S.encrypt_secret(self.sk["private_key"], self.enckey),
@@ -29,6 +31,7 @@ class SessionKeeperTests(unittest.TestCase):
 
     def tearDown(self):
         self.store.close()
+        os.environ.pop("ARC_INTEL_SESSION_ENC_KEY", None)
 
     def test_signs_and_executes(self):
         captured = {}

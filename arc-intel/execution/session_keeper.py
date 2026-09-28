@@ -48,18 +48,19 @@ def run_session_keeper(store, *, submit=None, now=None, enc_key=None, executor=N
     import os
     import time
     from execution import sessions as S
+    from execution import signer
     if now is None:
         now = int(time.time())
     executor = executor or os.environ.get("ARC_INTEL_EXECUTOR")
     relayer = relayer or os.environ.get("ARC_INTEL_RELAYER_KEY")
-    rpc = rpc or os.environ.get("ARC_RPC", "https://rpc.mainnet.arc.io")
-    chain_id = int(chain_id or os.environ.get("ARC_INTEL_CHAIN_ID", "5042"))
-    enc_key = enc_key or os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
-    if not (executor and relayer and enc_key):
+    if not (executor and relayer):
         return {"skipped": "not_configured", "submitted": 0, "failed": 0}
+    rpc = rpc or os.environ.get("ARC_RPC")            # no default (A5)
     submit = submit or _default_submit
     submitted = failed = 0
     for po in store.armed_orders("session", now, limit=limit):
+        if store.custody_paused() or store.is_frozen(po["chat"]):
+            continue
         try:
             intent = json.loads(po.get("sig_payload") or "{}")
         except ValueError:
@@ -70,13 +71,13 @@ def run_session_keeper(store, *, submit=None, now=None, enc_key=None, executor=N
         if not sess:
             continue
         try:
-            pk = S.decrypt_secret(sess["enc_secret"], enc_key)
+            cid = int(chain_id or os.environ.get("ARC_INTEL_CHAIN_ID"))   # no default (A5)
             td = S.session_order_typed_data(
-                chain_id=chain_id, executor=executor, user=po["user"], key=intent["key"],
+                chain_id=cid, executor=executor, user=po["user"], key=intent["key"],
                 zero_for_one=intent["zero_for_one"], amount_in=int(intent["amount_in"]),
                 min_out=int(intent["min_out"]), recipient=intent["recipient"],
                 order_nonce=int(po["order_nonce"]), deadline=int(po["deadline"]))
-            sig = S.sign_session_order(pk, td)
+            sig = signer.sign_session_order(po["chat"], sess["enc_secret"], td)
             txh = submit(po, intent, sig, executor, rpc, relayer) or ""
             store.mark_executed(po["id"], txh)
             submitted += 1

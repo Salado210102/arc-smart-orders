@@ -105,6 +105,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "bridge", "description": "Bridge USDC to Arc"},
         {"command": "tier", "description": "My fee tier"},
         {"command": "portfolio", "description": "Bot-wallet positions"},
+        {"command": "security", "description": "2FA & withdrawal addresses"},
         {"command": "language", "description": "Language"},
         {"command": "disclaimer", "description": "Disclaimer"},
         {"command": "help", "description": "Help"},
@@ -126,6 +127,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "bridge", "description": "Puentea USDC a Arc"},
         {"command": "tier", "description": "Mi tarifa"},
         {"command": "portfolio", "description": "Posiciones (cartera bot)"},
+        {"command": "security", "description": "2FA y direcciones de retiro"},
         {"command": "language", "description": "Idioma"},
         {"command": "disclaimer", "description": "Aviso legal"},
         {"command": "help", "description": "Ayuda"},
@@ -147,6 +149,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "bridge", "description": "\u8de8\u94fe USDC \u5230 Arc"},
         {"command": "tier", "description": "\u6211\u7684\u8d39\u7387"},
         {"command": "portfolio", "description": "\u673a\u5668\u4eba\u94b1\u5305\u6301\u4ed3"},
+        {"command": "security", "description": "2FA \u4e0e\u63d0\u73b0\u5730\u5740"},
         {"command": "language", "description": "\u8bed\u8a00"},
         {"command": "disclaimer", "description": "\u514d\u8d23\u58f0\u660e"},
         {"command": "help", "description": "\u5e2e\u52a9"},
@@ -736,14 +739,17 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
     def custsell_fn(chat, token, pct) -> str:
         """Sell a % of a bot-wallet holding from the bot (same path as the Mini App)."""
         import time as _t
+        from execution import signer
         from execution import custody as C
         from execution.quotes import sell_quote
         from execution.eip712 import new_nonce
-        from execution.sessions import decrypt_secret
         from .miniapp_data import load_pool, latest_price
-        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
+        if store.custody_paused():
+            return "paused"
+        if store.is_frozen(chat):
+            return "frozen"
         c = store.get_custody(chat)
-        if not c or not enc:
+        if not c:
             return "no_wallet"
         tok = (token or "").lower()
         pool = load_pool(storage, tok)
@@ -756,10 +762,10 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
         price = latest_price(storage, tok) or 0
         dec = tokenmeta.rpc_decimals(tok)
         q = sell_quote(qty=amount_in / (10 ** dec), price=price, token_decimals=dec, floor_pct=30)
-        pk = decrypt_secret(c["enc_secret"], enc)
-        C.ensure_permit2_approval(pk, tok)
-        txh = C.swap(pk, pool=pool, token_in=tok, amount_in=amount_in, min_out=q["min_out_base"],
-                     recipient=c["address"], order_nonce=new_nonce(), deadline=int(_t.time()) + 600)
+        signer.ensure_approval(chat, c["enc_secret"], tok)
+        txh = signer.swap(chat, c["enc_secret"], pool=pool, token_in=tok, amount_in=amount_in,
+                          min_out=q["min_out_base"], recipient=c["address"],
+                          order_nonce=new_nonce(), deadline=int(_t.time()) + 600)
         try:
             store.record_fill(f"{(txh or '')}:sell", chat, tok, "sell", amount_in / (10 ** dec),
                               (amount_in / (10 ** dec)) * price, ts=int(_t.time()))

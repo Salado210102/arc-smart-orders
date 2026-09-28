@@ -95,6 +95,14 @@ class SubscriptionStore:
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS custody ("
             "chat TEXT PRIMARY KEY, address TEXT, enc_secret TEXT, created_ts INTEGER, status TEXT)")
+        # security: registered withdrawal addresses (24h delay) + append-only key-access audit
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS custody_addrs ("
+            "chat TEXT, address TEXT, status TEXT DEFAULT 'pending', created_ts INTEGER, "
+            "usable_ts INTEGER, PRIMARY KEY (chat, address))")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS key_audit ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, uid TEXT, reason TEXT, caller TEXT, ts INTEGER)")
         # session keys (Opción 3): scoped hot keys the user authorizes once
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS sessions ("
@@ -443,6 +451,95 @@ class SubscriptionStore:
     def list_custody_addresses(self) -> list:
         return [(r[0], r[1]) for r in self.conn.execute(
             "SELECT chat, address FROM custody WHERE status='active'").fetchall()]
+
+    # --- custody security: registered withdrawal addrs, daily cap, freeze, TOTP, key audit ---
+    def add_custody_addr(self, chat, address, delay_s=86400, now=0) -> int:
+        now = int(now or time.time())
+        self.conn.execute(
+            "INSERT OR IGNORE INTO custody_addrs(chat,address,status,created_ts,usable_ts) "
+            "VALUES(?,?,'pending',?,?)",
+            (str(chat), str(address).lower(), now, now + int(delay_s)))
+        self.conn.commit()
+        r = self.conn.execute("SELECT usable_ts FROM custody_addrs WHERE chat=? AND address=?",
+                              (str(chat), str(address).lower())).fetchone()
+        return int(r[0]) if r else now + int(delay_s)
+
+    def get_custody_addr(self, chat, address) -> dict | None:
+        r = self.conn.execute(
+            "SELECT address,status,created_ts,usable_ts FROM custody_addrs WHERE chat=? AND address=?",
+            (str(chat), str(address).lower())).fetchone()
+        if not r:
+            return None
+        return {"address": r[0], "status": r[1], "created_ts": int(r[2] or 0),
+                "usable_ts": int(r[3] or 0)}
+
+    def list_custody_addrs(self, chat) -> list:
+        return [{"address": r[0], "status": r[1], "created_ts": int(r[2] or 0),
+                 "usable_ts": int(r[3] or 0)}
+                for r in self.conn.execute(
+                    "SELECT address,status,created_ts,usable_ts FROM custody_addrs WHERE chat=? "
+                    "ORDER BY created_ts", (str(chat),)).fetchall()]
+
+    def custody_addr_usable(self, chat, address, now=0) -> bool:
+        a = self.get_custody_addr(chat, address)
+        return bool(a) and int(now or time.time()) >= a["usable_ts"]
+
+    def _wd_day(self, now) -> str:
+        return time.strftime("%Y%m%d", time.gmtime(int(now or time.time())))
+
+    def withdraw_today(self, chat, now=0) -> float:
+        try:
+            return float(self.get_state(f"wd:{chat}:{self._wd_day(now)}", "0") or 0)
+        except ValueError:
+            return 0.0
+
+    def add_withdraw_today(self, chat, usdc, now=0) -> float:
+        total = self.withdraw_today(chat, now) + float(usdc)
+        self.set_state(f"wd:{chat}:{self._wd_day(now)}", str(total))
+        return total
+
+    def trade_today(self, chat, now=0) -> float:
+        try:
+            return float(self.get_state(f"td:{chat}:{self._wd_day(now)}", "0") or 0)
+        except ValueError:
+            return 0.0
+
+    def add_trade_today(self, chat, usdc, now=0) -> float:
+        total = self.trade_today(chat, now) + float(usdc)
+        self.set_state(f"td:{chat}:{self._wd_day(now)}", str(total))
+        return total
+
+    def set_frozen(self, chat, frozen: bool) -> None:
+        self.set_state(f"frozen:{chat}", "1" if frozen else "0")
+
+    def is_frozen(self, chat) -> bool:
+        return self.get_state(f"frozen:{chat}", "0") == "1"
+
+    def save_totp(self, chat, enc_secret) -> None:
+        self.set_state(f"totp:{chat}", enc_secret or "")
+
+    def get_totp(self, chat) -> str:
+        return self.get_state(f"totp:{chat}", "") or ""
+
+    def clear_totp(self, chat) -> None:
+        self.set_state(f"totp:{chat}", "")
+
+    def custody_paused(self) -> bool:
+        return self.get_state("custody_paused", "0") == "1"
+
+    def set_custody_paused(self, paused: bool) -> None:
+        self.set_state("custody_paused", "1" if paused else "0")
+
+    def log_key_audit(self, uid, reason, caller, ts=0) -> None:
+        self.conn.execute("INSERT INTO key_audit(uid,reason,caller,ts) VALUES(?,?,?,?)",
+                          (str(uid), str(reason), str(caller), int(ts or time.time())))
+        self.conn.commit()
+
+    def list_key_audit(self, limit: int = 100) -> list:
+        return [{"uid": r[0], "reason": r[1], "caller": r[2], "ts": int(r[3])}
+                for r in self.conn.execute(
+                    "SELECT uid,reason,caller,ts FROM key_audit ORDER BY id DESC LIMIT ?",
+                    (int(limit),)).fetchall()]
 
     # --- session keys (Opción 3) ---
     def save_session(self, chat, session_key, enc_secret, executor, pool_id, token_in,

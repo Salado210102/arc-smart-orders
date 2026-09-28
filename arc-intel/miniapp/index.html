@@ -136,6 +136,7 @@
           <input id="custto" placeholder="0x destino (retirar)" style="width:100%">
           <div class="row" style="margin-top:6px">
             <input id="custamt" placeholder="monto USDC" style="flex:1">
+            <input id="custcode" placeholder="2FA" style="width:80px">
             <button class="ghost" id="custwithdraw" data-i18n="withdraw">Retirar</button>
           </div>
           <div class="mut" style="margin-top:10px" data-i18n="cust_sell">Vender token de tu wallet del bot:</div>
@@ -148,6 +149,17 @@
           </div>
           <div id="custsellout" class="mut" style="margin-top:6px"></div>
         </div>
+      </div>
+      <div class="card">
+        <div class="mut" data-i18n="sec_title">🔐 Seguridad (2FA y direcciones de retiro)</div>
+        <div id="secout" style="margin-top:8px"></div>
+        <button class="ghost" id="sectotp" style="margin-top:6px" data-i18n="sec_enroll">Activar 2FA</button>
+        <input id="secaddr" placeholder="0x… dirección de retiro" style="width:100%;margin-top:6px">
+        <div class="row" style="margin-top:6px">
+          <input id="seccode" placeholder="código 2FA" style="flex:1">
+          <button class="ghost" id="secadd" data-i18n="sec_add_addr">Añadir dirección</button>
+        </div>
+        <div id="secmsg" class="mut" style="margin-top:6px"></div>
       </div>
       <div class="card">
         <div class="row" style="justify-content:space-between;align-items:center">
@@ -243,6 +255,8 @@
 
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    // Only absolute https:// URLs are allowed for creator-controlled links/images (blocks javascript:, data:).
+    const httpsUrl = (u) => { const s = String(u == null ? "" : u).trim(); return /^https:\/\//i.test(s) ? s : ""; };
 
     //  i18n: follow the Telegram / bot language (en / es / zh)
     let LANG = "en";
@@ -277,6 +291,8 @@
         bridge_waiting: "Te aviso cuando llegue.",
         bridge_open: "Abrir bridge", bridge_noaddr: "Crea tu wallet del bot primero.",
         tier_title: "💎 Tu tarifa",
+        sec_title: "🔐 Seguridad (2FA y direcciones de retiro)", sec_enroll: "Activar 2FA",
+        sec_add_addr: "Añadir dirección", sec_none: "Sin direcciones registradas.",
         pozo_label: "🏆 Pozo de la ronda", pozo_ends: "termina en", pozo_see: "Ver ranking",
         pozo_ranking: "Ranking de la ronda (trader · afiliado)",
         pozo_trader: "Trader", pozo_affiliate: "Afiliado", pozo_none: "Aún sin volumen esta ronda.",
@@ -311,6 +327,8 @@
         bridge_waiting: "I'll notify you when it arrives.",
         bridge_open: "Open bridge", bridge_noaddr: "Create your bot wallet first.",
         tier_title: "💎 Your fee tier",
+        sec_title: "🔐 Security (2FA & withdrawal addresses)", sec_enroll: "Enable 2FA",
+        sec_add_addr: "Add address", sec_none: "No registered addresses.",
         pozo_label: "🏆 Round prize pool", pozo_ends: "ends in", pozo_see: "See ranking",
         pozo_ranking: "Round ranking (trader · affiliate)",
         pozo_trader: "Trader", pozo_affiliate: "Affiliate", pozo_none: "No volume this round yet.",
@@ -342,6 +360,8 @@
         bridge_waiting: "到账后我会通知你。",
         bridge_open: "打开跨链桥", bridge_noaddr: "请先创建机器人钱包。",
         tier_title: "💎 你的费率",
+        sec_title: "🔐 安全（2FA 与提现地址）", sec_enroll: "启用 2FA",
+        sec_add_addr: "添加地址", sec_none: "暂无已注册地址。",
         pozo_label: "🏆 本轮奖池", pozo_ends: "结束于", pozo_see: "查看排行",
         pozo_ranking: "本轮排行（交易者 · 推荐人）",
         pozo_trader: "交易者", pozo_affiliate: "推荐人", pozo_none: "本轮暂无交易量。",
@@ -449,7 +469,7 @@
         }
         if (POS_TIMER) { clearInterval(POS_TIMER); POS_TIMER = null; }
         if (name === "pos") { loadPositions(); POS_TIMER = setInterval(() => loadPositions().catch(() => {}), 10000); }
-        if (name === "wal") { loadWallet(); loadCustody(); loadReferral(); loadBridge(); loadTier(); }
+        if (name === "wal") { loadWallet(); loadCustody(); loadReferral(); loadBridge(); loadTier(); loadSec(); }
         if (name === "alr") loadAlerts();
         if (name === "copy") loadCopy();
       }
@@ -545,12 +565,13 @@
         const money = x => (x == null || x === "") ? "—" : "$" + Number(x).toLocaleString(undefined, { maximumFractionDigits: 0 });
         const links = [].concat((d.socials || []).map(s => ({ u: s.url, l: s.type })),
                                 (d.websites || []).map(w => ({ u: w.url, l: w.label || "web" })))
-          .map(s => `<a class="ghost" style="padding:4px 8px;border-radius:8px;text-decoration:none" href="${esc(s.u)}" target="_blank">${esc(s.l)}</a>`).join(" ");
-        const logo = d.logo || body.logo || "";
+          .map(s => { const u = httpsUrl(s.u); return u ? `<a class="ghost" style="padding:4px 8px;border-radius:8px;text-decoration:none" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(s.l)}</a>` : ""; }).join(" ");
+        const logo = httpsUrl(d.logo || body.logo || "");
+        const embed = httpsUrl(d.embed);
         const rk = body.risk || {};
         $("tokencard").innerHTML =
           `<div class="row" style="gap:10px;align-items:center">
-             ${logo ? `<img src="${esc(logo)}" style="width:44px;height:44px;border-radius:10px" onerror="this.style.display='none'">` : ""}
+             ${logo ? `<img src="${esc(logo)}" style="width:44px;height:44px;border-radius:10px">` : ""}
              <div><b>${esc(body.symbol || "?")}</b> <span class="mut">${esc(body.name || "")}</span></div>
            </div>
            ${(body.safety && body.safety.verdict) ? `<div class="kv"><span>Safety</span><b class="${body.safety.verdict === "SAFE" ? "ok" : body.safety.verdict === "DANGER" ? "bad" : "warn"}">${body.safety.score}/100 · ${esc(body.safety.verdict)}</b></div>` : ""}
@@ -565,7 +586,7 @@
            <div class="kv"><span>${t("creator")}</span><b>${rep}</b></div>
            <div class="kv"><span>${t("contract")}</span><b class="${rk.level === "high" ? "bad" : rk.level === "medium" ? "warn" : "ok"}">${esc(rk.level || "—")}${rk.honeypot_hint ? " ⚠" : ""}</b></div>
            ${links ? `<div class="row" style="margin-top:6px">${links}</div>` : ""}
-           ${d.embed ? `<iframe src="${esc(d.embed)}" style="width:100%;height:64vh;min-height:420px;border:0;border-radius:10px;margin-top:8px" loading="lazy"></iframe>` : `<div class="mut" style="margin-top:8px">Sin gráfico de DexScreener.</div>`}
+           ${embed ? `<iframe src="${esc(embed)}" style="width:100%;height:64vh;min-height:420px;border:0;border-radius:10px;margin-top:8px" loading="lazy"></iframe>` : `<div class="mut" style="margin-top:8px">Sin gráfico de DexScreener.</div>`}
            <div class="mut" style="margin-top:6px;font-size:12px">${esc(body.address)}</div>`;
         $("step2").classList.remove("hide");
       };
@@ -617,11 +638,12 @@
           const t = p.token || "";
           const d = p.dex || {};
           const V = d.volume || {}, T = (d.txns || {}).h24 || {};
-          const logo = d.logo || "";
+          const logo = httpsUrl(d.logo || "");
+          const embed = httpsUrl(d.embed);
           const sym = p.symbol || (t.slice(0, 8) + "…");
           return `<div class="card" style="padding:10px" data-tok="${esc(t)}">
             <div class="row" style="gap:10px;align-items:center">
-              ${logo ? `<img src="${esc(logo)}" style="width:40px;height:40px;border-radius:10px" onerror="this.style.display='none'">` : ""}
+              ${logo ? `<img src="${esc(logo)}" style="width:40px;height:40px;border-radius:10px">` : ""}
               <div><b>${esc(sym)}</b>${p.status === "rugged" ? ' <span class="bad">🪦 RUGGED</span>' : (p.status === "dev_sell" ? ' <span class="warn">⚠ dev-sold</span>' : '')}<div class="mut" style="font-size:12px">${p.qty.toLocaleString(undefined, { maximumFractionDigits: 2 })} · ${p.value ? "$" + p.value.toFixed(2) : "—"}</div></div>
             </div>
             <div class="kv"><span>${t("pnl")}</span><b class="${p.unrealized_pct >= 0 ? "ok" : "bad"}">${p.unrealized_pct >= 0 ? "🟢" : "🔴"} ${(p.unrealized_pct * 100).toFixed(1)}% · ${p.unrealized >= 0 ? "+" : "-"}$${Math.abs(p.unrealized || 0).toFixed(2)}</b></div>
@@ -645,7 +667,7 @@
               <input class="buyamt" type="number" placeholder="${t("amount")}" style="flex:1">
               <button class="ghost buyrmore">${t("buy_more")}</button>
             </div>
-            ${d.embed ? `<iframe src="${esc(d.embed)}" style="width:100%;height:58vh;min-height:380px;border:0;border-radius:10px;margin-top:8px" loading="lazy"></iframe>` : ""}
+            ${embed ? `<iframe src="${esc(embed)}" style="width:100%;height:58vh;min-height:380px;border:0;border-radius:10px;margin-top:8px" loading="lazy"></iframe>` : ""}
           </div>`;
         }).join("");
         const sm = body.summary || {};
@@ -727,7 +749,8 @@
           if (!/^0x[0-9a-fA-F]{40}$/.test(to) || amt <= 0) { $("custout").innerHTML += '<br><span class="bad">destino/monto inválido</span>'; return; }
           $("custwithdraw").textContent = "Retirando…";
           const r = await api("/custody/withdraw", { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ to, amount_raw: Math.round(amt * 1e6).toString() }) });
+            body: JSON.stringify({ to, amount_raw: Math.round(amt * 1e6).toString(),
+                                   code: ($("custcode").value || "").trim() }) });
           $("custwithdraw").textContent = "Retirar";
           $("custout").innerHTML += (r.status === 200 && r.body && r.body.ok)
             ? '<br><span class="ok">✅ Retirado.</span>' : `<br><span class="bad">Error: ${esc((r.body && r.body.error) || r.status)}</span>`;
@@ -775,7 +798,7 @@
           `<div class="mut" style="font-size:12px">${esc(t("bridge_instr"))}</div>` +
           `<div style="word-break:break-all;margin-top:4px"><code>${esc(body.address)}</code></div>` +
           `<div class="mut" style="font-size:12px;margin-top:4px">${esc(t("bridge_waiting"))}</div>` +
-          (body.link ? `<a class="ghost" style="display:inline-block;margin-top:8px;padding:8px 12px;border-radius:8px" href="${esc(body.link)}" target="_blank">${esc(t("bridge_open"))}</a>` : "");
+          (httpsUrl(body.link) ? `<a class="ghost" style="display:inline-block;margin-top:8px;padding:8px 12px;border-radius:8px" href="${esc(httpsUrl(body.link))}" target="_blank" rel="noopener noreferrer">${esc(t("bridge_open"))}</a>` : "");
       }
 
       async function loadTier() {
@@ -785,6 +808,32 @@
           `<div class="kv"><span>${esc(body.tier || "STANDARD")}</span><b class="${body.fee_bps < 100 ? "ok" : "mut"}">${(body.fee_pct || 0).toFixed(2)}%</b></div>` +
           `<div class="kv mut"><span>30d vol</span><b>$${(body.volume_30d || 0).toFixed(0)}</b></div>`;
       }
+
+      async function loadSec() {
+        const { status, body } = await api("/custody/addresses");
+        if (status !== 200 || !body) { $("secout").innerHTML = ""; return; }
+        const a = body.addresses || [];
+        $("secout").innerHTML = a.length
+          ? a.map(x => `<div class="kv"><span>${esc(x.address.slice(0, 10))}…${esc(x.address.slice(-4))}</span><b>${(x.usable_ts * 1000) <= Date.now() ? "✅" : "⏳ 24h"}</b></div>`).join("")
+          : `<span class="mut">${esc(t("sec_none"))}</span>`;
+      }
+      $("sectotp").onclick = async () => {
+        const { status, body } = await api("/custody/totp");
+        if (status !== 200 || !body) { $("secmsg").textContent = "Error " + status; return; }
+        $("secmsg").innerHTML = `Añádelo a tu app 2FA:<br><code>${esc(body.secret)}</code>` +
+          `<div class="mut" style="font-size:11px;word-break:break-all">${esc(body.uri)}</div>`;
+      };
+      $("secadd").onclick = async () => {
+        const address = ($("secaddr").value || "").trim().toLowerCase();
+        const code = ($("seccode").value || "").trim();
+        if (!/^0x[0-9a-f]{40}$/.test(address)) { $("secmsg").textContent = "CA inválida."; return; }
+        const r = await api("/custody/address", { method: "POST",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify({ address, code }) });
+        $("secmsg").innerHTML = (r.status === 200)
+          ? '<span class="ok">✅ Registrada (usable en 24h).</span>'
+          : `<span class="bad">${esc((r.body && r.body.error) || r.status)}</span>`;
+        if (r.status === 200) { $("secaddr").value = ""; $("seccode").value = ""; loadSec(); }
+      };
 
       let COPY = null;
       async function loadCopy() {

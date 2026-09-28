@@ -17,8 +17,55 @@ from urllib.parse import parse_qs, urlparse
 from .store import SubscriptionStore
 
 DB = os.environ.get("ARC_INTEL_DB", "/root/arc-intel/bot_subs.db")
-ALLOWED_ORIGIN = os.environ.get("ARC_INTEL_ALLOWED_ORIGIN", "https://app.basepump.dev")
+# No default origin: without an explicit ARC_INTEL_ALLOWED_ORIGIN the server enables NO CORS.
+ALLOWED_ORIGIN = os.environ.get("ARC_INTEL_ALLOWED_ORIGIN", "")
 ADDR_RE = re.compile(r"^0x[0-9a-fA-F]{40}$")
+SENSITIVE_MAX_AGE = 300          # initData freshness (seconds) for fund-moving endpoints
+RATE_MAX = 20                    # max /custody/* calls per user per window
+RATE_WINDOW = 60                 # window (seconds)
+
+_RATE = {}                       # uid -> list[timestamps]
+_RATE_LOCK = threading.Lock()
+
+
+def _rate_ok(uid) -> bool:
+    import time
+    now = time.time()
+    with _RATE_LOCK:
+        hits = [t for t in _RATE.get(str(uid), []) if now - t < RATE_WINDOW]
+        if len(hits) >= RATE_MAX:
+            _RATE[str(uid)] = hits
+            return False
+        hits.append(now)
+        _RATE[str(uid)] = hits
+        return True
+
+
+def _limit(name: str, default):
+    try:
+        return type(default)(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def _csp(html: bytes) -> str:
+    """Strict CSP for the Mini App: allow only our code + the Telegram script (by hash for inline)."""
+    import base64
+    import hashlib
+    txt = html.decode("utf-8", "ignore")
+    hashes = []
+    for m in re.finditer(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", txt, re.S | re.I):
+        h = hashlib.sha256(m.group(1).encode()).digest()
+        hashes.append("'sha256-" + base64.b64encode(h).decode() + "'")
+    script_src = " ".join(["'self'", "https://telegram.org", "https://esm.sh"] + hashes)
+    return ("default-src 'self'; "
+            f"script-src {script_src}; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' https: data:; "
+            "connect-src 'self' https://esm.sh https://*.walletconnect.com wss://*.walletconnect.com; "
+            "frame-src https://dexscreener.com; "
+            "frame-ancestors https://web.telegram.org https://*.telegram.org; "
+            "base-uri 'self'; object-src 'none'; form-action 'self'")
 _STORAGE = None
 
 
@@ -43,21 +90,25 @@ def _bot_token():
 
 
 class Handler(BaseHTTPRequestHandler):
-    def _send(self, code, obj):
+    def _send(self, code, obj, extra_headers=None):
         body = json.dumps(obj).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
-        self.send_header("Vary", "Origin")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type,X-Telegram-Init-Data")
-        self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+        if ALLOWED_ORIGIN:
+            self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+            self.send_header("Vary", "Origin")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type,X-Telegram-Init-Data")
+            self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+        for k, v in (extra_headers or {}).items():
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
 
-    def _auth_user(self):
-        """Validate Telegram WebApp initData -> user id, or None."""
+    def _auth_user(self, max_age: int = 86400):
+        """Validate Telegram WebApp initData -> user id, or None. `max_age` gates freshness."""
         from .telegram_auth import validate_init_data
-        data = validate_init_data(self.headers.get("X-Telegram-Init-Data") or "", _bot_token() or "")
+        data = validate_init_data(self.headers.get("X-Telegram-Init-Data") or "",
+                                  _bot_token() or "", max_age=max_age)
         if not data:
             return None
         u = data.get("user")
@@ -75,8 +126,10 @@ class Handler(BaseHTTPRequestHandler):
         executor = os.environ.get("ARC_INTEL_EXECUTOR")
         if not executor:
             return 503, {"error": "no_executor"}
-        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
-        if not enc:
+        from execution import signer
+        try:
+            signer.encrypt_secret("probe")      # fail fast if no key configured
+        except Exception:
             return 503, {"error": "no_enc_key"}
         st = _storage()
         if st is None:
@@ -100,10 +153,10 @@ class Handler(BaseHTTPRequestHandler):
         sell_cap = 10 ** 30  # effectively "any amount" for the sell side
         store = SubscriptionStore(DB)
         try:
-            store.save_session(uid, buy["address"], S.encrypt_secret(buy["private_key"], enc),
+            store.save_session(uid, buy["address"], signer.encrypt_secret(buy["private_key"]),
                                executor, pid, stable, max_per_order, max_total, min_out_floor,
                                expiry, status="active")
-            store.save_session(uid, sell["address"], S.encrypt_secret(sell["private_key"], enc),
+            store.save_session(uid, sell["address"], signer.encrypt_secret(sell["private_key"]),
                                executor, pid, addr, sell_cap, sell_cap, 0, expiry, status="active")
         finally:
             store.close()
@@ -325,27 +378,98 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             store.close()
 
-    def _custody_create(self, uid, data):
-        from execution import custody as C
-        from execution.sessions import encrypt_secret
-        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
-        if not enc:
-            return 503, {"error": "no_enc_key"}
-        pk = (data.get("private_key") or "").strip()
+    def _notify(self, uid, text, inline=None):
         try:
-            if pk:
-                addr = C.address_of(pk)
-            else:
-                w = C.new_wallet()
-                pk, addr = w["private_key"], w["address"]
+            from .telegram import TelegramTransport, load_token
+            tok = load_token()
+            if tok:
+                TelegramTransport(tok).send(uid, text, parse_mode="HTML", inline=inline)
         except Exception:
-            return 400, {"error": "bad_key"}
+            pass
+
+    def _totp_ok(self, store, uid, code) -> bool:
+        enc = store.get_totp(uid)
+        if not enc or not code:
+            return False
+        try:
+            from execution import signer
+            from . import totp as T
+            return T.verify(signer.decrypt(uid, enc, "totp"), str(code))
+        except Exception:
+            return False
+
+    def _guards(self, store, uid):
+        if store.custody_paused():
+            return 423, {"error": "custody_paused"}
+        if store.is_frozen(uid):
+            return 423, {"error": "frozen"}
+        return None
+
+    def _custody_create(self, uid, data):
+        if data.get("private_key"):
+            return 400, {"error": "private_key_not_allowed"}
+        from execution import custody as C
+        from execution import signer
         store = SubscriptionStore(DB)
         try:
-            store.save_custody(uid, addr, encrypt_secret(pk, enc))
+            g = self._guards(store, uid)
+            if g:
+                return g
+            admin = str(store.get_state("admin_chat", ""))
+            if not (store.is_allowed(uid) or (admin and str(uid) == admin)):
+                return 403, {"error": "not_allowlisted"}
+            if store.get_custody(uid):
+                return 409, {"error": "exists"}
         finally:
             store.close()
-        return 200, {"address": addr}
+        w = C.new_wallet()
+        store = SubscriptionStore(DB)
+        try:
+            store.save_custody(uid, w["address"], signer.encrypt_secret(w["private_key"]))
+        finally:
+            store.close()
+        return 200, {"address": w["address"]}
+
+    def _custody_totp_get(self, uid):
+        from execution import signer
+        from . import totp as T
+        secret = T.new_secret()
+        store = SubscriptionStore(DB)
+        try:
+            store.save_totp(uid, signer.encrypt_secret(secret))
+        finally:
+            store.close()
+        return 200, {"secret": secret, "uri": T.provisioning_uri(secret, str(uid))}
+
+    def _custody_totp_verify(self, uid, data):
+        store = SubscriptionStore(DB)
+        try:
+            ok = self._totp_ok(store, uid, data.get("code"))
+        finally:
+            store.close()
+        return (200, {"ok": True}) if ok else (400, {"error": "bad_code"})
+
+    def _custody_address_add(self, uid, data):
+        import time
+        store = SubscriptionStore(DB)
+        try:
+            g = self._guards(store, uid)
+            if g:
+                return g
+            if not self._totp_ok(store, uid, data.get("code")):
+                return 401, {"error": "totp_required"}
+            addr = (data.get("address") or "").lower()
+            if not ADDR_RE.match(addr):
+                return 400, {"error": "bad_address"}
+            delay = int(os.environ.get("ARC_INTEL_ADDR_DELAY_S", "86400"))
+            usable = store.add_custody_addr(uid, addr, delay_s=delay)
+        finally:
+            store.close()
+        when = time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(usable))
+        self._notify(uid, f"\U0001F4E5 Nueva direcci\u00f3n de retiro: <code>{addr}</code>\n"
+                          f"Usable a partir de <b>{when}</b>.\nSi NO fuiste t\u00fa, pulsa el bot\u00f3n.",
+                     inline=[[{"text": "\U0001F6D1 No fui yo", "data": "notme"}]])
+        return 200, {"address": addr, "usable_ts": usable}
 
     def _custody_view(self, uid):
         from execution import custody as C
@@ -359,46 +483,76 @@ class Handler(BaseHTTPRequestHandler):
                      "native": C.native_balance(addr) / 1e18}
 
     def _custody_withdraw(self, uid, data):
-        from execution import custody as C
-        from execution.sessions import decrypt_secret
-        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
-        c = self._custody_of(uid)
-        if not c:
-            return 409, {"error": "no_custody"}
-        to = (data.get("to") or "").lower()
-        if not ADDR_RE.match(to):
-            return 400, {"error": "bad_address"}
-        token = (data.get("token") or os.environ.get("ARC_INTEL_STABLE",
-                   "0x3600000000000000000000000000000000000000")).lower()
-        if not ADDR_RE.match(token):
-            return 400, {"error": "bad_token"}
+        from execution import signer
+        store = SubscriptionStore(DB)
         try:
-            amount = int(str(data.get("amount_raw") or "0"))
-        except (TypeError, ValueError):
-            return 400, {"error": "bad_amount"}
+            g = self._guards(store, uid)
+            if g:
+                return g
+            c = store.get_custody(uid)
+            if not c:
+                return 409, {"error": "no_custody"}
+            if not self._totp_ok(store, uid, data.get("code")):
+                return 401, {"error": "totp_required"}
+            to = (data.get("to") or "").lower()
+            if not ADDR_RE.match(to):
+                return 400, {"error": "bad_address"}
+            if not store.custody_addr_usable(uid, to):
+                return 409, {"error": "address_not_registered"}
+            stable = os.environ.get("ARC_INTEL_STABLE",
+                                    "0x3600000000000000000000000000000000000000").lower()
+            token = (data.get("token") or stable).lower()
+            if not ADDR_RE.match(token):
+                return 400, {"error": "bad_token"}
+            try:
+                amount = int(str(data.get("amount_raw") or "0"))
+            except (TypeError, ValueError):
+                return 400, {"error": "bad_amount"}
+            if amount <= 0:
+                return 400, {"error": "bad_amount"}
+            usdc = amount / 1e6 if token == stable else 0.0
+            cap = _limit("ARC_INTEL_WITHDRAW_DAILY_USDC", 50.0)
+            if usdc and (store.withdraw_today(uid) + usdc) > cap:
+                return 429, {"error": "daily_cap", "cap_usdc": cap}
+        finally:
+            store.close()
         try:
-            pk = decrypt_secret(c["enc_secret"], enc)
-            txh = C.withdraw(pk, token, to, amount)
+            txh = signer.withdraw(uid, c["enc_secret"], token, to, amount)
         except Exception as e:
             return 502, {"error": "withdraw_failed", "detail": str(e)[:120]}
+        if usdc:
+            store = SubscriptionStore(DB)
+            try:
+                store.add_withdraw_today(uid, usdc)
+            finally:
+                store.close()
+        self._notify(uid, f"\U0001F4B8 Retiro de ${usdc:.2f} a <code>{to}</code> iniciado."
+                          f"\nSi NO fuiste t\u00fa, pulsa el bot\u00f3n.",
+                     inline=[[{"text": "\U0001F6D1 No fui yo", "data": "notme"}]])
         return 200, {"ok": True, "tx": txh}
 
     def _custody_buy(self, uid, data):
         import time
         from execution import custody as C
         from execution import sessions as S
+        from execution import signer
         from execution.quotes import buy_quote
         from execution.eip712 import new_nonce
-        from execution.sessions import decrypt_secret
         from . import tokenmeta
         from .miniapp_data import load_pool, load_token_card
-        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
         tok = (data.get("token") or "").lower()
         if not ADDR_RE.match(tok):
             return 400, {"error": "bad_address"}
         c = self._custody_of(uid)
         if not c:
             return 409, {"error": "no_custody"}
+        store = SubscriptionStore(DB)
+        try:
+            g = self._guards(store, uid)
+            if g:
+                return g
+        finally:
+            store.close()
         st = _storage()
         if st is None:
             return 503, {"error": "no_storage"}
@@ -410,6 +564,19 @@ class Handler(BaseHTTPRequestHandler):
         stable = os.environ.get("ARC_INTEL_STABLE", "0x3600000000000000000000000000000000000000")
         card = load_token_card(st, tok)
         amount_in = int(round(float(data.get("amount_usdc") or 0) * 1e6))
+        usdc_buy = amount_in / 1e6
+        max_trade = _limit("ARC_INTEL_MAX_TRADE_USDC", 50.0)
+        store = SubscriptionStore(DB)
+        try:
+            if max_trade and usdc_buy > max_trade:
+                return 429, {"error": "over_trade_cap", "cap_usdc": max_trade}
+            if (store.trade_today(uid) + usdc_buy) > _limit("ARC_INTEL_MAX_DAILY_TRADE_USDC", 200.0):
+                return 429, {"error": "over_daily_trade_cap"}
+        finally:
+            store.close()
+        bal_cap = _limit("ARC_INTEL_MAX_CUSTODY_BALANCE_USDC", 200.0)
+        if bal_cap and (C.erc20_balance(stable, c["address"]) / 1e6 + usdc_buy) > bal_cap:
+            return 429, {"error": "over_balance_cap", "cap_usdc": bal_cap}
         try:
             quote = buy_quote(amount_in_base=amount_in, token_price=card["price"],
                               token_decimals=tokenmeta.rpc_decimals(tok),
@@ -417,16 +584,16 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as e:
             return 400, {"error": str(e)}
         try:
-            pk = decrypt_secret(c["enc_secret"], enc)
-            C.ensure_permit2_approval(pk, stable)
-            txh = C.swap(pk, pool=pool, token_in=stable, amount_in=amount_in,
-                         min_out=quote["min_out_base"], recipient=c["address"],
-                         order_nonce=new_nonce(), deadline=int(time.time()) + 600)
+            signer.ensure_approval(uid, c["enc_secret"], stable)
+            txh = signer.swap(uid, c["enc_secret"], pool=pool, token_in=stable, amount_in=amount_in,
+                              min_out=quote["min_out_base"], recipient=c["address"],
+                              order_nonce=new_nonce(), deadline=int(time.time()) + 600)
         except Exception as e:
             return 502, {"error": "swap_failed", "detail": str(e)[:160]}
         store2 = SubscriptionStore(DB)
         try:
             store2.add_holding(uid, tok)
+            store2.add_trade_today(uid, usdc_buy)
             try:
                 store2.record_fill(f"{(txh or '')}:buy", uid, tok, "buy",
                                    float(quote.get("expected_out") or 0),
@@ -486,18 +653,24 @@ class Handler(BaseHTTPRequestHandler):
         import time
         from execution import custody as C
         from execution import sessions as S
+        from execution import signer
         from execution.quotes import sell_quote
         from execution.eip712 import new_nonce
-        from execution.sessions import decrypt_secret
         from . import tokenmeta
         from .miniapp_data import load_pool, latest_price
-        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
         tok = (data.get("token") or "").lower()
         if not ADDR_RE.match(tok):
             return 400, {"error": "bad_address"}
         c = self._custody_of(uid)
         if not c:
             return 409, {"error": "no_custody"}
+        store = SubscriptionStore(DB)
+        try:
+            g = self._guards(store, uid)
+            if g:
+                return g
+        finally:
+            store.close()
         try:
             pct = float(data.get("pct") or 0)
         except (TypeError, ValueError):
@@ -526,11 +699,10 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as e:
             return 400, {"error": str(e)}
         try:
-            pk = decrypt_secret(c["enc_secret"], enc)
-            C.ensure_permit2_approval(pk, tok)
-            txh = C.swap(pk, pool=pool, token_in=tok, amount_in=amount_in,
-                         min_out=quote["min_out_base"], recipient=c["address"],
-                         order_nonce=new_nonce(), deadline=int(time.time()) + 600)
+            signer.ensure_approval(uid, c["enc_secret"], tok)
+            txh = signer.swap(uid, c["enc_secret"], pool=pool, token_in=tok, amount_in=amount_in,
+                              min_out=quote["min_out_base"], recipient=c["address"],
+                              order_nonce=new_nonce(), deadline=int(time.time()) + 600)
         except Exception as e:
             return 502, {"error": "swap_failed", "detail": str(e)[:160]}
         store2 = SubscriptionStore(DB)
@@ -648,10 +820,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, {"error": "miniapp_missing"})
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
-            self.send_header("Vary", "Origin")
+            if ALLOWED_ORIGIN:
+                self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+                self.send_header("Vary", "Origin")
             self.send_header("Cache-Control", "no-store, max-age=0")
             self.send_header("Pragma", "no-cache")
+            self.send_header("Content-Security-Policy", _csp(body))
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
             self.end_headers()
             self.wfile.write(body)
             return
@@ -753,6 +929,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(401, {"error": "unauthorized"})
             code, resp = self._custody_view(uid)
             return self._send(code, resp)
+        if u.path == "/custody/totp":
+            uid = self._auth_user(max_age=SENSITIVE_MAX_AGE)
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            code, resp = self._custody_totp_get(uid)
+            return self._send(code, resp)
+        if u.path == "/custody/addresses":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            store = SubscriptionStore(DB)
+            try:
+                addrs = store.list_custody_addrs(uid)
+            finally:
+                store.close()
+            return self._send(200, {"addresses": addrs})
         if u.path == "/portfolio":
             uid = self._auth_user()
             if uid is None:
@@ -1045,10 +1237,13 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 store.close()
             return self._send(200, {"ok": True, "sl_pct": sl, "tp_pct": tp, "trailing_pct": tr})
-        if u.path in ("/custody/create", "/custody/withdraw", "/custody/buy", "/custody/sell"):
-            uid = self._auth_user()
+        if u.path in ("/custody/create", "/custody/withdraw", "/custody/buy", "/custody/sell",
+                      "/custody/address", "/custody/totp"):
+            uid = self._auth_user(max_age=SENSITIVE_MAX_AGE)   # fresh initData required
             if uid is None:
                 return self._send(401, {"error": "unauthorized"})
+            if not _rate_ok(uid):
+                return self._send(429, {"error": "rate_limited"})
             n = int(self.headers.get("Content-Length") or 0)
             try:
                 data = json.loads(self.rfile.read(n) or b"{}")
@@ -1060,11 +1255,15 @@ class Handler(BaseHTTPRequestHandler):
                 code, resp = self._custody_withdraw(uid, data)
             elif u.path == "/custody/buy":
                 code, resp = self._custody_buy(uid, data)
-            else:
+            elif u.path == "/custody/sell":
                 code, resp = self._custody_sell(uid, data)
+            elif u.path == "/custody/address":
+                code, resp = self._custody_address_add(uid, data)
+            else:
+                code, resp = self._custody_totp_verify(uid, data)
             return self._send(code, resp)
         if u.path == "/session/authorize":
-            uid = self._auth_user()
+            uid = self._auth_user(max_age=SENSITIVE_MAX_AGE)
             if uid is None:
                 return self._send(401, {"error": "unauthorized"})
             n = int(self.headers.get("Content-Length") or 0)

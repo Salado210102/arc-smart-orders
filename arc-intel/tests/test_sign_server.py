@@ -27,6 +27,10 @@ class SignServerTests(unittest.TestCase):
     def setUp(self):
         self._old_tok = os.environ.get("TELEGRAM_BOT_TOKEN")
         os.environ["TELEGRAM_BOT_TOKEN"] = BOT_TOKEN
+        from cryptography.fernet import Fernet
+        self._old_enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
+        os.environ["ARC_INTEL_SESSION_ENC_KEY"] = Fernet.generate_key().decode()
+        ss._RATE.clear()
         self.db = tempfile.mktemp(suffix=".db")
         ss.DB = self.db
         store = SubscriptionStore(self.db)
@@ -44,10 +48,33 @@ class SignServerTests(unittest.TestCase):
             os.environ.pop("TELEGRAM_BOT_TOKEN", None)
         else:
             os.environ["TELEGRAM_BOT_TOKEN"] = self._old_tok
+        if self._old_enc is None:
+            os.environ.pop("ARC_INTEL_SESSION_ENC_KEY", None)
+        else:
+            os.environ["ARC_INTEL_SESSION_ENC_KEY"] = self._old_enc
+        ss._RATE.clear()
         try:
             os.remove(self.db)
         except OSError:
             pass
+
+    def _post_json(self, path, body, uid=1, auth_date=None):
+        req = urllib.request.Request(
+            self._url(path), data=json.dumps(body).encode(),
+            headers={"Content-Type": "application/json",
+                     "X-Telegram-Init-Data": init_data(uid, auth_date)})
+        try:
+            r = urllib.request.urlopen(req)
+            return r.status, json.loads(r.read() or b"{}")
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read() or b"{}")
+
+    def _allow(self, uid=1):
+        store = SubscriptionStore(self.db)
+        try:
+            store.add_allow(uid)
+        finally:
+            store.close()
 
     def _url(self, p):
         return f"http://127.0.0.1:{self.port}{p}"
@@ -341,6 +368,40 @@ class SignServerTests(unittest.TestCase):
         self.assertEqual(s.get_preorder(buy)["kind"], "buy")
         self.assertEqual(s.get_preorder(sell)["kind"], "sell")
         s.close()
+
+
+    def test_custody_create_rejects_private_key(self):
+        self._allow(1)
+        code, body = self._post_json("/custody/create", {"private_key": "0x" + "1" * 64})
+        self.assertEqual(code, 400)
+        self.assertEqual(body.get("error"), "private_key_not_allowed")
+
+    def test_custody_create_wallet_no_key_leak(self):
+        self._allow(1)
+        code, body = self._post_json("/custody/create", {})
+        self.assertEqual(code, 200)
+        self.assertTrue(body.get("address", "").startswith("0x"))
+        self.assertNotIn("private_key", json.dumps(body).lower())
+
+    def test_custody_stale_initdata_rejected(self):
+        self._allow(1)
+        code, _ = self._post_json("/custody/create", {}, auth_date=time.time() - 400)
+        self.assertEqual(code, 401)          # initData older than 300s rejected
+
+    def test_custody_not_allowlisted(self):
+        code, body = self._post_json("/custody/create", {})   # uid 1 not allowlisted
+        self.assertEqual(code, 403)
+
+    def test_custody_paused_blocks(self):
+        self._allow(1)
+        store = SubscriptionStore(self.db)
+        try:
+            store.set_custody_paused(True)
+        finally:
+            store.close()
+        code, body = self._post_json("/custody/create", {})
+        self.assertEqual(code, 423)
+        self.assertEqual(body.get("error"), "custody_paused")
 
 
 if __name__ == "__main__":
