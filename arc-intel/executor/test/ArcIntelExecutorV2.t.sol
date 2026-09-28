@@ -235,4 +235,18 @@ contract ArcIntelExecutorV2Test is Test {
         vm.expectRevert(ArcIntelExecutorV2.Paused.selector);
         exec.executeWithSession(o, sig);
     }
+
+    function testRevertZeroRecipientV1() public {
+        IPermit2.PermitTransferFrom memory permit = IPermit2.PermitTransferFrom({
+            permitted: IPermit2.TokenPermissions({token: _buyIn(), amount: 1e18}),
+            nonce: 1,
+            deadline: uint256(block.timestamp + 100)
+        });
+        ArcIntelExecutorV2.Order memory o = ArcIntelExecutorV2.Order({
+            key: key, zeroForOne: buyZeroForOne, minOut: 0, recipient: address(0),
+            orderNonce: 1, deadline: uint256(block.timestamp + 100)
+        });
+        vm.expectRevert(ArcIntelExecutorV2.BadRecipient.selector);
+        exec.execute(permit, user, o, "");
+    }
 }

@@ -203,6 +203,7 @@ contract ArcIntelExecutorV2 is IUnlockCallback {
     ) external nonReentrant returns (uint256 amountOut) {
         if (paused) revert Paused();
         if (block.timestamp > order.deadline) revert OrderExpired();
+        if (order.recipient == address(0)) revert BadRecipient();
         bytes32 poolId = keccak256(abi.encode(order.key));
         if (!allowedPools[poolId]) revert PoolNotAllowed(poolId);
         if (orderNonceUsed[user][order.orderNonce]) revert NonceAlreadyUsed();
