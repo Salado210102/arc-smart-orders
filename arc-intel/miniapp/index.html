@@ -162,6 +162,10 @@
         <div id="secmsg" class="mut" style="margin-top:6px"></div>
       </div>
       <div class="card">
+        <div class="mut" data-i18n="sess_title">🔑 Sesiones (no-custodial, revocables)</div>
+        <div id="sessout" style="margin-top:8px"></div>
+      </div>
+      <div class="card">
         <div class="row" style="justify-content:space-between;align-items:center">
           <div class="mut">🛡️ <b>Auto-Protect</b> — <span data-i18n="autoprotect_hint">vende sola si hay riesgo (dev-sell / liquidez)</span></div>
           <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="apchk"><span class="mut" style="font-size:12px">ON</span></label>
@@ -293,6 +297,8 @@
         tier_title: "💎 Tu tarifa",
         sec_title: "🔐 Seguridad (2FA y direcciones de retiro)", sec_enroll: "Activar 2FA",
         sec_add_addr: "Añadir dirección", sec_none: "Sin direcciones registradas.",
+        sess_title: "🔑 Sesiones (no-custodial, revocables)", sess_none: "Sin sesiones activas.",
+        sess_revoke: "Revocar",
         pozo_label: "🏆 Pozo de la ronda", pozo_ends: "termina en", pozo_see: "Ver ranking",
         pozo_ranking: "Ranking de la ronda (trader · afiliado)",
         pozo_trader: "Trader", pozo_affiliate: "Afiliado", pozo_none: "Aún sin volumen esta ronda.",
@@ -329,6 +335,8 @@
         tier_title: "💎 Your fee tier",
         sec_title: "🔐 Security (2FA & withdrawal addresses)", sec_enroll: "Enable 2FA",
         sec_add_addr: "Add address", sec_none: "No registered addresses.",
+        sess_title: "🔑 Sessions (non-custodial, revocable)", sess_none: "No active sessions.",
+        sess_revoke: "Revoke",
         pozo_label: "🏆 Round prize pool", pozo_ends: "ends in", pozo_see: "See ranking",
         pozo_ranking: "Round ranking (trader · affiliate)",
         pozo_trader: "Trader", pozo_affiliate: "Affiliate", pozo_none: "No volume this round yet.",
@@ -362,6 +370,8 @@
         tier_title: "💎 你的费率",
         sec_title: "🔐 安全（2FA 与提现地址）", sec_enroll: "启用 2FA",
         sec_add_addr: "添加地址", sec_none: "暂无已注册地址。",
+        sess_title: "🔑 会话（非托管，可撤销）", sess_none: "无有效会话。",
+        sess_revoke: "撤销",
         pozo_label: "🏆 本轮奖池", pozo_ends: "结束于", pozo_see: "查看排行",
         pozo_ranking: "本轮排行（交易者 · 推荐人）",
         pozo_trader: "交易者", pozo_affiliate: "推荐人", pozo_none: "本轮暂无交易量。",
@@ -469,7 +479,7 @@
         }
         if (POS_TIMER) { clearInterval(POS_TIMER); POS_TIMER = null; }
         if (name === "pos") { loadPositions(); POS_TIMER = setInterval(() => loadPositions().catch(() => {}), 10000); }
-        if (name === "wal") { loadWallet(); loadCustody(); loadReferral(); loadBridge(); loadTier(); loadSec(); }
+        if (name === "wal") { loadWallet(); loadCustody(); loadReferral(); loadBridge(); loadTier(); loadSec(); loadSessions(); }
         if (name === "alr") loadAlerts();
         if (name === "copy") loadCopy();
       }
@@ -834,6 +844,27 @@
           : `<span class="bad">${esc((r.body && r.body.error) || r.status)}</span>`;
         if (r.status === 200) { $("secaddr").value = ""; $("seccode").value = ""; loadSec(); }
       };
+
+      async function loadSessions() {
+        const { status, body } = await api("/sessions");
+        if (status !== 200 || !body) { $("sessout").innerHTML = ""; return; }
+        const ss = body.sessions || [];
+        $("sessout").innerHTML = ss.length
+          ? ss.map(s => `<div class="card" style="padding:8px">
+              <div class="mut" style="font-size:11px;word-break:break-all">${esc(s.token_in)}</div>
+              <div class="kv"><span>max/op</span><b>$${((s.max_per_order || 0) / 1e6).toFixed(2)}</b></div>
+              <div class="kv"><span>max total</span><b>$${((s.max_total || 0) / 1e6).toFixed(2)}</b></div>
+              <div class="kv"><span>minOutFloor</span><b>${s.min_out_floor || 0}</b></div>
+              <div class="kv"><span>expira</span><b>${new Date((s.expiry || 0) * 1000).toLocaleString()}</b></div>
+              <button class="ghost sessrev" data-k="${esc(s.session_key)}" style="margin-top:6px">${esc(t("sess_revoke"))}</button>
+            </div>`).join("")
+          : `<span class="mut">${esc(t("sess_none"))}</span>`;
+        document.querySelectorAll(".sessrev").forEach(b => b.onclick = async () => {
+          await api("/session/revoke", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_key: b.dataset.k }) });
+          loadSessions();
+        });
+      }
 
       let COPY = null;
       async function loadCopy() {

@@ -156,3 +156,31 @@ tiene sentido auditar la v1 y luego rehacer: se audita la versión final.
 | Fuga de la session key | Cifrado en reposo; nunca en logs |
 | Contract bug | Tests exhaustivos + **auditoría** |
 | Dependencia de infra | B no usa bundler (menos superficie) |
+
+---
+
+## Pérdida máxima si la session key se filtra (B3)
+
+Si un atacante obtiene la **session key** (no la clave de la wallet), **no puede sacar fondos**: solo
+puede usar la sesión dentro de sus límites **on-chain**. La **pérdida máxima por sesión** es:
+
+> **`maxTotal`** (tope acumulado del `tokenIn`) **al peor precio que permita `minOutFloor`**.
+
+El atacante puede gastar hasta `maxTotal` del token de entrada en swaps que respeten `poolId`, `tokenIn`,
+`maxPerOrder`, `maxTotal`, `minOutFloor` y `expiry`; y **siempre** el output va a `recipient == user`
+(nunca a una dirección del atacante).
+
+### Defaults conservadores
+- **`maxTotal` bajo** (default **50 USDC**; `maxPerOrder` **25**).
+- **`expiry` corta** (default **6 h**; `ttl` configurable).
+- **`minOutFloor` derivado de una cotización en vivo** con un **slippage máximo** definido (default
+  **50%**): `minOutFloor = (maxTotal / price) · (1 − slippage) · 10^dec`. Una caída arbitraria de precio
+  **revierte** en vez de ejecutarse.
+
+### UI
+La Mini App muestra **los topes** de cada sesión (`maxPerOrder`, `maxTotal`, `minOutFloor`, `expiry`) y
+ofrece un **botón de revocar** (`POST /session/revoke`).
+
+> **Conclusión:** comprometer la session key **no da acceso a la wallet**; como mucho permite operar
+> dentro del scope firmado, con la pérdida máxima acotada a `maxTotal` al peor precio permitido por
+> `minOutFloor`.

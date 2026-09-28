@@ -138,13 +138,26 @@ class Handler(BaseHTTPRequestHandler):
         if not pool:
             return 404, {"error": "no_pool"}
         stable = os.environ.get("ARC_INTEL_STABLE", "0x3600000000000000000000000000000000000000")
+        # B3: conservative defaults — low maxTotal, short expiry, minOutFloor from a live quote.
         try:
-            max_per_order = int(float(data.get("max_per_order") or 50) * 1e6)
-            max_total = int(float(data.get("max_total") or 200) * 1e6)
+            max_per_order = int(float(data.get("max_per_order") or 25) * 1e6)
+            max_total = int(float(data.get("max_total") or 50) * 1e6)
+            ttl = int(data.get("ttl") or 6 * 3600)
+            slip = float(data.get("max_slippage") or 50)
             min_out_floor = int(data.get("min_out_floor") or 0)
-            ttl = int(data.get("ttl") or 24 * 3600)
         except (TypeError, ValueError):
             return 400, {"error": "bad_amount"}
+        if min_out_floor == 0:
+            try:
+                from . import tokenmeta
+                from .miniapp_data import load_token_card
+                price = float(load_token_card(st, addr).get("price") or 0)
+                dec = tokenmeta.rpc_decimals(addr)
+                if price > 0:
+                    min_out_floor = int((max_total / 1e6) / price
+                                        * max(0.0, 1.0 - slip / 100.0) * (10 ** dec))
+            except Exception:
+                min_out_floor = 0
         expiry = int(time.time()) + ttl
         pid = S.pool_id(pool)
         #  Two sessions: buy (spend the stable) and sell (spend the token) -> one setup, both ways.
@@ -957,8 +970,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(401, {"error": "unauthorized"})
             store = SubscriptionStore(DB)
             try:
+                def _n(v):
+                    try:
+                        return int(v)
+                    except (TypeError, ValueError):
+                        return 0
                 out = [{"session_key": s["session_key"], "pool_id": s["pool_id"],
-                        "token_in": s["token_in"], "expiry": s["expiry"], "status": s["status"]}
+                        "token_in": s["token_in"], "expiry": s["expiry"], "status": s["status"],
+                        "max_per_order": _n(s.get("max_per_order")),
+                        "max_total": _n(s.get("max_total")),
+                        "min_out_floor": _n(s.get("min_out_floor"))}
                        for s in store.list_sessions(uid)]
             finally:
                 store.close()

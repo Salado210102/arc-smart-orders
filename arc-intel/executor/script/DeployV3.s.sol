@@ -17,6 +17,13 @@ contract DeployV3 is Script {
         ArcIntelExecutorV3 v3 = new ArcIntelExecutorV3(poolManager, safeOwner, pools, false);
         vm.stopBroadcast();
 
+        // B2: mainnet MUST NOT have allowAllPools (policy = allowedHooks per launchpad + allowedPools).
+        require(!v3.isTestnet(), "mainnet deploy must be isTestnet=false");
+        require(!v3.allowAllPools(), "allowAllPools MUST be false on mainnet");
+        require(v3.owner() == safeOwner, "owner must be the Safe");
+
         console2.log("ArcIntelExecutorV3", address(v3));
+        console2.log("isTestnet", v3.isTestnet());
+        console2.log("allowAllPools", v3.allowAllPools());
     }
 }
