@@ -935,10 +935,8 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
             n = dispatch(batch, store, transport, throttle=thr, logo_fn=logo_fn)
             try:
                 from .contest_publish import publish_round
-                from . import i18n as _i18n
                 res = publish_round(store, transport, int(time.time()),
-                                    os.environ.get("ARC_INTEL_CHANNEL", ""), logger=logger,
-                                    link=_i18n.MINIAPP_URL)
+                                    os.environ.get("ARC_INTEL_CHANNEL", ""), logger=logger)
                 if res:
                     logger({"contest": res})
             except Exception:

@@ -81,8 +81,7 @@ def render_contest_poster(*, title: str = "CONCURSO POR VOLUMEN", label: str = "
     return buf.getvalue()
 
 
-def poster_caption(pozo: float, trader: dict | None, affiliate: dict | None,
-                   link: str = "") -> str:
+def poster_caption(pozo: float, trader: dict | None, affiliate: dict | None) -> str:
     """Flashy HTML caption that goes with the image (Telegram HTML)."""
     lines = ["\U0001F3C6\U0001F525 <b>RESULTADOS DEL CONCURSO</b> \U0001F525\U0001F3C6",
              f"\U0001F4B0 Pozo repartido: <b>${pozo:,.2f}</b>", ""]
@@ -94,6 +93,4 @@ def poster_caption(pozo: float, trader: dict | None, affiliate: dict | None,
             lines.append(f"{emoji} <b>{label}:</b> sin volumen")
     lines.append("")
     lines.append("\U0001F4A5 \u00a1Opera y gana la pr\u00f3xima ronda!")
-    if link:
-        lines.append(f"\U0001F449 {link}")
     return "\n".join(lines)

@@ -469,6 +469,9 @@ auditoría + hot key acotada; no es lo primero).
   que ejecutan la venta custodial en el propio bot (`custsell_fn` en el loop, misma ruta que la Mini
   App). Textos i18n `portfolio_*`/`custsell_*`/`btn_portfolio`. Paridad **completa** (Mini App ya lo
   tenía). Tests +4. Suite **395 passed** (1 fallo ambiental local).
+- **2026-09-27 (cartel sin URL)** — Se **quita el enlace** `https://app.basepump.dev/` del **caption del
+  cartel** del concurso (`poster_caption` ya no recibe/muestra `link`; el CTA "¡Opera y gana la próxima
+  ronda!" se mantiene). Ajustado el loop y el CLI de preview + test (`assertNotIn("http", …)`).
   `copy_subs` + `add/get/list/remove/set_enabled/bump_spent/set_last_block`. Bot: comandos
   **`/copytrade <addr> [max_por_op] [presupuesto]`** y **`/copyoff`**; botón del menú **Copytrade**
   ahora **funcional** (`cmd:/copytrade`); comando registrado EN/ES/ZH. Thread propio en el loop

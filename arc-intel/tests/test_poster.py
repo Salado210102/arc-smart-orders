@@ -5,12 +5,11 @@ from bot import poster as P
 
 class PosterTests(unittest.TestCase):
     def test_caption(self):
-        c = P.poster_caption(1234.56, {"user": "@a", "volume": 1000, "prize": 10}, None,
-                             "https://app.basepump.dev/")
+        c = P.poster_caption(1234.56, {"user": "@a", "volume": 1000, "prize": 10}, None)
         self.assertIn("1,234.56", c)
         self.assertIn("@a", c)
         self.assertIn("sin volumen", c)          # affiliate is None
-        self.assertIn("https://app.basepump.dev/", c)
+        self.assertNotIn("http", c)              # no URL in the poster
 
     def test_round_label(self):
         self.assertIn("UTC", P.round_label(0))

@@ -37,7 +37,7 @@ def _send(transport, chat, png, caption, html) -> bool:
 
 
 def publish_round(store, transport, now, channel, *, logger=None, round_hours: int = CT.ROUND_HOURS,
-                  delay_s: int = CT.PUBLISH_DELAY_S, broadcast: bool = True, link: str = "") -> dict | None:
+                  delay_s: int = CT.PUBLISH_DELAY_S, broadcast: bool = True) -> dict | None:
     prev = CT.previous_round(now, round_hours)
     if now < prev["end"] + delay_s:
         return None
@@ -52,7 +52,7 @@ def publish_round(store, transport, now, channel, *, logger=None, round_hours: i
                                           pozo=s["pozo"], trader=trader, affiliate=aff)
         except Exception:
             png = None
-    caption = P.poster_caption(s["pozo"], trader, aff, link)
+    caption = P.poster_caption(s["pozo"], trader, aff)
     targets = []
     if channel:
         targets.append(channel)
@@ -110,7 +110,7 @@ def main():
             print("no bot token")
             return
         TelegramTransport(tok).send_photo_bytes(
-            args.preview, png, caption=P.poster_caption(1234.56, trader, aff, ""), parse_mode="HTML")
+            args.preview, png, caption=P.poster_caption(1234.56, trader, aff), parse_mode="HTML")
         print("sent preview to", args.preview)
 
 
