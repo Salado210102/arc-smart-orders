@@ -143,7 +143,7 @@ class Handler(BaseHTTPRequestHandler):
             max_per_order = int(float(data.get("max_per_order") or 25) * 1e6)
             max_total = int(float(data.get("max_total") or 50) * 1e6)
             ttl = int(data.get("ttl") or 6 * 3600)
-            slip = float(data.get("max_slippage") or 50)
+            slip = float(data.get("max_slippage") or 15)   # auditor: 10-20% default, user can raise
             min_out_floor = int(data.get("min_out_floor") or 0)
         except (TypeError, ValueError):
             return 400, {"error": "bad_amount"}
@@ -446,10 +446,18 @@ class Handler(BaseHTTPRequestHandler):
     def _custody_totp_get(self, uid):
         from execution import signer
         from . import totp as T
+        store = SubscriptionStore(DB)
+        try:
+            if store.totp_confirmed(uid):
+                return 409, {"error": "totp_already_set",
+                             "hint": "rotate via POST /custody/totp/rotate with the current code"}
+        finally:
+            store.close()
         secret = T.new_secret()
         store = SubscriptionStore(DB)
         try:
             store.save_totp(uid, signer.encrypt_secret(secret))
+            store.set_totp_confirmed(uid, False)   # pending until a code is verified
         finally:
             store.close()
         return 200, {"secret": secret, "uri": T.provisioning_uri(secret, str(uid))}
@@ -458,9 +466,30 @@ class Handler(BaseHTTPRequestHandler):
         store = SubscriptionStore(DB)
         try:
             ok = self._totp_ok(store, uid, data.get("code"))
+            if ok:
+                store.set_totp_confirmed(uid, True)
         finally:
             store.close()
         return (200, {"ok": True}) if ok else (400, {"error": "bad_code"})
+
+    def _custody_totp_rotate(self, uid, data):
+        """Rotate the TOTP secret — requires the CURRENT code (no silent re-enroll)."""
+        from execution import signer
+        from . import totp as T
+        store = SubscriptionStore(DB)
+        try:
+            if not (store.totp_confirmed(uid) and self._totp_ok(store, uid, data.get("code"))):
+                return 401, {"error": "totp_required"}
+        finally:
+            store.close()
+        secret = T.new_secret()
+        store = SubscriptionStore(DB)
+        try:
+            store.save_totp(uid, signer.encrypt_secret(secret))
+            store.set_totp_confirmed(uid, False)
+        finally:
+            store.close()
+        return 200, {"secret": secret, "uri": T.provisioning_uri(secret, str(uid))}
 
     def _custody_address_add(self, uid, data):
         import time
@@ -469,7 +498,7 @@ class Handler(BaseHTTPRequestHandler):
             g = self._guards(store, uid)
             if g:
                 return g
-            if not self._totp_ok(store, uid, data.get("code")):
+            if not store.totp_confirmed(uid) or not self._totp_ok(store, uid, data.get("code")):
                 return 401, {"error": "totp_required"}
             addr = (data.get("address") or "").lower()
             if not ADDR_RE.match(addr):
@@ -505,7 +534,7 @@ class Handler(BaseHTTPRequestHandler):
             c = store.get_custody(uid)
             if not c:
                 return 409, {"error": "no_custody"}
-            if not self._totp_ok(store, uid, data.get("code")):
+            if not store.totp_confirmed(uid) or not self._totp_ok(store, uid, data.get("code")):
                 return 401, {"error": "totp_required"}
             to = (data.get("to") or "").lower()
             if not ADDR_RE.match(to):
@@ -1259,7 +1288,7 @@ class Handler(BaseHTTPRequestHandler):
                 store.close()
             return self._send(200, {"ok": True, "sl_pct": sl, "tp_pct": tp, "trailing_pct": tr})
         if u.path in ("/custody/create", "/custody/withdraw", "/custody/buy", "/custody/sell",
-                      "/custody/address", "/custody/totp"):
+                      "/custody/address", "/custody/totp", "/custody/totp/rotate"):
             uid = self._auth_user(max_age=SENSITIVE_MAX_AGE)   # fresh initData required
             if uid is None:
                 return self._send(401, {"error": "unauthorized"})
@@ -1280,6 +1309,8 @@ class Handler(BaseHTTPRequestHandler):
                 code, resp = self._custody_sell(uid, data)
             elif u.path == "/custody/address":
                 code, resp = self._custody_address_add(uid, data)
+            elif u.path == "/custody/totp/rotate":
+                code, resp = self._custody_totp_rotate(uid, data)
             else:
                 code, resp = self._custody_totp_verify(uid, data)
             return self._send(code, resp)

@@ -1,5 +1,11 @@
 # Audit Scope — Arc AI Phase 5 Minimal Executor
 
+> **⚠️ SUPERSEDED / REPLACED (2026-09-28).** The **V1** executor described here is **obsolete** and **must not be
+> audited as the current artifact**. Findings **B1** (`recipient == 0`), **B2** (`deadline` not signed) and **B4**
+> (static `DOMAIN_SEPARATOR`) exist in this frozen V1 and were fixed only in **V2/V3** (see
+> `ARC_AI_EXECUTOR_V3_AUDIT_SCOPE.md`, tag **`arc-intel-executor-v3-pre-audit`**). Review **V2/V3** instead. The tag
+> `arc-intel-executor-v1` is kept only as historical provenance and was **not modified**.
+
 **Project:** Arc AI — Phase 5 non-custodial order executor
 **Repo:** https://github.com/Salado210102/arc-smart-orders
 **Network:** Arc (testnet `5042002`; mainnet `5042`)

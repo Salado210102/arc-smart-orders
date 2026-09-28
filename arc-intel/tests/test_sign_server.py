@@ -77,6 +77,15 @@ class SignServerTests(unittest.TestCase):
         except urllib.error.HTTPError as e:
             return e.code, json.loads(e.read() or b"{}")
 
+    def _get(self, path, uid=1):
+        req = urllib.request.Request(self._url(path),
+                                     headers={"X-Telegram-Init-Data": init_data(uid)})
+        try:
+            r = urllib.request.urlopen(req)
+            return r.status, json.loads(r.read() or b"{}")
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read() or b"{}")
+
     def _allow(self, uid=1):
         store = SubscriptionStore(self.db)
         try:
@@ -377,6 +386,43 @@ class SignServerTests(unittest.TestCase):
         self.assertEqual(s.get_preorder(sell)["kind"], "sell")
         s.close()
 
+
+    def test_totp_confirm_and_no_silent_reenroll(self):
+        from bot import totp as T
+        code, body = self._get("/custody/totp")
+        self.assertEqual(code, 200)
+        secret = body["secret"]
+        c, _ = self._post_json("/custody/totp", {"code": T.code(secret)})
+        self.assertEqual(c, 200)
+        c2, b2 = self._get("/custody/totp")            # already confirmed -> refuse re-enroll
+        self.assertEqual(c2, 409)
+        self.assertEqual(b2.get("error"), "totp_already_set")
+
+    def test_totp_rotate_requires_current_code(self):
+        from bot import totp as T
+        _, body = self._get("/custody/totp")
+        secret = body["secret"]
+        self._post_json("/custody/totp", {"code": T.code(secret)})
+        self.assertEqual(self._post_json("/custody/totp/rotate", {})[0], 401)     # no code
+        c2, b2 = self._post_json("/custody/totp/rotate", {"code": T.code(secret)})
+        self.assertEqual(c2, 200)
+        self.assertIn("secret", b2)
+
+    def test_trading_gate_requires_confirmed_totp(self):
+        from bot import totp as T
+        self._allow(1)
+        self._post_json("/custody/create", {})
+        _, body = self._get("/custody/totp")
+        secret = body["secret"]
+        # address registration BEFORE confirming -> 401
+        c, _ = self._post_json("/custody/address", {"address": "0x" + "a" * 40,
+                                                    "code": T.code(secret)})
+        self.assertEqual(c, 401)
+        # confirm, then it works
+        self._post_json("/custody/totp", {"code": T.code(secret)})
+        c2, _ = self._post_json("/custody/address", {"address": "0x" + "a" * 40,
+                                                     "code": T.code(secret)})
+        self.assertEqual(c2, 200)
 
     def test_custody_create_rejects_private_key(self):
         self._allow(1)

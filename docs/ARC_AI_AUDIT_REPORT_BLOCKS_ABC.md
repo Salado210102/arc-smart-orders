@@ -111,18 +111,27 @@ management, KYC/AML for custody, mainnet plan, anti-wash wiring).
 
 | Executor | owner | paused | allowAllPools | isTestnet |
 |---|---|---|---|---|
-| V2 `0xb6393A…53B56` | Safe `0xe911D6…86b7` | false | — (V2) | — |
-| V3 `0xC9E5d1…9Afd2` | Safe `0xe911D6…86b7` | false | **false** | — (old bytecode) |
+| V2 `0xb6393A…53B56` | **EOA `0xe911D6…86b7`** (⚠️ NOT a Safe) | false | — (V2) | — |
+| V3 `0xC9E5d1…9Afd2` | **EOA `0xe911D6…86b7`** (⚠️ NOT a Safe) | false | **false** | — (old bytecode) |
 | V3 old `0x5e938A…55E9c14` | relayer `0x5ce3F7…7A98f` | false | **true** | — (obsolete) |
 | **V3 new `0xBD1a80…6e678d`** | relayer `0x5ce3F7…7A98f` | false | **true** | **true** |
 
 `allowedHooks` for known pool hooks on the live V3 = **false** (allowAll is on).
 
+> **⚠️ Correction (2026-09-28, auditor review).** The address labelled "Safe" `0xe911D6F5…86b7` is **NOT a Safe**: a raw
+> `eth_call` (`getThreshold()` / `VERSION()` / `getOwners()`) returns **`0x`** → it has **no code** → it is an **EOA**
+> (and per the reviewer, the discarded Phase-5 E2E key). Consequence: **V2 `0xb639…` and V3 `0xC9E5…` have their
+> `setPaused`/policy authority under a key that no longer exists** → their admin is **unusable** (they can't be
+> paused nor have pools allowed → they are effectively dead). The **live** executor `0xBD1a80…` is owned by the
+> **relayer EOA** (controlled) → manageable. **Mainnet must deploy with a real Safe** (real signers on distinct
+> devices). Note: the testnet RPC's `eth_getCode` returns `0x` even for contracts, so `cast call` is unreliable here;
+> use raw `eth_call` to distinguish an EOA (`0x`) from a contract (calldata).
+
 ### B3 — Session key risk
 - Documented in `ARC_AI_SESSION_KEYS.md`: **max loss = `maxTotal` at the worst price allowed by
   `minOutFloor`**; output always goes to `user`.
 - **Conservative defaults** (maxTotal 50 / maxPerOrder 25 / ttl 6 h) + **`minOutFloor` from a live quote**
-  at max slippage (50%). Mini App shows caps + **revoke** button.
+  at max slippage (default **15%** after reviewer feedback; user can raise). Mini App shows caps + **revoke** button.
 
 ### B4 — Audit package
 - `ARC_AI_EXECUTOR_V3_AUDIT_SCOPE.md`: scope = **V2, V3, interfaces + signer + custody + eip712 +
@@ -186,3 +195,27 @@ management, KYC/AML for custody, mainnet plan, anti-wash wiring).
 - **Data is mainnet; executor/wallet/relayer are testnet** ⇒ copy-trading runs in **dry-run**; no mainnet
   token trades on testnet.
 - **V1 executor frozen** (`ArcIntelExecutor.sol`, tag `arc-intel-executor-v1`) — **not modified**.
+
+---
+
+## 8. Post-review fixes (2026-09-28, after reviewer feedback)
+
+Applied:
+- **Owner is NOT a Safe (corrected).** Raw `eth_call` (`getThreshold`/`VERSION`/`getOwners`) on `0xe911D6…86b7`
+  returns `0x` → it is an **EOA**, not a Safe. V2 `0xb639…` and V3 `0xC9E5…` have their admin under that
+  (discarded) key → **unusable**; the **live** executor `0xBD1a80…` is owned by the **relayer EOA**.
+  **Mainnet must use a real Safe.**
+- **V1 marked SUPERSEDED** (`ARC_AI_PHASE5_EXECUTOR_AUDIT_SCOPE.md`): B1/B2/B4 live in V1; review V2/V3.
+- **`minOutFloor` default 50% → 15%** (`max_slippage`; user can raise).
+- **TOTP hardening:** `GET /custody/totp` **refuses to re-enroll** once a TOTP is confirmed (`409
+  totp_already_set`); rotation only via **`POST /custody/totp/rotate`** with the **current code**; withdraw and
+  address-add now require a **confirmed** TOTP (not just a stored secret). Tests added.
+
+Pending (need approval / decisions):
+- **V2/V3 code** (awaiting explicit OK): `isTestnet` → derive from `block.chainid`; **SafeERC20**; measure
+  `amountOut` from the **PoolManager delta** (not recipient balance); then redeploy + invariants + Slither.
+- **Hook policy for mainnet** (Argus = one hook per token): verify hook provenance (factory/codehash).
+- **CSP:** vendor libraries locally (pinned) and use an **own domain** (not `app.basepump.dev`).
+- **Key management:** signer in its own process/user; KMS/HSM medium-term. **Legal**: license/KYC/AML review.
+- **Session keys:** keep as the non-custodial fast path (reviewer recommends) rather than deprecating.
+- **Anti-wash** (own tokens / same-funding / thin): wire before enabling fee/payouts.

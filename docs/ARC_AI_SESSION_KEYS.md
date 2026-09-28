@@ -174,8 +174,8 @@ El atacante puede gastar hasta `maxTotal` del token de entrada en swaps que resp
 - **`maxTotal` bajo** (default **50 USDC**; `maxPerOrder` **25**).
 - **`expiry` corta** (default **6 h**; `ttl` configurable).
 - **`minOutFloor` derivado de una cotización en vivo** con un **slippage máximo** definido (default
-  **50%**): `minOutFloor = (maxTotal / price) · (1 − slippage) · 10^dec`. Una caída arbitraria de precio
-  **revierte** en vez de ejecutarse.
+  **15%**, opción del usuario a subirlo; el auditor bajó el default): `minOutFloor = (maxTotal / price) ·
+  (1 − slippage) · 10^dec`. Una caída arbitraria de precio **revierte** en vez de ejecutarse.
 
 ### UI
 La Mini App muestra **los topes** de cada sesión (`maxPerOrder`, `maxTotal`, `minOutFloor`, `expiry`) y

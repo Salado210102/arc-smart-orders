@@ -523,6 +523,14 @@ class SubscriptionStore:
 
     def clear_totp(self, chat) -> None:
         self.set_state(f"totp:{chat}", "")
+        self.set_state(f"totp_ok:{chat}", "0")
+
+    def totp_confirmed(self, chat) -> bool:
+        """True once the user has proven the TOTP secret (a code verified)."""
+        return self.get_state(f"totp_ok:{chat}", "0") == "1"
+
+    def set_totp_confirmed(self, chat, ok: bool) -> None:
+        self.set_state(f"totp_ok:{chat}", "1" if ok else "0")
 
     def custody_paused(self) -> bool:
         return self.get_state("custody_paused", "0") == "1"
