@@ -243,6 +243,30 @@ class TelegramTransport:
                                      headers={"Content-Type": "application/json"})
         urllib.request.urlopen(req, timeout=30).read()
 
+    def send_photo_bytes(self, chat_id, png: bytes, caption="", parse_mode=None,
+                         filename="poster.png", timeout: int = 30) -> None:  # pragma: no cover
+        import uuid
+        import urllib.request
+        boundary = "----ArcAI" + uuid.uuid4().hex
+        dash = ("--" + boundary).encode()
+
+        def field(name, value):
+            return (dash + b"\r\nContent-Disposition: form-data; name=\"" + name.encode()
+                    + b"\"\r\n\r\n" + str(value).encode() + b"\r\n")
+
+        body = field("chat_id", chat_id)
+        if caption:
+            body += field("caption", caption[:1024])
+        if parse_mode:
+            body += field("parse_mode", parse_mode)
+        body += (dash + b"\r\nContent-Disposition: form-data; name=\"photo\"; filename=\""
+                 + filename.encode() + b"\"\r\nContent-Type: image/png\r\n\r\n" + png
+                 + b"\r\n" + dash + b"--\r\n")
+        url = f"https://api.telegram.org/bot{self.token}/sendPhoto"
+        req = urllib.request.Request(url, data=body, headers={
+            "Content-Type": f"multipart/form-data; boundary={boundary}"})
+        urllib.request.urlopen(req, timeout=timeout).read()
+
     def edit_message(self, chat_id, message_id, text, parse_mode=None,
                      inline=None, timeout: int = 30) -> None:  # noqa (needs network)
         import urllib.request
@@ -874,8 +898,10 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
             n = dispatch(batch, store, transport, throttle=thr, logo_fn=logo_fn)
             try:
                 from .contest_publish import publish_round
+                from . import i18n as _i18n
                 res = publish_round(store, transport, int(time.time()),
-                                    os.environ.get("ARC_INTEL_CHANNEL", ""), logger=logger)
+                                    os.environ.get("ARC_INTEL_CHANNEL", ""), logger=logger,
+                                    link=_i18n.MINIAPP_URL)
                 if res:
                     logger({"contest": res})
             except Exception:

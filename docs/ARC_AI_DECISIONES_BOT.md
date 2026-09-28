@@ -452,6 +452,16 @@ auditoría + hot key acotada; no es lo primero).
   añade `status`, con badge); (2) **toggle de Auto-Protect** añadido al **`/settings` del bot**
   (callback `setap`, fila nueva) para igualar el toggle de la Mini App; (3) nuevo texto i18n
   `btn_autoprotect`. Suite **389 passed** (1 fallo ambiental local).
+- **2026-09-27 (cartel del ganador — imagen + FOMO)** — La publicación de resultados pasa a un **cartel
+  llamativo**: `bot/poster.py` renderiza un **PNG (1080×1080)** con marco dorado, **POZO** en grande,
+  filas **TRADER** y **AFILIADO** con volumen y premio, y CTA; `bot/poster_caption` arma el **caption
+  HTML** con emojis (🏆🔥🥇💰💥). `bot/telegram.py` gana **`send_photo_bytes`** (subida multipart).
+  `bot/contest_publish.py`: **1 h tras el cierre** envía el **póster al canal** (`ARC_INTEL_CHANNEL`) **y
+  a todos los suscriptores del bot** (FOMO), idempotente por ronda y con **fallback a texto** si no hay
+  Pillow. CLI de preview `python3 -m bot.contest_publish --preview <chat>`/`--out <png>` (enviada de
+  prueba a tu chat). **Pillow instalado en el VPS** (12.3). Mini App ya cubre el equivalente (banner del
+  pozo + ranking) → **paridad OK**. Tests `tests/test_poster.py` (+3). Suite **392 passed** (1 fallo
+  ambiental local).
   `copy_subs` + `add/get/list/remove/set_enabled/bump_spent/set_last_block`. Bot: comandos
   **`/copytrade <addr> [max_por_op] [presupuesto]`** y **`/copyoff`**; botón del menú **Copytrade**
   ahora **funcional** (`cmd:/copytrade`); comando registrado EN/ES/ZH. Thread propio en el loop

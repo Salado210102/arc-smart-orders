@@ -95,11 +95,12 @@ class ContestPublishTests(unittest.TestCase):
         res = publish_round(self.s, t, now, "-100123")
         self.assertIsNotNone(res)
         self.assertEqual(res["winners"], 1)
-        self.assertEqual(len(t.msgs), 1)
-        self.assertIn("@winner", t.msgs[0][1])
-        self.assertEqual(t.msgs[0][0], "-100123")
+        # channel + the (auto-subscribed) user 1 -> broadcast
+        self.assertEqual(len(t.msgs), 2)
+        self.assertEqual({m[0] for m in t.msgs}, {"-100123", "1"})
+        self.assertTrue(all("@winner" in m[1] for m in t.msgs))
         self.assertIsNone(publish_round(self.s, t, now, "-100123"))   # already published
-        self.assertEqual(len(t.msgs), 1)
+        self.assertEqual(len(t.msgs), 2)
 
     def test_not_published_too_early_or_without_channel(self):
         from bot.contest_publish import publish_round
