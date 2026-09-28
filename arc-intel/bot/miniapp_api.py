@@ -172,6 +172,19 @@ def copy_view(wallets: list, settings: dict | None = None) -> dict:
     }
 
 
+def tier_view(store, uid, now=None) -> dict:
+    """Effective fee tier for a user: VIP (by 30d volume) > welcome (referred) > standard."""
+    import time as _t
+    from monetization import tiers as TI
+    now = int(now if now is not None else _t.time())
+    joined = int(store.get_state(f"joined:{uid}", "0") or 0)
+    referred = bool(store.get_referrer(uid))
+    vol = float(store.volume_by_user_since(now - 30 * 86400).get(str(uid), 0.0))
+    t = TI.fee_bps_for(joined_ts=joined, now=now, referred=referred, volume_30d=vol)
+    return {"tier": t["level"], "fee_bps": t["fee_bps"], "fee_pct": t["fee_bps"] / 100.0,
+            "volume_30d": vol, "referred": referred}
+
+
 def wallet_view(store, chat_id) -> dict:
     """Linked wallet + auto-followed tokens (from wallet tracking)."""
     addr = store.get_linked_wallet(chat_id)

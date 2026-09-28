@@ -190,6 +190,8 @@ class SubscriptionStore:
             "INSERT OR IGNORE INTO subscribers(chat_id,tokens,wallets,kinds,since_block) "
             "VALUES(?,?,?,?,?)", (str(chat_id), "", "", "", int(since_block)))
         self.conn.commit()
+        if self.get_state(f"joined:{chat_id}") is None:
+            self.set_state(f"joined:{chat_id}", str(int(time.time())))
 
     def add_token(self, chat_id, token: str, now_block: int = 0,
                   allow_over_cap: bool = False) -> tuple[bool, str]:

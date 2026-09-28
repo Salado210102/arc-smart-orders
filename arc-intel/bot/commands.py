@@ -168,6 +168,15 @@ def referral_screen(store, chat, lang) -> dict:
     return {"text": text, "inline": rows, "parse_mode": "HTML"}
 
 
+def tier_screen(store, chat, lang) -> dict:
+    from .miniapp_api import tier_view
+    v = tier_view(store, chat)
+    text = i18n.t("tier_text", lang).format(label=(v["tier"] or "STANDARD"),
+                                            fee=f"{v['fee_pct']:.2f}", vol=f"{v['volume_30d']:,.0f}")
+    return {"text": text, "inline": [[{"text": i18n.t("btn_app", lang), "web_app": i18n.MINIAPP_URL}]],
+            "parse_mode": "HTML"}
+
+
 def bridge_screen(store, chat, lang) -> dict:
     c = store.get_custody(chat)
     addr = (c or {}).get("address", "")
@@ -369,6 +378,8 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
         return copy_screen(store, chat_id, lang)
     if cmd == "/bridge":
         return bridge_screen(store, chat_id, lang)
+    if cmd in ("/tier", "/fee"):
+        return tier_screen(store, chat_id, lang)
     if cmd in ("/start", "/menu"):
         s = _pozo_summary(store)
         rows = i18n.menu_buttons(lang)
@@ -622,6 +633,8 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
         return copy_screen(store, chat_id, lang)["text"]
     if cmd == "/bridge":
         return bridge_screen(store, chat_id, lang)["text"]
+    if cmd in ("/tier", "/fee"):
+        return tier_screen(store, chat_id, lang)["text"]
     if cmd == "/copyoff":
         for w in store.list_copy_wallets(chat_id):
             store.remove_copy_wallet(chat_id, w["leader"])

@@ -384,6 +384,17 @@ TEXTS: dict[str, dict[str, str]] = {
         "es": "\U0001F517 Abrir bridge",
         "zh": "\U0001F517 \u6253\u5f00\u8de8\u94fe\u6865",
     },
+    "tier_text": {
+        "en": ("\U0001F48E <b>Your fee tier</b>\nLevel: <b>{label}</b> \u00b7 Fee: <b>{fee}%</b>\n"
+               "30-day volume: ${vol}\n\n"
+               "<i>VIP by volume; referred users pay 0.90% for 30 days.</i>"),
+        "es": ("\U0001F48E <b>Tu tarifa</b>\nNivel: <b>{label}</b> \u00b7 Comisi\u00f3n: <b>{fee}%</b>\n"
+               "Volumen 30 d\u00edas: ${vol}\n\n"
+               "<i>VIP por volumen; los referidos pagan 0.90% durante 30 d\u00edas.</i>"),
+        "zh": ("\U0001F48E <b>\u4f60\u7684\u8d39\u7387</b>\n\u7b49\u7ea7\uff1a<b>{label}</b> \u00b7 "
+               "\u8d39\u7387\uff1a<b>{fee}%</b>\n30 \u5929\u4ea4\u6613\u91cf\uff1a${vol}\n\n"
+               "<i>\u6309\u4ea4\u6613\u91cf\u5347\u7ea7 VIP\uff1b\u88ab\u63a8\u8350\u7528\u6237 30 \u5929\u5185 0.90%\u3002</i>"),
+    },
 }
 
 

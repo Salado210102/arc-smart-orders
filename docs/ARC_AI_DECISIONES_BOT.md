@@ -433,6 +433,17 @@ auditoría + hot key acotada; no es lo primero).
   **`Cache-Control: no-store`** para evitar que Telegram sirva una versión antigua. Endpoints: `GET
   /copy`, `POST /copy/wallet`, `/copy/wallet/remove`, `/copy/wallet/toggle`, `/copy/settings`. Tests
   reescritos/adjustados. Suite **377 passed** (1 fallo ambiental local). Sigue **dry-run** hasta mainnet.
+- **2026-09-27 (las tres: bridge + PnL RUGGED + tarifas)** — **Paso 1, Bridge** (`bot/bridge.py`): USDC
+  desde **Base/Arbitrum/Solana → Arc** guiado (destino = tu wallet del bot, bridge oficial Circle CCTP;
+  no-custodial del origen) + **aviso al llegar** (poll de saldo, `bridge_bal:{chat}`); comando `/bridge`,
+  `GET /bridge`, tarjeta en **Cartera**. **Paso 2, PnL honesto + RUGGED**: `store.token_risk_status`
+  (`rugged` si hay `liquidity_removal`, `dev_sell` si el dev vendió); `/portfolio` añade `status`,
+  `realized` y **resumen** (valor / PnL no realizado / realizado); la Mini App muestra **badge 🪦 RUGGED
+  / ⚠ dev-sold** y el resumen (sin ocultar pérdidas). **Paso 3, tarifas** (`monetization/tiers.py` +
+  `bot/miniapp_api.tier_view`): **descuento de bienvenida** por referido **1%→0.90% durante 30 días** y
+  **niveles VIP** por volumen 30d (**VIP1 $10k 0.80% · VIP2 $50k 0.70% · VIP3 $250k 0.65%**, suelo 0.65%;
+  VIP **anula** bienvenida). `joined:{chat}` al alta; comando `/tier`, `GET /tier`, tarjeta en Cartera.
+  Suite **388 passed** (1 fallo ambiental local). Todo desplegado.
   `copy_subs` + `add/get/list/remove/set_enabled/bump_spent/set_last_block`. Bot: comandos
   **`/copytrade <addr> [max_por_op] [presupuesto]`** y **`/copyoff`**; botón del menú **Copytrade**
   ahora **funcional** (`cmd:/copytrade`); comando registrado EN/ES/ZH. Thread propio en el loop

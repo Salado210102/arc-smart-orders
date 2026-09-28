@@ -169,6 +169,10 @@
         </div>
         <div id="bridgeout" style="margin-top:8px"></div>
       </div>
+      <div class="card">
+        <div class="mut" data-i18n="tier_title">💎 Tu tarifa</div>
+        <div id="tierout" style="margin-top:6px"></div>
+      </div>
     </section>
 
     <section id="sec-alr" class="hide">
@@ -272,6 +276,7 @@
         bridge_instr: "Envía USDC desde Base/Arbitrum/Solana a esta dirección de Arc (Circle CCTP):",
         bridge_waiting: "Te aviso cuando llegue.",
         bridge_open: "Abrir bridge", bridge_noaddr: "Crea tu wallet del bot primero.",
+        tier_title: "💎 Tu tarifa",
         pozo_label: "🏆 Pozo de la ronda", pozo_ends: "termina en", pozo_see: "Ver ranking",
         pozo_ranking: "Ranking de la ronda (trader · afiliado)",
         pozo_trader: "Trader", pozo_affiliate: "Afiliado", pozo_none: "Aún sin volumen esta ronda.",
@@ -305,6 +310,7 @@
         bridge_instr: "Send USDC from Base/Arbitrum/Solana to this Arc address (Circle CCTP):",
         bridge_waiting: "I'll notify you when it arrives.",
         bridge_open: "Open bridge", bridge_noaddr: "Create your bot wallet first.",
+        tier_title: "💎 Your fee tier",
         pozo_label: "🏆 Round prize pool", pozo_ends: "ends in", pozo_see: "See ranking",
         pozo_ranking: "Round ranking (trader · affiliate)",
         pozo_trader: "Trader", pozo_affiliate: "Affiliate", pozo_none: "No volume this round yet.",
@@ -335,6 +341,7 @@
         bridge_instr: "从 Base/Arbitrum/Solana 向此 Arc 地址发送 USDC（Circle CCTP）：",
         bridge_waiting: "到账后我会通知你。",
         bridge_open: "打开跨链桥", bridge_noaddr: "请先创建机器人钱包。",
+        tier_title: "💎 你的费率",
         pozo_label: "🏆 本轮奖池", pozo_ends: "结束于", pozo_see: "查看排行",
         pozo_ranking: "本轮排行（交易者 · 推荐人）",
         pozo_trader: "交易者", pozo_affiliate: "推荐人", pozo_none: "本轮暂无交易量。",
@@ -442,7 +449,7 @@
         }
         if (POS_TIMER) { clearInterval(POS_TIMER); POS_TIMER = null; }
         if (name === "pos") { loadPositions(); POS_TIMER = setInterval(() => loadPositions().catch(() => {}), 10000); }
-        if (name === "wal") { loadWallet(); loadCustody(); loadReferral(); loadBridge(); }
+        if (name === "wal") { loadWallet(); loadCustody(); loadReferral(); loadBridge(); loadTier(); }
         if (name === "alr") loadAlerts();
         if (name === "copy") loadCopy();
       }
@@ -768,6 +775,14 @@
           `<div style="word-break:break-all;margin-top:4px"><code>${esc(body.address)}</code></div>` +
           `<div class="mut" style="font-size:12px;margin-top:4px">${esc(t("bridge_waiting"))}</div>` +
           (body.link ? `<a class="ghost" style="display:inline-block;margin-top:8px;padding:8px 12px;border-radius:8px" href="${esc(body.link)}" target="_blank">${esc(t("bridge_open"))}</a>` : "");
+      }
+
+      async function loadTier() {
+        const { status, body } = await api("/tier");
+        if (status !== 200 || !body) { $("tierout").innerHTML = ""; return; }
+        $("tierout").innerHTML =
+          `<div class="kv"><span>${esc(body.tier || "STANDARD")}</span><b class="${body.fee_bps < 100 ? "ok" : "mut"}">${(body.fee_pct || 0).toFixed(2)}%</b></div>` +
+          `<div class="kv mut"><span>30d vol</span><b>$${(body.volume_30d || 0).toFixed(0)}</b></div>`;
       }
 
       let COPY = null;

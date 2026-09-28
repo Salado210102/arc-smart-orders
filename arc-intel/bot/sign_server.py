@@ -807,6 +807,17 @@ class Handler(BaseHTTPRequestHandler):
             base = os.environ.get("ARC_INTEL_BRIDGE_URL", "")
             return self._send(200, {"address": addr, "chains": list(SUPPORTED_SOURCES),
                                     "link": bridge_link(base, addr)})
+        if u.path == "/tier":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            from .miniapp_api import tier_view
+            store = SubscriptionStore(DB)
+            try:
+                out = tier_view(store, uid)
+            finally:
+                store.close()
+            return self._send(200, out)
         if u.path == "/contest":
             uid = self._auth_user()
             if uid is None:
