@@ -21,13 +21,17 @@ contract ArcIntelExecutorV2 is IUnlockCallback {
 
     IPoolManager public immutable poolManager;
     address public immutable owner;
-    bytes32 public immutable DOMAIN_SEPARATOR;
 
-    //  v1 witness (permit-signed order).
-    bytes32 private constant ORDER_TYPEHASH =
-        keccak256("ArcIntelOrder(bytes32 poolId,bool zeroForOne,uint256 minOut,address recipient,uint256 orderNonce)");
+    //  EIP-712 domain: cached at deploy, recomputed if the chain id changes (fork-safe).
+    bytes32 private immutable _DOMAIN_SEPARATOR;
+    uint256 private immutable _CHAIN_ID;
+
+    //  v1 witness (permit-signed order). `deadline` is bound in the signature (B2).
+    bytes32 private constant ORDER_TYPEHASH = keccak256(
+        "ArcIntelOrder(bytes32 poolId,bool zeroForOne,uint256 minOut,address recipient,uint256 orderNonce,uint256 deadline)"
+    );
     string public constant WITNESS_TYPE_STRING =
-        "ArcIntelOrder witness)ArcIntelOrder(bytes32 poolId,bool zeroForOne,uint256 minOut,address recipient,uint256 orderNonce)TokenPermissions(address token,uint256 amount)";
+        "ArcIntelOrder witness)ArcIntelOrder(bytes32 poolId,bool zeroForOne,uint256 minOut,address recipient,uint256 orderNonce,uint256 deadline)TokenPermissions(address token,uint256 amount)";
 
     //  Session order signed by the session key (own EIP-712 domain, verified in-contract).
     bytes32 private constant SESSION_ORDER_TYPEHASH = keccak256(
@@ -126,7 +130,16 @@ contract ArcIntelExecutorV2 is IUnlockCallback {
         if (poolManager_ == address(0) || owner_ == address(0)) revert ZeroAddr();
         poolManager = IPoolManager(poolManager_);
         owner = owner_;
-        DOMAIN_SEPARATOR = keccak256(
+        _CHAIN_ID = block.chainid;
+        _DOMAIN_SEPARATOR = _computeDomainSeparator();
+        for (uint256 i = 0; i < initialPools.length; i++) {
+            allowedPools[initialPools[i]] = true;
+            emit PoolAllowed(initialPools[i], true);
+        }
+    }
+
+    function _computeDomainSeparator() private view returns (bytes32) {
+        return keccak256(
             abi.encode(
                 keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
                 keccak256("ArcIntelExecutor"),
@@ -135,10 +148,11 @@ contract ArcIntelExecutorV2 is IUnlockCallback {
                 address(this)
             )
         );
-        for (uint256 i = 0; i < initialPools.length; i++) {
-            allowedPools[initialPools[i]] = true;
-            emit PoolAllowed(initialPools[i], true);
-        }
+    }
+
+    /// @notice EIP-712 domain separator; recomputed if `block.chainid` changed (fork-safe).
+    function DOMAIN_SEPARATOR() public view returns (bytes32) {
+        return block.chainid == _CHAIN_ID ? _DOMAIN_SEPARATOR : _computeDomainSeparator();
     }
 
     // --------------------------------------------------------------------- admin
@@ -215,7 +229,10 @@ contract ArcIntelExecutorV2 is IUnlockCallback {
         if (tokenIn != expectedIn) revert TokenMismatch();
 
         bytes32 witness = keccak256(
-            abi.encode(ORDER_TYPEHASH, poolId, order.zeroForOne, order.minOut, order.recipient, order.orderNonce)
+            abi.encode(
+                ORDER_TYPEHASH, poolId, order.zeroForOne, order.minOut, order.recipient, order.orderNonce,
+                order.deadline
+            )
         );
         IPermit2(PERMIT2).permitWitnessTransferFrom(
             permit,
@@ -297,7 +314,7 @@ contract ArcIntelExecutorV2 is IUnlockCallback {
                 o.orderNonce, o.deadline
             )
         );
-        return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR, structHash));
+        return keccak256(abi.encodePacked("\x19\x01", DOMAIN_SEPARATOR(), structHash));
     }
 
     function _recover(bytes32 digest, bytes calldata sig) internal pure returns (address) {

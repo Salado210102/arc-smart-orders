@@ -14,7 +14,7 @@ contract DeployV3Testnet is Script {
 
         vm.startBroadcast(pk);
         bytes32[] memory pools = new bytes32[](0);
-        ArcIntelExecutorV3 ex = new ArcIntelExecutorV3(poolManager, admin, pools);
+        ArcIntelExecutorV3 ex = new ArcIntelExecutorV3(poolManager, admin, pools, true);
         ex.setAllowAllPools(true);
         vm.stopBroadcast();
 

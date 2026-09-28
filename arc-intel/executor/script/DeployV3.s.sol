@@ -14,7 +14,7 @@ contract DeployV3 is Script {
 
         vm.startBroadcast(pk);
         bytes32[] memory pools = new bytes32[](0);
-        ArcIntelExecutorV3 v3 = new ArcIntelExecutorV3(poolManager, safeOwner, pools);
+        ArcIntelExecutorV3 v3 = new ArcIntelExecutorV3(poolManager, safeOwner, pools, false);
         vm.stopBroadcast();
 
         console2.log("ArcIntelExecutorV3", address(v3));

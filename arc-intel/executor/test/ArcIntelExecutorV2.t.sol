@@ -249,4 +249,19 @@ contract ArcIntelExecutorV2Test is Test {
         vm.expectRevert(ArcIntelExecutorV2.BadRecipient.selector);
         exec.execute(permit, user, o, "");
     }
+
+    function testWitnessBindsDeadline() public view {
+        string memory expected =
+            "ArcIntelOrder witness)ArcIntelOrder(bytes32 poolId,bool zeroForOne,uint256 minOut,address recipient,uint256 orderNonce,uint256 deadline)TokenPermissions(address token,uint256 amount)";
+        assertEq(keccak256(bytes(exec.WITNESS_TYPE_STRING())), keccak256(bytes(expected)));
+    }
+
+    function testDomainSeparatorForkSafe() public {
+        bytes32 d1 = exec.DOMAIN_SEPARATOR();
+        vm.chainId(block.chainid + 1);
+        bytes32 d2 = exec.DOMAIN_SEPARATOR();
+        assertTrue(d1 != d2, "domain must change with chainid");
+        vm.chainId(block.chainid + 2);
+        assertTrue(exec.DOMAIN_SEPARATOR() != d2, "domain tracks chainid");
+    }
 }

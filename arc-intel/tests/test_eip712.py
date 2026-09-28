@@ -6,8 +6,9 @@ from execution import eip712
 
 class Eip712Tests(unittest.TestCase):
     def test_type_string_matches_contract(self):
+        # B2: the witness binds `deadline`
         self.assertIn("ArcIntelOrder(bytes32 poolId,bool zeroForOne,uint256 minOut,address recipient,"
-                      "uint256 orderNonce)", eip712.WITNESS_TYPE_STRING)
+                      "uint256 orderNonce,uint256 deadline)", eip712.WITNESS_TYPE_STRING)
         self.assertIn("TokenPermissions(address token,uint256 amount)", eip712.WITNESS_TYPE_STRING)
         self.assertTrue(eip712.WITNESS_TYPE_STRING.startswith("ArcIntelOrder witness)"))
 
@@ -17,7 +18,8 @@ class Eip712Tests(unittest.TestCase):
                           {"name": "zeroForOne", "type": "bool"},
                           {"name": "minOut", "type": "uint256"},
                           {"name": "recipient", "type": "address"},
-                          {"name": "orderNonce", "type": "uint256"}])
+                          {"name": "orderNonce", "type": "uint256"},
+                          {"name": "deadline", "type": "uint256"}])
 
     def test_typed_data_domain_and_message(self):
         td = eip712.order_typed_data(
@@ -30,6 +32,7 @@ class Eip712Tests(unittest.TestCase):
         w = td["message"]["witness"]
         self.assertEqual(w["minOut"], 70)
         self.assertTrue(w["zeroForOne"])
+        self.assertEqual(w["deadline"], 1790000000)     # B2: deadline bound in the witness
         self.assertEqual(td["message"]["permitted"]["amount"], 100)
 
     def test_min_out_from_floor(self):

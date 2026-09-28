@@ -11,10 +11,10 @@ import secrets
 
 PERMIT2 = "0x000000000022D473030F116dDEE9F6B43aC78BA3"
 
-# Must equal ArcIntelExecutor.WITNESS_TYPE_STRING byte-for-byte.
+# Must equal ArcIntelExecutorV2/V3.WITNESS_TYPE_STRING byte-for-byte (includes `deadline`, B2).
 WITNESS_TYPE_STRING = (
     "ArcIntelOrder witness)ArcIntelOrder(bytes32 poolId,bool zeroForOne,uint256 minOut,"
-    "address recipient,uint256 orderNonce)TokenPermissions(address token,uint256 amount)"
+    "address recipient,uint256 orderNonce,uint256 deadline)TokenPermissions(address token,uint256 amount)"
 )
 
 TYPES = {
@@ -35,6 +35,7 @@ TYPES = {
         {"name": "minOut", "type": "uint256"},
         {"name": "recipient", "type": "address"},
         {"name": "orderNonce", "type": "uint256"},
+        {"name": "deadline", "type": "uint256"},
     ],
 }
 
@@ -73,6 +74,7 @@ def order_typed_data(chain_id: int, executor: str, token_in: str, amount_in: int
                 "minOut": int(min_out),
                 "recipient": recipient,
                 "orderNonce": int(order_nonce),
+                "deadline": int(deadline),
             },
         },
     }

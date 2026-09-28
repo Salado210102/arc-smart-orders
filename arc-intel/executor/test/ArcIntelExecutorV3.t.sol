@@ -39,7 +39,7 @@ contract ArcIntelExecutorV3Test is Test {
 
         pm = new MockPoolManager();
         bytes32[] memory pools = new bytes32[](0); // no pools pre-allowed
-        exec = new ArcIntelExecutorV3(address(pm), safe, pools);
+        exec = new ArcIntelExecutorV3(address(pm), safe, pools, true);   // testnet: allowAll permitted
 
         permit2 = new MockPermit2();
         vm.etch(exec.PERMIT2(), address(permit2).code);
@@ -129,5 +129,24 @@ contract ArcIntelExecutorV3Test is Test {
         });
         vm.expectRevert(ArcIntelExecutorV3.BadRecipient.selector);
         exec.execute(permit, user, o, "");
+    }
+
+    function testWitnessBindsDeadline() public view {
+        string memory expected =
+            "ArcIntelOrder witness)ArcIntelOrder(bytes32 poolId,bool zeroForOne,uint256 minOut,address recipient,uint256 orderNonce,uint256 deadline)TokenPermissions(address token,uint256 amount)";
+        assertEq(keccak256(bytes(exec.WITNESS_TYPE_STRING())), keccak256(bytes(expected)));
+    }
+
+    function testMainnetCannotAllowAll() public {
+        bytes32[] memory pools = new bytes32[](0);
+        ArcIntelExecutorV3 mainnetExec = new ArcIntelExecutorV3(address(pm), safe, pools, false);
+        assertFalse(mainnetExec.isTestnet());
+        vm.prank(safe);
+        vm.expectRevert(ArcIntelExecutorV3.AllowAllNotAllowed.selector);
+        mainnetExec.setAllowAllPools(true);
+        // explicit policy still works on mainnet
+        vm.prank(safe);
+        mainnetExec.setAllowedHook(key.hooks, true);
+        assertTrue(mainnetExec.allowedHooks(key.hooks));
     }
 }
