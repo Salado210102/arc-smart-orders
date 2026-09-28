@@ -511,6 +511,15 @@ class SubscriptionStore:
                  "ts": int(r[4] or 0), "wallet": r[5], "amount_usdc": r[6], "message": r[7],
                  "context": _json.loads(r[8] or "{}")} for r in self.conn.execute(q, params).fetchall()]
 
+    def token_risk_status(self, token) -> str:
+        """'rugged' (liquidity removed), 'dev_sell' (creator dumped), or '' — honest trade state."""
+        row = self.conn.execute(
+            "SELECT kind FROM alerts WHERE token=? AND kind IN ('liquidity_removal','dev_sell') "
+            "ORDER BY block DESC LIMIT 1", (str(token).lower(),)).fetchone()
+        if not row:
+            return ""
+        return "rugged" if row[0] == "liquidity_removal" else "dev_sell"
+
     # --- real fills + positions (idempotent, average cost) ---
     def record_fill(self, fill_id, user, token, side, qty, usdc, block=0, ts=0) -> bool:
         """Record a CONFIRMED fill once (idempotent by fill_id) and update the position.

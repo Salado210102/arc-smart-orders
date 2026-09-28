@@ -450,6 +450,7 @@ class Handler(BaseHTTPRequestHandler):
             holds = store.list_holdings(uid)
             plans = store.list_exit_plans(uid)
             pos_map = {t: store.get_position(uid, t) for t in holds}
+            status_map = {t: store.token_risk_status(t) for t in holds}
         finally:
             store.close()
         st = _storage()
@@ -471,10 +472,15 @@ class Handler(BaseHTTPRequestHandler):
             pct = (price / avg - 1.0) if (avg > 0 and price > 0) else 0.0
             out.append({"token": t, "qty": qty, "price": price, "value": qty * price,
                         "avg_cost": avg, "unrealized": unrealized, "unrealized_pct": pct,
+                        "realized": float(pos_map.get(t, {}).get("realized") or 0.0),
+                        "status": status_map.get(t, ""),
                         "symbol": dex.get("symbol", ""), "dex": dex,
                         "sl_pct": plan["sl_pct"], "tp_pct": plan["tp_pct"],
                         "trailing_pct": plan.get("trailing_pct", 0)})
-        return 200, {"positions": out, "address": c["address"]}
+        summary = {"value": sum(p["value"] for p in out),
+                   "unrealized": sum(p["unrealized"] for p in out),
+                   "realized": sum(p["realized"] for p in out)}
+        return 200, {"positions": out, "address": c["address"], "summary": summary}
 
     def _custody_sell(self, uid, data):
         import time

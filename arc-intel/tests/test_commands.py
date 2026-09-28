@@ -156,6 +156,15 @@ class CommandTests(unittest.TestCase):
         r = command_reply_rich("/start", 1, self.store, self.exists, self.check, 1000)
         self.assertIn("Prize pool", r["text"])
 
+    def test_token_risk_status(self):
+        self.store.add_alert({"token": ADDR, "kind": "liquidity_removal", "severity": "high",
+                              "block": 5, "message": "lp removed"})
+        self.assertEqual(self.store.token_risk_status(ADDR), "rugged")
+        self.assertEqual(self.store.token_risk_status(ADDR2), "")
+        self.store.add_alert({"token": ADDR2, "kind": "dev_sell", "severity": "high",
+                              "block": 6, "message": "dev sold"})
+        self.assertEqual(self.store.token_risk_status(ADDR2), "dev_sell")
+
     def test_referral_screen(self):
         r = command_reply_rich("/referral", 1, self.store, self.exists, self.check, 1000)
         self.assertEqual(r["parse_mode"], "HTML")
