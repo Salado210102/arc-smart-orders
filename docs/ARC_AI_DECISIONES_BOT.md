@@ -494,3 +494,13 @@ auditoría + hot key acotada; no es lo primero).
   apuntan a él vía drop-in `Environment=ARC_INTEL_EXECUTOR=…`; desplegado `execution/eip712.py` nuevo.
   Verificado: `/health` 200, servicios activos, loop limpio. **Nota:** el V3 antiguo
   (`0x5e938A…9c14`) queda obsoleto; mainnet usará owner=Safe+`isTestnet=false`.
+- **2026-09-28 (post-auditoría · owner no era Safe + endurecimiento V2/V3)** — (1) Confirmado que
+  **`0xe911D6…86b7` NO es un Safe** (raw `eth_call` a `getThreshold`/`VERSION`/`getOwners` = `0x` → **EOA**):
+  V2 `0xb639…` y V3 `0xC9E5…` tienen su admin bajo una **clave muerta**; el vivo lo lleva el relayer.
+  (2) **V1 marcado SUPERSEDED**. (3) **`minOutFloor` default 15%**. (4) **TOTP endurecido** (no re-inscripción
+  silenciosa; rotación con `POST /custody/totp/rotate`; gate de TOTP confirmado en retirar/registrar).
+  (5) **V2/V3**: `isTestnet` por **`block.chainid`**, **SafeERC20** (`_safeTransfer`), `amountOut` por **delta
+  del PoolManager**. Unit **54**, invariantes **V2/V3 5000×100 passed**, **Slither sin High/Medium**. (6) **Nuevo
+  V3 testnet `0x082Ec4090d79cb5F4D8731661b58A0d1934Fa6ad`** (owner=relayer, allowAll, chainid-derived) desplegado
+  y apuntado en ambos servicios (`0xBD1a80…` obsoleto). Commits `c156621` + `08cc6b8`. **Pendiente**: mainnet
+  con **Safe real**, política de hooks, dominio propio + libs locales (CSP), KMS/HSM, legal.
