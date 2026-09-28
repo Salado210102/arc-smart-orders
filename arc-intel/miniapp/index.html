@@ -37,18 +37,6 @@
     <span class="badge" id="netbadge">TESTNET</span>
   </div>
 
-  <!-- ================= SIGN VIEW (?t=...) ================= -->
-  <div id="signview" class="hide">
-    <div class="card">
-      <h3 id="signtitle">Armar orden</h3>
-      <div id="signinfo" class="mut">Cargando…</div>
-      <pre id="signdetails" class="hide"></pre>
-      <button id="signgo" class="primary" disabled>Conectar wallet y firmar</button>
-      <div id="signout" class="mut"></div>
-    </div>
-    <button class="ghost" onclick="location.href='/'">← Volver</button>
-  </div>
-
   <!-- ================= MAIN APP ================= -->
     <div id="main" class="hide">
       <div class="card" id="pozocard" style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid #2a3a2a">
@@ -160,10 +148,6 @@
           <button class="ghost" id="secadd" data-i18n="sec_add_addr">Añadir dirección</button>
         </div>
         <div id="secmsg" class="mut" style="margin-top:6px"></div>
-      </div>
-      <div class="card">
-        <div class="mut" data-i18n="sess_title">🔑 Sesiones (no-custodial, revocables)</div>
-        <div id="sessout" style="margin-top:8px"></div>
       </div>
       <div class="card">
         <div class="row" style="justify-content:space-between;align-items:center">
@@ -297,8 +281,6 @@
         tier_title: "💎 Tu tarifa",
         sec_title: "🔐 Seguridad (2FA y direcciones de retiro)", sec_enroll: "Activar 2FA",
         sec_add_addr: "Añadir dirección", sec_none: "Sin direcciones registradas.",
-        sess_title: "🔑 Sesiones (no-custodial, revocables)", sess_none: "Sin sesiones activas.",
-        sess_revoke: "Revocar",
         pozo_label: "🏆 Pozo de la ronda", pozo_ends: "termina en", pozo_see: "Ver ranking",
         pozo_ranking: "Ranking de la ronda (trader · afiliado)",
         pozo_trader: "Trader", pozo_affiliate: "Afiliado", pozo_none: "Aún sin volumen esta ronda.",
@@ -335,8 +317,6 @@
         tier_title: "💎 Your fee tier",
         sec_title: "🔐 Security (2FA & withdrawal addresses)", sec_enroll: "Enable 2FA",
         sec_add_addr: "Add address", sec_none: "No registered addresses.",
-        sess_title: "🔑 Sessions (non-custodial, revocable)", sess_none: "No active sessions.",
-        sess_revoke: "Revoke",
         pozo_label: "🏆 Round prize pool", pozo_ends: "ends in", pozo_see: "See ranking",
         pozo_ranking: "Round ranking (trader · affiliate)",
         pozo_trader: "Trader", pozo_affiliate: "Affiliate", pozo_none: "No volume this round yet.",
@@ -370,8 +350,6 @@
         tier_title: "💎 你的费率",
         sec_title: "🔐 安全（2FA 与提现地址）", sec_enroll: "启用 2FA",
         sec_add_addr: "添加地址", sec_none: "暂无已注册地址。",
-        sess_title: "🔑 会话（非托管，可撤销）", sess_none: "无有效会话。",
-        sess_revoke: "撤销",
         pozo_label: "🏆 本轮奖池", pozo_ends: "结束于", pozo_see: "查看排行",
         pozo_ranking: "本轮排行（交易者 · 推荐人）",
         pozo_trader: "交易者", pozo_affiliate: "推荐人", pozo_none: "本轮暂无交易量。",
@@ -398,67 +376,8 @@
       let body = null; try { body = await r.json(); } catch (e) {}
       return { status: r.status, body };
     }
-    let _signer = null;
-    async function getSigner() {
-      if (_signer) return _signer;
-      // 1) Injected wallet (open the Mini App inside a wallet browser -> instant, no QR).
-      if (window.ethereum) {
-        const accs = await window.ethereum.request({ method: "eth_requestAccounts" });
-        _signer = { kind: "injected", address: accs[0],
-          sign: (td, from) => window.ethereum.request(
-            { method: "eth_signTypedData_v4", params: [from, JSON.stringify(td)] }),
-          sendTx: ({ to, data }) => window.ethereum.request(
-            { method: "eth_sendTransaction", params: [{ from: accs[0], to, data, value: "0x0" }] }) };
-        return _signer;
-      }
-      // 2) WalletConnect, reusing the persisted session: connect once, then silent (no QR).
-      const { EthereumProvider } = await import("https://esm.sh/@walletconnect/ethereum-provider@2");
-      const wc = await EthereumProvider.init({ projectId: PROJECT_ID, chains: [CHAIN_ID],
-        optionalChains: [CHAIN_ID], showQrModal: true, methods: ["eth_signTypedData_v4"] });
-      if (!(wc.accounts && wc.accounts.length)) await wc.connect();  // QR only the first time
-      _signer = { kind: "walletconnect", address: (wc.accounts || [])[0],
-        sign: (td, from) => wc.request(
-          { method: "eth_signTypedData_v4", params: [from, JSON.stringify(td)] }),
-        sendTx: ({ to, data }) => wc.request(
-          { method: "eth_sendTransaction",
-            params: [{ from: (wc.accounts || [])[0], to, data, value: "0x0" }] }) };
-      return _signer;
-    }
-    async function connectSign(payload) {
-      const s = await getSigner();
-      return s.sign(payload.typedData, s.address);
-    }
-
-    // ---------------- SIGN VIEW ----------------
-    const stok = new URLSearchParams(location.search).get("t");
-    if (stok) {
-      $("signview").classList.remove("hide");
-      const info = $("signinfo"), details = $("signdetails"), out = $("signout"), go = $("signgo");
-      let payload = null;
-      (async () => {
-        const { status, body } = await api(`/order?t=${encodeURIComponent(stok)}`);
-        if (status !== 200 || !body || body.error) { info.textContent = "Orden no disponible: " + (body && body.error ? body.error : status); return; }
-        payload = body.payload;
-        const p = body.preorder || {};
-        info.innerHTML = `Orden <b>#${esc(p.id)}</b> · ${esc(p.token || "")}<br>` +
-          `<span class="mut">No-custodial: tú firmas; el bot nunca tiene tus llaves.</span>`;
-        details.textContent = JSON.stringify(payload.typedData && payload.typedData.message ? payload.typedData.message : payload, null, 2);
-        details.classList.remove("hide");
-        go.disabled = false;
-      })();
-      go.onclick = async () => {
-        try {
-          out.textContent = "Conectando wallet…"; go.disabled = true;
-          const sig = await connectSign(payload);
-          out.textContent = "Enviando firma…";
-          const { status, body } = await api("/sign", { method: "POST",
-            headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t: stok, signature: sig }) });
-          out.innerHTML = (status === 200 && body && body.ok)
-            ? '<span class="ok">✅ Orden firmada. El keeper la ejecutará al cumplirse la condición.</span>'
-            : 'Error: ' + JSON.stringify(body || status);
-        } catch (e) { out.textContent = "Cancelado/error: " + (e && e.message ? e.message : e); go.disabled = false; }
-      };
-    } else {
+    // Custody-only: removed the non-custodial sign view + WalletConnect (no esm.sh dependency).
+    {
       // ---------------- MAIN APP ----------------
       $("main").classList.remove("hide");
       //  Use the language saved in the bot (overrides Telegram's), then re-render labels.
@@ -479,7 +398,7 @@
         }
         if (POS_TIMER) { clearInterval(POS_TIMER); POS_TIMER = null; }
         if (name === "pos") { loadPositions(); POS_TIMER = setInterval(() => loadPositions().catch(() => {}), 10000); }
-        if (name === "wal") { loadWallet(); loadCustody(); loadReferral(); loadBridge(); loadTier(); loadSec(); loadSessions(); }
+        if (name === "wal") { loadWallet(); loadCustody(); loadReferral(); loadBridge(); loadTier(); loadSec(); }
         if (name === "alr") loadAlerts();
         if (name === "copy") loadCopy();
       }
@@ -605,36 +524,18 @@
         const amt = parseFloat($("amount").value || "0");
         const slip = parseFloat($("slippage").value || "3");
         if (!token || !amt) { $("armout").textContent = "Consulta un token y pon un monto."; return; }
-        if (CUSTODY && CUSTODY.exists) {
-          $("armout").textContent = "Comprando al instante…";
-          const r = await api("/custody/buy", { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token: token.address, amount_usdc: amt, slippage: slip }) });
-          if (r.status === 200 && r.body && r.body.executing) {
-            const saved = await saveExitPlanFromBuy(token.address);
-            $("armout").innerHTML = '<span class="ok">✅ Comprado al instante.</span>' + (saved ? ' <span class="mut">(TP/SL guardados)</span>' : '');
-          } else {
-            $("armout").innerHTML = `<span class="bad">Error: ${esc((r.body && r.body.error) || r.status)}</span>`;
-          }
+        if (!CUSTODY || !CUSTODY.exists) {
+          $("armout").innerHTML = '<span class="warn">Crea tu wallet del bot (pestaña Cartera) para comprar.</span>';
           return;
         }
-        $("armout").textContent = "Creando orden…";
-        const { status, body } = await api("/buy_order", { method: "POST",
-          headers: { "Content-Type": "application/json" },
+        $("armout").textContent = "Comprando al instante…";
+        const r = await api("/custody/buy", { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token: token.address, amount_usdc: amt, slippage: slip }) });
-        if (status === 200 && body && body.executing) {
-          $("armout").innerHTML = '<span class="ok">✅ Comprando en 1 toque (sin firma).</span>';
-        } else if (status === 200 && body && body.sign_url) {
-          location.href = body.sign_url;
-        } else if (body && body.hint === "link_wallet") {
-          $("armout").innerHTML = 'Primero enlaza tu wallet: envía <b>/link_wallet 0xTuDireccion</b> en el chat del bot y vuelve a intentar.';
-        } else if (body && body.error === "no_pool") {
-          $("armout").innerHTML = '<span class="warn">Ese token no tiene pool v4 en Arc todavía; no se puede operar aquí.</span>';
-        } else if (body && body.error === "pool_not_allowed") {
-          $("armout").innerHTML = '<span class="warn">El pool no está habilitado en el contrato. Pásale al admin este poolId para allowlistear:<br><code>' + esc(body.pool_id) + '</code></span>';
-        } else if (body && body.error) {
-          $("armout").innerHTML = `<span class="bad">No se pudo crear la orden: ${esc(body.error)}</span>`;
+        if (r.status === 200 && r.body && r.body.executing) {
+          const saved = await saveExitPlanFromBuy(token.address);
+          $("armout").innerHTML = '<span class="ok">✅ Comprado al instante.</span>' + (saved ? ' <span class="mut">(TP/SL guardados)</span>' : '');
         } else {
-          $("armout").innerHTML = `<span class="bad">No se pudo crear la orden (HTTP ${status}).</span>`;
+          $("armout").innerHTML = `<span class="bad">Error: ${esc((r.body && r.body.error) || r.status)}</span>`;
         }
       };
 
@@ -844,27 +745,6 @@
           : `<span class="bad">${esc((r.body && r.body.error) || r.status)}</span>`;
         if (r.status === 200) { $("secaddr").value = ""; $("seccode").value = ""; loadSec(); }
       };
-
-      async function loadSessions() {
-        const { status, body } = await api("/sessions");
-        if (status !== 200 || !body) { $("sessout").innerHTML = ""; return; }
-        const ss = body.sessions || [];
-        $("sessout").innerHTML = ss.length
-          ? ss.map(s => `<div class="card" style="padding:8px">
-              <div class="mut" style="font-size:11px;word-break:break-all">${esc(s.token_in)}</div>
-              <div class="kv"><span>max/op</span><b>$${((s.max_per_order || 0) / 1e6).toFixed(2)}</b></div>
-              <div class="kv"><span>max total</span><b>$${((s.max_total || 0) / 1e6).toFixed(2)}</b></div>
-              <div class="kv"><span>minOutFloor</span><b>${s.min_out_floor || 0}</b></div>
-              <div class="kv"><span>expira</span><b>${new Date((s.expiry || 0) * 1000).toLocaleString()}</b></div>
-              <button class="ghost sessrev" data-k="${esc(s.session_key)}" style="margin-top:6px">${esc(t("sess_revoke"))}</button>
-            </div>`).join("")
-          : `<span class="mut">${esc(t("sess_none"))}</span>`;
-        document.querySelectorAll(".sessrev").forEach(b => b.onclick = async () => {
-          await api("/session/revoke", { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ session_key: b.dataset.k }) });
-          loadSessions();
-        });
-      }
 
       let COPY = null;
       async function loadCopy() {

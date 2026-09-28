@@ -57,12 +57,12 @@ def _csp(html: bytes) -> str:
     for m in re.finditer(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", txt, re.S | re.I):
         h = hashlib.sha256(m.group(1).encode()).digest()
         hashes.append("'sha256-" + base64.b64encode(h).decode() + "'")
-    script_src = " ".join(["'self'", "https://telegram.org", "https://esm.sh"] + hashes)
+    script_src = " ".join(["'self'", "https://telegram.org"] + hashes)
     return ("default-src 'self'; "
             f"script-src {script_src}; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' https: data:; "
-            "connect-src 'self' https://esm.sh https://*.walletconnect.com wss://*.walletconnect.com; "
+            "connect-src 'self'; "
             "frame-src https://dexscreener.com; "
             "frame-ancestors https://web.telegram.org https://*.telegram.org; "
             "base-uri 'self'; object-src 'none'; form-action 'self'")
