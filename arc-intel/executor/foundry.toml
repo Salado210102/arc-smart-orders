@@ -11,3 +11,8 @@ optimizer_runs = 200
 via_ir = true
 bytecode_hash = "none"
 fs_permissions = [{ access = "read-write", path = "./" }]
+
+# Stateful invariant campaign (V1/V2/V3): heavy but bounded.
+[invariant]
+runs = 5000
+depth = 100

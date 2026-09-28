@@ -149,4 +149,59 @@ contract ArcIntelExecutorV3Test is Test {
         mainnetExec.setAllowedHook(key.hooks, true);
         assertTrue(mainnetExec.allowedHooks(key.hooks));
     }
+
+    function testHookRevokedBlocks() public {
+        _authorize();
+        vm.prank(safe);
+        exec.setAllowedHook(key.hooks, true);   // allow
+        vm.prank(safe);
+        exec.setAllowedHook(key.hooks, false);  // revoke
+        ArcIntelExecutorV3.SessionOrder memory o = _order(100e18, 0, 1);
+        bytes memory sig = _sign(o);
+        vm.expectRevert(abi.encodeWithSelector(ArcIntelExecutorV3.PoolNotAllowed.selector, poolId));
+        exec.executeWithSession(o, sig);
+    }
+
+    function testAllowedHookOnlyCoversItsOwnHook() public {
+        vm.prank(safe);
+        exec.setAllowedHook(address(0xDEAD), true); // a different hook
+        _authorize();
+        ArcIntelExecutorV3.SessionOrder memory o = _order(100e18, 0, 1);
+        bytes memory sig = _sign(o);
+        vm.expectRevert(abi.encodeWithSelector(ArcIntelExecutorV3.PoolNotAllowed.selector, poolId));
+        exec.executeWithSession(o, sig);
+    }
+
+    function testAllowAllPoolsPermitsArbitraryPool() public {
+        vm.prank(safe);
+        exec.setAllowAllPools(true);
+        _authorize();
+        pm.setRate(1e18);
+        ArcIntelExecutorV3.SessionOrder memory o = _order(100e18, 0, 1);
+        uint256 before = tok.balanceOf(user);
+        exec.executeWithSession(o, _sign(o));
+        assertEq(tok.balanceOf(user) - before, 100e18);
+    }
+
+    function testHostileAllowedHookIsContained() public {
+        MaliciousHook hook = new MaliciousHook(address(exec), address(tok), user);
+        IPoolManager.PoolKey memory k2 =
+            IPoolManager.PoolKey(key.currency0, key.currency1, 10000, 200, address(hook));
+        bytes32 pid2 = keccak256(abi.encode(k2));
+        vm.prank(safe);
+        exec.setAllowedHook(address(hook), true);
+        vm.prank(user);
+        exec.authorizeSession(sessionKey, pid2, address(usdc), type(uint256).max, type(uint256).max, 0,
+                              uint64(block.timestamp + 1 days));
+        pm.setSwapHook(address(hook));
+        pm.setRate(1e18);
+        ArcIntelExecutorV3.SessionOrder memory o = ArcIntelExecutorV3.SessionOrder({
+            user: user, key: k2, zeroForOne: buyZeroForOne, amountIn: 100e18, minOut: 0, recipient: user,
+            orderNonce: 1, deadline: block.timestamp + 100
+        });
+        uint256 before = tok.balanceOf(user);
+        exec.executeWithSession(o, _sign(o));
+        assertEq(tok.balanceOf(user) - before, 100e18);
+        assertTrue(hook.reentryBlocked(), "reentry via hook not blocked");
+    }
 }
