@@ -63,6 +63,21 @@ class ReferralStoreTests(unittest.TestCase):
         commands.capture_referral(self.s, 1, f"/start ref_{code}")   # self-referral ignored
         self.assertEqual(self.s.get_referrer(1), "")
 
+    def test_breakdown_by_referred(self):
+        code = self.s.ensure_referral_code(1, R.make_code(1))
+        self.s.bind_referral(2, 1, code)
+        self.s.bind_referral(3, 1, code)
+        self.s.record_fill("t1:buy", 2, "0x" + "a" * 40, "buy", 1.0, 100.0)  # -> 0.30
+        self.s.record_fill("t2:buy", 2, "0x" + "a" * 40, "buy", 1.0, 100.0)  # -> 0.30
+        self.s.record_fill("t3:buy", 3, "0x" + "b" * 40, "buy", 1.0, 200.0)  # -> 0.60
+        b = self.s.referral_breakdown(1)
+        self.assertEqual(len(b), 2)
+        self.assertEqual(b[0]["buyer"], "3")                     # highest commission first
+        self.assertAlmostEqual(b[0]["commission_usdc"], 0.60)
+        self.assertEqual(b[1]["buyer"], "2")
+        self.assertEqual(b[1]["fills"], 2)
+        self.assertAlmostEqual(b[1]["commission_usdc"], 0.60)
+
     def test_credits_listed(self):
         code = self.s.ensure_referral_code(1, R.make_code(1))
         self.s.bind_referral(2, 1, code)

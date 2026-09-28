@@ -163,14 +163,20 @@ TEXTS: dict[str, dict[str, str]] = {
     "wallet_disconnected": {"en": "\u2705 Wallet disconnected.", "es": "\u2705 Cartera desconectada.",
                             "zh": "\u2705 钱包已断开。"},
     "wallet_text": {
-        "en": ("\U0001F510 <b>Wallet (non-custodial)</b>\n"
-               "SNIPER IA never holds your funds or keys. You trade with <b>your own wallet</b> and "
-               "sign every order yourself. No deposit/withdraw inside the bot."),
-        "es": ("\U0001F510 <b>Cartera (no-custodial)</b>\n"
-               "SNIPER IA nunca guarda tus fondos ni tus claves. Operas con <b>tu propia cartera</b> y "
-               "firmas tú cada orden. Sin depósito/retiro dentro del bot."),
-        "zh": ("\U0001F510 <b>钱包（非托管）</b>\n"
-               "SNIPER IA 从不保管你的资金或私钥。你使用<b>自己的钱包</b>交易并亲自签署每笔订单。机器人内无充值/提现。"),
+        "en": ("\U0001F517 <b>Linked wallet (watch-only)</b>\n"
+               "Link your own wallet (read-only, no keys) to auto-follow the tokens it holds "
+               "(future alerts only).\n\n"
+               "\U0001F45B To <b>trade instantly</b>, create your <b>bot wallet</b> (custody) in the "
+               "Mini App \u2192 Cartera. Deposit USDC and the bot operates for you; withdraw anytime."),
+        "es": ("\U0001F517 <b>Cartera enlazada (solo lectura)</b>\n"
+               "Enlaza tu propia cartera (solo lectura, sin claves) para seguir automáticamente los "
+               "tokens que tenga (solo alertas futuras).\n\n"
+               "\U0001F45B Para <b>operar al instante</b>, crea tu <b>wallet del bot</b> (custodia) en la "
+               "Mini App \u2192 Cartera. Deposita USDC y el bot opera por ti; retira cuando quieras."),
+        "zh": ("\U0001F517 <b>已关联钱包（只读）</b>\n"
+               "关联你自己的钱包（只读，无私钥）以自动关注其中的代币（仅未来提醒）。\n\n"
+               "\U0001F45B 想要<b>即时交易</b>，请在 Mini App \u2192 钱包 中创建<b>机器人钱包</b>（托管）。"
+               "存入 USDC，机器人代为操作；随时可提取。"),
     },
     "btn_check_now": {"en": "\u26A1 Check a token now", "es": "\u26A1 Consultar un token ahora",
                       "zh": "\u26A1 立即查询代币"},
@@ -205,6 +211,31 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Your code: <code>{code}</code> (share it; the bot will attribute new users).",
         "es": "Tu código: <code>{code}</code> (compártelo; el bot atribuirá a los nuevos usuarios).",
         "zh": "你的代码：<code>{code}</code>（分享它，机器人将归因新用户）。",
+    },
+    "btn_ref_stats": {"en": "\U0001F4CA Referral stats", "es": "\U0001F4CA Estadísticas",
+                      "zh": "\U0001F4CA 推荐统计"},
+    "btn_ref_back": {"en": "\u2B05\uFE0F Back", "es": "\u2B05\uFE0F Volver", "zh": "\u2B05\uFE0F 返回"},
+    "referral_stats_text": {
+        "en": ("\U0001F4CA <b>Your referral stats</b>\n\n"
+               "\U0001F465 Invited: <b>{referred}</b>\n"
+               "\U0001F4B5 Accrued: <b>${accrued:.2f}</b>\n"
+               "\u23F3 Pending payout: <b>${pending:.2f}</b>\n\n"
+               "<b>By referred user</b>\n{detail}"),
+        "es": ("\U0001F4CA <b>Estadísticas de tus referidos</b>\n\n"
+               "\U0001F465 Invitados: <b>{referred}</b>\n"
+               "\U0001F4B5 Acumulado: <b>${accrued:.2f}</b>\n"
+               "\u23F3 Pendiente de pago: <b>${pending:.2f}</b>\n\n"
+               "<b>Por usuario referido</b>\n{detail}"),
+        "zh": ("\U0001F4CA <b>你的推荐统计</b>\n\n"
+               "\U0001F465 已邀请：<b>{referred}</b>\n"
+               "\U0001F4B5 累计：<b>${accrued:.2f}</b>\n"
+               "\u23F3 待支付：<b>${pending:.2f}</b>\n\n"
+               "<b>按被推荐用户</b>\n{detail}"),
+    },
+    "referral_stats_empty": {
+        "en": "No referred volume yet. Share your link to start earning.",
+        "es": "Aún no hay volumen referido. Comparte tu enlace para empezar a ganar.",
+        "zh": "暂无推荐交易量。分享你的链接即可开始赚取。",
     },
 }
 

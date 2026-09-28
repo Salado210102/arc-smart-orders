@@ -377,3 +377,9 @@ auditoría + hot key acotada; no es lo primero).
   Tests: **63** en los módulos tocados (13 + 1 de pantalla + 1 de integración nuevos); suite total
   **348 passed** (1 fallo **ambiental** local de la Mini App). Nota: las comisiones quedan **acumuladas**
   (`status='accrued'`); el **pago en USDC** se hará cuando el cobro del fee esté activo en mainnet.
+- **2026-09-27 (referidos: estadísticas)** — Botón **"📊 Estadísticas"** en la pantalla `/referral`
+  (callback `ref:stats` / volver `ref:home`) con **desglose por usuario referido** (ops · fee · comisión),
+  vía `store.referral_breakdown`; mismo desglose en la **tarjeta de la Mini App** (`GET /referral`
+  devuelve `breakdown`). Además se **corrige el copy de `/wallet`** (decía "non-custodial"): ahora
+  describe la **cartera enlazada solo-lectura** y remite al **wallet del bot (custodia)** en la Mini App.
+  Suite total **351 passed** (1 fallo ambiental local).

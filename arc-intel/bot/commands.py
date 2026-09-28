@@ -163,8 +163,29 @@ def referral_screen(store, chat, lang) -> dict:
         accrued=s["accrued"], pending=s["pending"])
     if not link:
         text += "\n\n" + i18n.t("referral_nolink", lang).format(code=code)
-    rows = [[{"text": i18n.t("btn_app", lang), "web_app": i18n.MINIAPP_URL}]]
+    rows = [[{"text": i18n.t("btn_ref_stats", lang), "data": "ref:stats"}],
+            [{"text": i18n.t("btn_app", lang), "web_app": i18n.MINIAPP_URL}]]
     return {"text": text, "inline": rows, "parse_mode": "HTML"}
+
+
+def referral_stats_screen(store, chat, lang) -> dict:
+    """Per-referred-user breakdown: who traded, how much, and what you earned."""
+    s = store.referral_summary(chat)
+    rows = store.referral_breakdown(chat)
+    if rows:
+        lines = []
+        for r in rows:
+            uid = str(r["buyer"])
+            short = uid if len(uid) <= 9 else (uid[:4] + "\u2026" + uid[-4:])
+            lines.append(f"\u2022 <b>{_html.escape(short)}</b> \u2014 {r['fills']} ops \u00b7 "
+                         f"fee ${r['fee_usdc']:.2f} \u00b7 <b>${r['commission_usdc']:.2f}</b>")
+        detail = "\n".join(lines)
+    else:
+        detail = i18n.t("referral_stats_empty", lang)
+    text = i18n.t("referral_stats_text", lang).format(
+        referred=s["referred"], accrued=s["accrued"], pending=s["pending"], detail=detail)
+    btns = [[{"text": i18n.t("btn_ref_back", lang), "data": "ref:home"}]]
+    return {"text": text, "inline": btns, "parse_mode": "HTML", "edit": True}
 
 
 def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_block: int,
@@ -330,7 +351,7 @@ def _arm_protect(store, chat, token, pct, floor_pct, price_fn) -> str:
                                 status="armed")
     return (f"\U0001F6E1\uFE0F [PAPER] Protection <b>#{pid}</b> ARMED \u2014 sell <b>{pct:.0f}%</b> "
             f"(~{qty:.4g}) if a dev-sell/rug trigger fires (floor ${min_out:.2f}, ~30 days).\n"
-            f"<i>The real (signed, non-custodial) version arrives with the signing UX (Opción 2).</i>")
+            f"<i>The real version runs automatically with your bot wallet (Modo Maestro).</i>")
 
 
 def fire_preorders(store, alerts, transport, thr, price_fn) -> int:
@@ -698,6 +719,12 @@ def _handle_callback(data, chat, store, token_exists, check_fn, now_block,
         return screen
     if data == "wallet:refresh":
         screen = wallet_screen(store, chat, lang)
+        screen["edit"] = True
+        return screen
+    if data == "ref:stats":
+        return referral_stats_screen(store, chat, lang)
+    if data == "ref:home":
+        screen = referral_screen(store, chat, lang)
         screen["edit"] = True
         return screen
     if data.startswith("buymenu:"):

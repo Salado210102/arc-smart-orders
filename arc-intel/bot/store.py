@@ -830,6 +830,16 @@ class SubscriptionStore:
         return {"referred": int(n), "fills": int(fills or 0), "accrued": total,
                 "paid": paid, "pending": total - paid}
 
+    def referral_breakdown(self, owner_chat) -> list:
+        """Per-referred-user totals (fills, fees, commission), highest commission first."""
+        rows = self.conn.execute(
+            "SELECT buyer_chat, COUNT(*), COALESCE(SUM(fee_usdc),0), "
+            "COALESCE(SUM(commission_usdc),0), MAX(created_ts) FROM referral_credits "
+            "WHERE owner_chat=? GROUP BY buyer_chat ORDER BY SUM(commission_usdc) DESC",
+            (str(owner_chat),)).fetchall()
+        return [{"buyer": r[0], "fills": int(r[1]), "fee_usdc": float(r[2]),
+                 "commission_usdc": float(r[3]), "last_ts": int(r[4] or 0)} for r in rows]
+
     def list_referral_credits(self, owner_chat, limit: int = 50) -> list:
         return [{"buyer": r[0], "token": r[1], "fee_usdc": float(r[2]),
                  "commission_usdc": float(r[3]), "ts": int(r[4]), "status": r[5]}

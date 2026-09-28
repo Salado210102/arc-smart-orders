@@ -764,10 +764,12 @@ class Handler(BaseHTTPRequestHandler):
                 botu = store.get_state("bot_username", "") or refs.bot_username()
                 s = store.referral_summary(uid)
                 credits = store.list_referral_credits(uid, limit=20)
+                breakdown = store.referral_breakdown(uid)
             finally:
                 store.close()
             return self._send(200, {"code": code, "link": refs.referral_link(botu, code),
-                                    "pct": refs.REFERRAL_PCT_BPS / 100.0, "credits": credits, **s})
+                                    "pct": refs.REFERRAL_PCT_BPS / 100.0, "credits": credits,
+                                    "breakdown": breakdown, **s})
         if u.path == "/buy_quote":
             uid = self._auth_user()
             if uid is None:

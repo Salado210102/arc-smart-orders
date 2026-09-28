@@ -154,9 +154,28 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(r["parse_mode"], "HTML")
         self.assertIn("30%", r["text"])
         self.assertIn(self.store.get_referral_code(1), r["text"])
+        # a button to open the per-referral stats
+        flat = [b for row in r["inline"] for b in row]
+        self.assertTrue(any(b.get("data") == "ref:stats" for b in flat))
 
-    def test_wallet_panel_non_custodial(self):
-        self.assertIn("custodial", self.reply("/wallet"))
+    def test_referral_stats_button_and_screen(self):
+        code = self.store.ensure_referral_code(1, "ABCDEFGH")
+        self.store.bind_referral(2, 1, code)
+        self.store.record_fill("t1:buy", 2, ADDR, "buy", 1.0, 100.0)
+        r = _handle_callback("ref:stats", 1, self.store, self.exists, self.check, 1000)
+        self.assertEqual(r["parse_mode"], "HTML")
+        self.assertTrue(r.get("edit"))
+        self.assertIn("0.30", r["text"])            # 30% of a $1.00 fee
+        self.assertIn("2", r["text"])               # the referred user id
+        back = [b for row in r["inline"] for b in row]
+        self.assertTrue(any(b.get("data") == "ref:home" for b in back))
+        home = _handle_callback("ref:home", 1, self.store, self.exists, self.check, 1000)
+        self.assertIn(code, home["text"])
+
+    def test_wallet_panel_watch_only_and_custody(self):
+        r = self.reply("/wallet")
+        self.assertIn("watch-only", r)
+        self.assertIn("custody", r)
 
     def test_connect_wallet(self):
         self.assertIn("No wallet", self.reply("/wallet"))
