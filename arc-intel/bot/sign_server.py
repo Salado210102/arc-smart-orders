@@ -794,17 +794,20 @@ class Handler(BaseHTTPRequestHandler):
                 w = CT.round_window(time.time())
                 trader = store.volume_by_user_since(w["start"])
                 aff = store.referred_volume_by_user_since(w["start"])
+                st = CT.standings(trader, aff, top=10)
+
+                def _named(rows):
+                    return [{"rank": r["rank"],
+                             "user": store.get_state(f"name:{r['user']}", "") or CT.mask_user(r["user"]),
+                             "volume": r["volume"]} for r in rows]
+
+                top_t, top_a = _named(st["trader_top"]), _named(st["affiliate_top"])
+                me = {"trader": CT.rank_of(trader, uid), "affiliate": CT.rank_of(aff, uid)}
             finally:
                 store.close()
-            st = CT.standings(trader, aff, top=10)
-            masked = lambda rows: [{"rank": r["rank"], "user": CT.mask_user(r["user"]),
-                                    "volume": r["volume"]} for r in rows]
-            return self._send(200, {
-                "round": w, "pozo": st["pozo"], "prize": st["prize"],
-                "total_volume": st["total_volume"],
-                "trader_top": masked(st["trader_top"]),
-                "affiliate_top": masked(st["affiliate_top"]),
-                "me": {"trader": CT.rank_of(trader, uid), "affiliate": CT.rank_of(aff, uid)}})
+            return self._send(200, {"round": w, "pozo": st["pozo"], "prize": st["prize"],
+                                    "total_volume": st["total_volume"], "trader_top": top_t,
+                                    "affiliate_top": top_a, "me": me})
         if u.path == "/buy_quote":
             uid = self._auth_user()
             if uid is None:

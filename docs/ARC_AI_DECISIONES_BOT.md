@@ -409,6 +409,16 @@ auditoría + hot key acotada; no es lo primero).
   puesto) y **botón dinámico "🏆 Pozo $X"** en el menú de `/start` (que abre `/pozo`), además de una
   **línea de pozo + contador** encabezando el mensaje de bienvenida. Registrado EN/ES/ZH. Suite
   **372 passed** (1 fallo ambiental local).
+- **2026-09-27 (publicación del ganador al canal)** — **Settlement automático**: `monetization/contest.py`
+  añade `previous_round`, `winner` y `settle` (ganador + premio por categoría). `bot/contest_publish.py`
+  (`publish_round`) calcula la ronda cerrada, y **1 h después** del cierre publica en el **canal oficial**
+  (`ARC_INTEL_CHANNEL`) el pozo y los campeones **trader** y **afiliado** con su premio; idempotente por
+  ronda (marca en `contest_rounds`, histórico en `contest_winners`), reintenta si el envío falla. Se
+  **captura el `@username`** del remitente (`name:{chat}`) para anunciar el alias (si no, se enmascara).
+  Enganchado al loop (tras `dispatch`). Store: `volume_by_user_between`, `referred_volume_between`,
+  `contest_round_published`/`mark_contest_round`/`record_contest_winner`/`list_contest_winners`. Tests
+  **+4**. Suite **375 passed** (1 fallo ambiental local). **Nota:** el canal debe configurarse
+  (`ARC_INTEL_CHANNEL=-100…`); hoy **dormido** hasta entonces.
   `copy_subs` + `add/get/list/remove/set_enabled/bump_spent/set_last_block`. Bot: comandos
   **`/copytrade <addr> [max_por_op] [presupuesto]`** y **`/copyoff`**; botón del menú **Copytrade**
   ahora **funcional** (`cmd:/copytrade`); comando registrado EN/ES/ZH. Thread propio en el loop

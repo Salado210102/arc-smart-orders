@@ -63,6 +63,51 @@ class ContestStoreTests(unittest.TestCase):
         self.s.record_fill("tx2:buy", "2", self.tok, "buy", 1.0, 200.0, ts=1500)
         self.assertEqual(self.s.referred_volume_by_user_since(1200), {"10": 200.0})
 
+    def test_volume_between(self):
+        self.s.record_fill("a:buy", "1", self.tok, "buy", 1.0, 100.0, ts=10)
+        self.s.record_fill("b:buy", "2", self.tok, "buy", 1.0, 200.0, ts=20)
+        self.assertEqual(self.s.volume_by_user_between(15, 25), {"2": 200.0})
+
+
+class _Transport:
+    def __init__(self):
+        self.msgs = []
+
+    def send(self, chat, text, **kw):
+        self.msgs.append((chat, text))
+
+
+class ContestPublishTests(unittest.TestCase):
+    def setUp(self):
+        self.s = SubscriptionStore(":memory:")
+        self.tok = "0x" + "a" * 40
+        self.R = 12 * 3600
+
+    def tearDown(self):
+        self.s.close()
+
+    def test_publish_once_and_idempotent(self):
+        from bot.contest_publish import publish_round
+        now = 10 * self.R + 4000                       # 1h+ into the round starting at 10R
+        self.s.record_fill("tx1:buy", "1", self.tok, "buy", 1.0, 1000.0, ts=9 * self.R + 10)
+        self.s.set_state("name:1", "@winner")
+        t = _Transport()
+        res = publish_round(self.s, t, now, "-100123")
+        self.assertIsNotNone(res)
+        self.assertEqual(res["winners"], 1)
+        self.assertEqual(len(t.msgs), 1)
+        self.assertIn("@winner", t.msgs[0][1])
+        self.assertEqual(t.msgs[0][0], "-100123")
+        self.assertIsNone(publish_round(self.s, t, now, "-100123"))   # already published
+        self.assertEqual(len(t.msgs), 1)
+
+    def test_not_published_too_early_or_without_channel(self):
+        from bot.contest_publish import publish_round
+        t = _Transport()
+        self.assertIsNone(publish_round(self.s, t, 10 * self.R + 100, "-100"))   # <1h after close
+        self.assertIsNone(publish_round(self.s, t, 10 * self.R + 4000, ""))      # no channel
+        self.assertEqual(t.msgs, [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -56,6 +56,27 @@ def standings(trader_vol: dict, affiliate_vol: dict | None = None, *, top: int =
             "affiliate_top": leaderboard(affiliate_vol, top)}
 
 
+def previous_round(now: float, round_hours: int = ROUND_HOURS) -> dict:
+    """The round that just closed (the one before the current one)."""
+    cur = round_window(now, round_hours)
+    secs = cur["end"] - cur["start"]
+    return {"id": cur["start"] - secs, "start": cur["start"] - secs, "end": cur["start"]}
+
+
+def winner(volume_by_user: dict) -> dict | None:
+    lb = leaderboard(volume_by_user, top=1)
+    return lb[0] if lb else None
+
+
+def settle(trader_vol: dict, affiliate_vol: dict, fee_bps: int = FEE_BPS) -> dict:
+    """Final results of a closed round: who won each category and the prize each takes."""
+    total = sum(float(v) for v in (trader_vol or {}).values())
+    p = pozo(total, fee_bps)
+    pr = split_prize(p)
+    return {"total_volume": total, "pozo": p, "prize": pr,
+            "trader": winner(trader_vol), "affiliate": winner(affiliate_vol)}
+
+
 def rank_of(volume_by_user: dict, user: str) -> dict:
     """The given user's rank (1-based) and volume, or rank 0 if not on the board."""
     lb = leaderboard(volume_by_user, top=10_000)

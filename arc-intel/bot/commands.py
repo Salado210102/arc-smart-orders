@@ -225,8 +225,11 @@ def contest_screen(store, chat, lang) -> dict:
     def lines(rows):
         if not rows:
             return i18n.t("contest_empty", lang)
-        return "\n".join(f"#{r['rank']} <b>{_html.escape(CT.mask_user(r['user']))}</b> \u2014 "
-                         f"${r['volume']:,.0f}" for r in rows)
+        out = []
+        for r in rows:
+            nm = store.get_state(f"name:{r['user']}", "") or CT.mask_user(r["user"])
+            out.append(f"#{r['rank']} <b>{_html.escape(nm)}</b> \u2014 ${r['volume']:,.0f}")
+        return "\n".join(out)
 
     me_t = CT.rank_of(trader, chat)["rank"]
     me_a = CT.rank_of(aff, chat)["rank"]
@@ -738,6 +741,19 @@ def _ensure_bot_username(bot_token, store) -> str:
     return u
 
 
+def _capture_name(store, chat, from_obj) -> None:
+    """Remember the sender's @username / first name (for public contest announcements)."""
+    try:
+        if not from_obj:
+            return
+        uname = from_obj.get("username")
+        name = ("@" + uname) if uname else (from_obj.get("first_name") or "")
+        if name:
+            store.set_state(f"name:{chat}", name)
+    except Exception:
+        pass
+
+
 def _get_updates(bot_token: str, offset: int, timeout: int = 25):
     url = f"https://api.telegram.org/bot{bot_token}/getUpdates"
     body = json.dumps({"offset": offset, "timeout": timeout,
@@ -934,6 +950,7 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
             message_id = cm.get("message_id")
             if chat is None:
                 continue
+            _capture_name(store, chat, cb.get("from"))
             data = cb.get("data") or ""
             if not is_authorized(store, chat):
                 store.add_request(chat, int(time.time()))
@@ -968,6 +985,7 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
             continue
         capture_referral(store, chat, text)
         _ensure_bot_username(bot_token, store)
+        _capture_name(store, chat, msg.get("from"))
         if not is_authorized(store, chat):
             store.add_request(chat, int(time.time()))
             log_reply = _emit(sender, chat, CLOSED_BETA)

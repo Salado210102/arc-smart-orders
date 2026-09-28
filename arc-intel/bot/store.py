@@ -125,6 +125,14 @@ class SubscriptionStore:
             "CREATE TABLE IF NOT EXISTS referral_credits ("
             "fill_id TEXT PRIMARY KEY, owner_chat TEXT, buyer_chat TEXT, token TEXT, "
             "fee_usdc REAL, commission_usdc REAL, created_ts INTEGER, status TEXT DEFAULT 'accrued')")
+        # contest: per-round settlement (who won, how much) + published marker
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS contest_rounds ("
+            "round_id INTEGER PRIMARY KEY, published_ts INTEGER)")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS contest_winners ("
+            "round_id INTEGER, category TEXT, user TEXT, volume REAL, prize REAL, "
+            "PRIMARY KEY (round_id, category))")
         # copy-trading: follow a leader wallet and mirror its trades with the bot wallet
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS copy_subs ("
@@ -566,6 +574,43 @@ class SubscriptionStore:
             "WHERE f.ts>=? AND f.fill_id NOT LIKE 'paper%' GROUP BY rb.owner_chat",
             (int(ts),)).fetchall()
         return {r[0]: float(r[1] or 0.0) for r in rows}
+
+    def volume_by_user_between(self, start, end) -> dict:
+        rows = self.conn.execute(
+            "SELECT user, COALESCE(SUM(usdc),0) FROM fills WHERE ts>=? AND ts<? "
+            "AND fill_id NOT LIKE 'paper%' GROUP BY user", (int(start), int(end))).fetchall()
+        return {r[0]: float(r[1] or 0.0) for r in rows}
+
+    def referred_volume_between(self, start, end) -> dict:
+        rows = self.conn.execute(
+            "SELECT rb.owner_chat, COALESCE(SUM(f.usdc),0) FROM fills f "
+            "JOIN referral_bindings rb ON rb.chat=f.user WHERE f.ts>=? AND f.ts<? "
+            "AND f.fill_id NOT LIKE 'paper%' GROUP BY rb.owner_chat",
+            (int(start), int(end))).fetchall()
+        return {r[0]: float(r[1] or 0.0) for r in rows}
+
+    def contest_round_published(self, round_id) -> bool:
+        return self.conn.execute("SELECT 1 FROM contest_rounds WHERE round_id=?",
+                                 (int(round_id),)).fetchone() is not None
+
+    def mark_contest_round(self, round_id, ts=0) -> None:
+        self.conn.execute("INSERT OR REPLACE INTO contest_rounds(round_id,published_ts) VALUES(?,?)",
+                          (int(round_id), int(ts or time.time())))
+        self.conn.commit()
+
+    def record_contest_winner(self, round_id, category, user, volume, prize) -> None:
+        self.conn.execute(
+            "INSERT OR REPLACE INTO contest_winners(round_id,category,user,volume,prize) "
+            "VALUES(?,?,?,?,?)",
+            (int(round_id), str(category), str(user), float(volume), float(prize)))
+        self.conn.commit()
+
+    def list_contest_winners(self, round_id) -> list:
+        rows = self.conn.execute(
+            "SELECT category,user,volume,prize FROM contest_winners WHERE round_id=?",
+            (int(round_id),)).fetchall()
+        return [{"category": r[0], "user": r[1], "volume": float(r[2]), "prize": float(r[3])}
+                for r in rows]
 
     # --- pre-signed protective orders ---
     def create_preorder(self, chat, user, token, pct, floor_pct, min_out, deadline,

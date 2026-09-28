@@ -842,6 +842,14 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
                 pass
             batch = store.dequeue(2000)
             n = dispatch(batch, store, transport, throttle=thr, logo_fn=logo_fn)
+            try:
+                from .contest_publish import publish_round
+                res = publish_round(store, transport, int(time.time()),
+                                    os.environ.get("ARC_INTEL_CHANNEL", ""), logger=logger)
+                if res:
+                    logger({"contest": res})
+            except Exception:
+                pass
             from .approvals import propose as ap_propose
             now_ts = int(time.time())
             for a in alerts:
