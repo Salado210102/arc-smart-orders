@@ -50,8 +50,22 @@
   </div>
 
   <!-- ================= MAIN APP ================= -->
-  <div id="main" class="hide">
-    <nav>
+    <div id="main" class="hide">
+      <div class="card" id="pozocard" style="display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid #2a3a2a">
+        <div><div class="mut" style="font-size:12px" data-i18n="pozo_label">🏆 Pozo de la ronda</div>
+          <div id="pozoval" style="font-size:20px;font-weight:700">$0.00</div></div>
+        <div style="text-align:right"><div class="mut" style="font-size:12px" data-i18n="pozo_ends">termina en</div>
+          <div id="pozoend" style="font-weight:700">--:--</div>
+          <button class="ghost" id="pozobtn" style="margin-top:4px;font-size:12px" data-i18n="pozo_see">Ver ranking</button></div>
+      </div>
+      <div class="card hide" id="pozorank">
+        <div class="row" style="justify-content:space-between">
+          <div class="mut" data-i18n="pozo_ranking">Ranking de la ronda (trader · afiliado)</div>
+          <button class="ghost" id="pozorefresh">↻</button>
+        </div>
+        <div id="pozoout" style="margin-top:8px"></div>
+      </div>
+      <nav>
       <button id="tab-buy" class="on" data-i18n="tab_buy">Compra</button>
       <button id="tab-pos" data-i18n="tab_pos">Posiciones</button>
       <button id="tab-wal" data-i18n="tab_wal">Cartera</button>
@@ -224,7 +238,11 @@
         copy_leader: "Líder", copy_per: "Máx/op", copy_budget: "Presupuesto",
         copy_spent: "Gastado", copy_remaining: "Restante",
         copy_nocustody: "Necesitas tu wallet del bot (Cartera) con USDC para operar.",
-        copy_dryrun: "Modo simulación (dry-run): no ejecuta operaciones reales todavía." },
+        copy_dryrun: "Modo simulación (dry-run): no ejecuta operaciones reales todavía.",
+        pozo_label: "🏆 Pozo de la ronda", pozo_ends: "termina en", pozo_see: "Ver ranking",
+        pozo_ranking: "Ranking de la ronda (trader · afiliado)",
+        pozo_trader: "Trader", pozo_affiliate: "Afiliado", pozo_none: "Aún sin volumen esta ronda.",
+        pozo_you: "Tú" },
       en: { tab_buy: "Buy", tab_pos: "Positions", tab_wal: "Wallet", tab_alr: "Alerts",
         step1: "Step 1 · Paste the token address", check: "Check", step2: "Step 2 · Amount & slippage",
         amount: "amount USDC", buy: "Buy", tp_hint: "Optional: set automatically on buy.",
@@ -248,7 +266,11 @@
         copy_leader: "Leader", copy_per: "Max/trade", copy_budget: "Budget",
         copy_spent: "Spent", copy_remaining: "Remaining",
         copy_nocustody: "You need your bot wallet (Wallet tab) with USDC to trade.",
-        copy_dryrun: "Simulation mode (dry-run): no real trades yet." },
+        copy_dryrun: "Simulation mode (dry-run): no real trades yet.",
+        pozo_label: "🏆 Round prize pool", pozo_ends: "ends in", pozo_see: "See ranking",
+        pozo_ranking: "Round ranking (trader · affiliate)",
+        pozo_trader: "Trader", pozo_affiliate: "Affiliate", pozo_none: "No volume this round yet.",
+        pozo_you: "You" },
       zh: { tab_buy: "买入", tab_pos: "持仓", tab_wal: "钱包", tab_alr: "提醒",
         step1: "步骤 1 · 粘贴代币地址", check: "查询", step2: "步骤 2 · 金额和滑点",
         amount: "金额 USDC", buy: "买入", tp_hint: "可选：买入时自动设置。",
@@ -269,7 +291,11 @@
         copy_leader: "领袖", copy_per: "单笔上限", copy_budget: "预算",
         copy_spent: "已用", copy_remaining: "剩余",
         copy_nocustody: "你需要机器人钱包（钱包页）并持有 USDC 才能交易。",
-        copy_dryrun: "模拟模式（dry-run）：暂不执行真实交易。" }
+        copy_dryrun: "模拟模式（dry-run）：暂不执行真实交易。",
+        pozo_label: "🏆 本轮奖池", pozo_ends: "结束于", pozo_see: "查看排行",
+        pozo_ranking: "本轮排行（交易者 · 推荐人）",
+        pozo_trader: "交易者", pozo_affiliate: "推荐人", pozo_none: "本轮暂无交易量。",
+        pozo_you: "你" }
     };
     const t = (k) => (TR[LANG] && TR[LANG][k]) || TR.en[k] || k;
     function applyI18n() {
@@ -714,6 +740,27 @@
         };
       }
 
+      function fmtClock(sec) {
+        sec = Math.max(0, sec | 0);
+        const h = String(Math.floor(sec / 3600)).padStart(2, "0");
+        const m = String(Math.floor((sec % 3600) / 60)).padStart(2, "0");
+        return h + ":" + m;
+      }
+      async function loadPozo() {
+        const { status, body } = await api("/contest");
+        if (status !== 200 || !body) return;
+        $("pozoval").textContent = "$" + (body.pozo || 0).toFixed(2);
+        $("pozoend").textContent = fmtClock(body.round && body.round.seconds_left);
+        const rowHtml = (rows) => (rows && rows.length)
+          ? rows.map(r => `<div class="kv"><span>#${r.rank} ${esc(r.user)}</span><b>$${(r.volume || 0).toFixed(0)}</b></div>`).join("")
+          : `<span class="mut">${esc(t("pozo_none"))}</span>`;
+        $("pozoout").innerHTML =
+          `<div class="mut" style="font-size:12px">${esc(t("pozo_trader"))}</div>` + rowHtml(body.trader_top) +
+          `<div class="mut" style="font-size:12px;margin-top:8px">${esc(t("pozo_affiliate"))}</div>` + rowHtml(body.affiliate_top);
+      }
+      $("pozobtn").onclick = () => { $("pozorank").classList.toggle("hide"); loadPozo(); };
+      $("pozorefresh").onclick = () => loadPozo();
+
       async function saveCopy() {
         const leader = ($("copyleader").value || "").trim().toLowerCase();
         if (!/^0x[0-9a-f]{40}$/.test(leader)) { $("copysaveout").textContent = "CA inválida."; return; }
@@ -739,6 +786,8 @@
       }
 
       loadCustody().catch(() => {});
+      loadPozo().catch(() => {});
+      setInterval(() => loadPozo().catch(() => {}), 30000);
       if ($("ca").value) $("check").click();
     }
   </script>

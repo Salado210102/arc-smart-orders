@@ -552,6 +552,21 @@ class SubscriptionStore:
                  "avg_cost": (float(r[2]) / float(r[1])) if r[1] else 0.0, "last_block": int(r[4])}
                 for r in cur.fetchall()]
 
+    # --- contest / volume (real fills only; [PAPER] never counts) ---
+    def volume_by_user_since(self, ts: int) -> dict:
+        rows = self.conn.execute(
+            "SELECT user, COALESCE(SUM(usdc),0) FROM fills "
+            "WHERE ts>=? AND fill_id NOT LIKE 'paper%' GROUP BY user", (int(ts),)).fetchall()
+        return {r[0]: float(r[1] or 0.0) for r in rows}
+
+    def referred_volume_by_user_since(self, ts: int) -> dict:
+        rows = self.conn.execute(
+            "SELECT rb.owner_chat, COALESCE(SUM(f.usdc),0) FROM fills f "
+            "JOIN referral_bindings rb ON rb.chat=f.user "
+            "WHERE f.ts>=? AND f.fill_id NOT LIKE 'paper%' GROUP BY rb.owner_chat",
+            (int(ts),)).fetchall()
+        return {r[0]: float(r[1] or 0.0) for r in rows}
+
     # --- pre-signed protective orders ---
     def create_preorder(self, chat, user, token, pct, floor_pct, min_out, deadline,
                         order_nonce, status="armed", created_ts=None, kind="sell") -> int:

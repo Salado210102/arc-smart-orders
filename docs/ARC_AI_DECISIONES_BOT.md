@@ -389,7 +389,21 @@ auditoría + hot key acotada; no es lo primero).
   la posición). Motor `execution/copy_keeper.py` (`run_copy_engine`): por cada seguidor lee las
   operaciones **nuevas** del líder (`indexer.pg_storage.recent_wallet_legs` sobre `legs`) y las replica
   best-effort con la wallet del bot; **self-advancing** de `last_block`, **idempotente** por bloque,
-  con **dry-run** (`ARC_INTEL_COPY_DRY_RUN=1`) y callback de aviso. Store `bot/store.py`: tabla
+  con **dry-run**   (`ARC_INTEL_COPY_DRY_RUN=1`) y callback de aviso. Store `bot/store.py`: tabla
+  `copy_subs` + `add/get/list/remove/set_enabled/bump_spent/set_last_block`. **UI Mini App**: pestaña
+  **Copy** (seguir líder, `max/op`, presupuesto, gastado/restante, pausar/parar) + endpoints
+  **`GET /copy`**, **`POST /copy`**, **`POST /copy/off`**, **`POST /copy/toggle`** (`copy_view` puro).
+  Tests **+1** de `copy_view` + auth. Commit `bd7bd04`.
+- **2026-09-27 (concurso + banner del pozo v1)** — Núcleo puro `monetization/contest.py`
+  (`round_window` 2 rondas/día UTC, `pozo` = 10% de las comisiones de la ronda, `split_prize` 50/50
+  trader/afiliado, `leaderboard`, `standings`, `rank_of`, `mask_user`). Store:
+  `volume_by_user_since` y `referred_volume_by_user_since` (**solo fills reales**, `[PAPER]` excluido;
+  se añadió `ts` a los `record_fill` de custodia y copytrading). Endpoint **`GET /contest`** (auth):
+  ronda actual, pozo, premio, total y **rankings** (trader/afiliado, usuarios enmascarados) + tu
+  puesto. **Banner del pozo** en la Mini App (arriba, siempre visible) con **contador** y ranking
+  desplegable (refresco 30 s). Tests **+7** (`tests/test_contest.py`) + auth. Suite **371 passed**
+  (1 fallo ambiental local). **Pendiente**: publicación automática del ganador (canal oficial) 1 h
+  tras el cierre y liquidación; el pozo es informativo hasta que el cobro del fee esté activo.
   `copy_subs` + `add/get/list/remove/set_enabled/bump_spent/set_last_block`. Bot: comandos
   **`/copytrade <addr> [max_por_op] [presupuesto]`** y **`/copyoff`**; botón del menú **Copytrade**
   ahora **funcional** (`cmd:/copytrade`); comando registrado EN/ES/ZH. Thread propio en el loop

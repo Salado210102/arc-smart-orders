@@ -430,7 +430,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 store2.record_fill(f"{(txh or '')}:buy", uid, tok, "buy",
                                    float(quote.get("expected_out") or 0),
-                                   float(data.get("amount_usdc") or 0))
+                                   float(data.get("amount_usdc") or 0), ts=int(time.time()))
             except Exception:
                 pass
         finally:
@@ -530,7 +530,8 @@ class Handler(BaseHTTPRequestHandler):
         store2 = SubscriptionStore(DB)
         try:
             qty_tok = amount_in / (10 ** dec)
-            store2.record_fill(f"{(txh or '')}:sell", uid, tok, "sell", qty_tok, qty_tok * price)
+            store2.record_fill(f"{(txh or '')}:sell", uid, tok, "sell", qty_tok, qty_tok * price,
+                               ts=int(time.time()))
         except Exception:
             pass
         finally:
@@ -783,6 +784,27 @@ class Handler(BaseHTTPRequestHandler):
                 store.close()
             return self._send(200, {"copy": copy_view(sub), "custody": has_custody,
                                     "dry_run": os.environ.get("ARC_INTEL_COPY_DRY_RUN") == "1"})
+        if u.path == "/contest":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            from monetization import contest as CT
+            store = SubscriptionStore(DB)
+            try:
+                w = CT.round_window(time.time())
+                trader = store.volume_by_user_since(w["start"])
+                aff = store.referred_volume_by_user_since(w["start"])
+            finally:
+                store.close()
+            st = CT.standings(trader, aff, top=10)
+            masked = lambda rows: [{"rank": r["rank"], "user": CT.mask_user(r["user"]),
+                                    "volume": r["volume"]} for r in rows]
+            return self._send(200, {
+                "round": w, "pozo": st["pozo"], "prize": st["prize"],
+                "total_volume": st["total_volume"],
+                "trader_top": masked(st["trader_top"]),
+                "affiliate_top": masked(st["affiliate_top"]),
+                "me": {"trader": CT.rank_of(trader, uid), "affiliate": CT.rank_of(aff, uid)}})
         if u.path == "/buy_quote":
             uid = self._auth_user()
             if uid is None:

@@ -59,7 +59,8 @@ def default_executor(store, storage, *, logger=None):
                          order_nonce=new_nonce(), deadline=int(time.time()) + 600)
             store.add_holding(chat, tok)
             store.record_fill(f"{(txh or '')}:copybuy", chat, tok, "buy",
-                              float(q.get("expected_out") or 0), float(decision["usdc"]))
+                              float(q.get("expected_out") or 0), float(decision["usdc"]),
+                              ts=int(time.time()))
             return {"tx": txh, "qty": q.get("expected_out"), "usdc": decision["usdc"]}
         if decision["action"] == "sell":
             bal = C.erc20_balance(tok, c["address"])
@@ -72,7 +73,8 @@ def default_executor(store, storage, *, logger=None):
             txh = C.swap(pk, pool=pool, token_in=tok, amount_in=q["amount_in_base"],
                          min_out=q["min_out_base"], recipient=c["address"],
                          order_nonce=new_nonce(), deadline=int(time.time()) + 600)
-            store.record_fill(f"{(txh or '')}:copysell", chat, tok, "sell", qty, qty * price)
+            store.record_fill(f"{(txh or '')}:copysell", chat, tok, "sell", qty, qty * price,
+                              ts=int(time.time()))
             return {"tx": txh, "qty": qty}
         return None
 
