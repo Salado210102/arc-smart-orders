@@ -644,6 +644,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
             self.send_header("Vary", "Origin")
+            self.send_header("Cache-Control", "no-store, max-age=0")
+            self.send_header("Pragma", "no-cache")
             self.end_headers()
             self.wfile.write(body)
             return
@@ -778,11 +780,12 @@ class Handler(BaseHTTPRequestHandler):
             from .miniapp_api import copy_view
             store = SubscriptionStore(DB)
             try:
-                sub = store.get_copy_sub(uid)
+                wallets = store.list_copy_wallets(uid)
+                settings = store.get_copy_settings(uid)
                 has_custody = store.get_custody(uid) is not None
             finally:
                 store.close()
-            return self._send(200, {"copy": copy_view(sub), "custody": has_custody,
+            return self._send(200, {**copy_view(wallets, settings), "custody": has_custody,
                                     "dry_run": os.environ.get("ARC_INTEL_COPY_DRY_RUN") == "1"})
         if u.path == "/contest":
             uid = self._auth_user()
@@ -890,7 +893,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "bad_json"})
             code, resp = self._sell(uid, data)
             return self._send(code, resp)
-        if u.path == "/copy":
+        if u.path == "/copy/wallet":
             uid = self._auth_user()
             if uid is None:
                 return self._send(401, {"error": "unauthorized"})
@@ -902,34 +905,43 @@ class Handler(BaseHTTPRequestHandler):
             leader = (data.get("leader") or "").lower()
             if not ADDR_RE.match(leader):
                 return self._send(400, {"error": "bad_address"})
+            flat = data.get("flat_usdc")
             try:
-                per = max(1.0, float(data.get("max_per_trade") or 25))
-                total = max(per, float(data.get("max_total") or 100))
-                slip = float(data.get("slippage") or 3)
+                flat = None if flat in (None, "") else max(1.0, float(flat))
             except (TypeError, ValueError):
                 return self._send(400, {"error": "bad_amount"})
             from .miniapp_api import copy_view
             store = SubscriptionStore(DB)
             try:
                 now_block = int(store.get_state("alert_cursor", "0") or 0)
-                store.add_copy_sub(uid, leader, max_per_trade=per, max_total=total, slippage=slip,
-                                   now_block=now_block)
-                sub = store.get_copy_sub(uid)
-                has_custody = store.get_custody(uid) is not None
+                store.add_copy_wallet(uid, leader, flat_usdc=flat, now_block=now_block)
+                wallets, settings = store.list_copy_wallets(uid), store.get_copy_settings(uid)
             finally:
                 store.close()
-            return self._send(200, {"copy": copy_view(sub), "custody": has_custody})
-        if u.path == "/copy/off":
-            uid = self._auth_user()
-            if uid is None:
-                return self._send(401, {"error": "unauthorized"})
-            store = SubscriptionStore(DB)
-            try:
-                ok = store.remove_copy_sub(uid)
-            finally:
-                store.close()
-            return self._send(200, {"ok": ok})
-        if u.path == "/copy/toggle":
+            return self._send(200, copy_view(wallets, settings))
+        for _p in ("/copy/wallet/remove", "/copy/wallet/toggle"):
+            if u.path == _p:
+                uid = self._auth_user()
+                if uid is None:
+                    return self._send(401, {"error": "unauthorized"})
+                nn = int(self.headers.get("Content-Length") or 0)
+                try:
+                    data = json.loads(self.rfile.read(nn) or b"{}")
+                except ValueError:
+                    return self._send(400, {"error": "bad_json"})
+                from .miniapp_api import copy_view
+                store = SubscriptionStore(DB)
+                try:
+                    leader = (data.get("leader") or "").lower()
+                    if _p.endswith("remove"):
+                        ok = store.remove_copy_wallet(uid, leader)
+                    else:
+                        ok = store.set_copy_wallet_enabled(uid, leader, bool(data.get("on")))
+                    wallets, settings = store.list_copy_wallets(uid), store.get_copy_settings(uid)
+                finally:
+                    store.close()
+                return self._send(200, {**copy_view(wallets, settings), "ok": ok})
+        if u.path == "/copy/settings":
             uid = self._auth_user()
             if uid is None:
                 return self._send(401, {"error": "unauthorized"})
@@ -938,12 +950,19 @@ class Handler(BaseHTTPRequestHandler):
                 data = json.loads(self.rfile.read(n) or b"{}")
             except ValueError:
                 return self._send(400, {"error": "bad_json"})
+            kw = {k: data[k] for k in ("min_buy_usdc", "max_open", "sizing", "flat_usdc",
+                                       "mirror_sells", "tp_pct", "sl_pct", "trailing_pct",
+                                       "dump_guard") if k in data}
+            if "sizing" in kw and kw["sizing"] not in ("flat", "proportional"):
+                return self._send(400, {"error": "bad_sizing"})
+            from .miniapp_api import copy_view
             store = SubscriptionStore(DB)
             try:
-                ok = store.set_copy_enabled(uid, bool(data.get("on")))
+                store.set_copy_settings(uid, **kw)
+                wallets, settings = store.list_copy_wallets(uid), store.get_copy_settings(uid)
             finally:
                 store.close()
-            return self._send(200, {"ok": ok, "enabled": bool(data.get("on"))})
+            return self._send(200, copy_view(wallets, settings))
         if u.path == "/autoprotect":
             uid = self._auth_user()
             if uid is None:

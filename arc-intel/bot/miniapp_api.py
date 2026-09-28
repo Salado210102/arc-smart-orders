@@ -151,20 +151,25 @@ def alerts_view(alerts: list) -> list:
     return [alert_view(a) for a in alerts]
 
 
-def copy_view(sub) -> dict | None:
-    """Normalize a copy-trading subscription row for the Mini App (or None)."""
-    if not sub:
-        return None
-    total = float(sub.get("max_total") or 0.0)
-    spent = float(sub.get("spent") or 0.0)
-    return {"leader": (sub.get("leader") or "").lower(),
-            "max_per_trade": float(sub.get("max_per_trade") or 0.0),
-            "max_total": total,
-            "spent": spent,
-            "remaining": max(0.0, total - spent),
-            "slippage": float(sub.get("slippage") or 0.0),
-            "enabled": bool(sub.get("enabled")),
-            "last_block": int(sub.get("last_block") or 0)}
+def copy_view(wallets: list, settings: dict | None = None) -> dict:
+    """Normalize tracked leader wallets + global filters for the Mini App."""
+    s = settings or {}
+    return {
+        "wallets": [{"leader": (w.get("leader") or "").lower(),
+                     "flat_usdc": w.get("flat_usdc"),
+                     "enabled": bool(w.get("enabled"))} for w in (wallets or [])],
+        "settings": {
+            "min_buy_usdc": float(s.get("min_buy_usdc") or 0),
+            "max_open": int(s.get("max_open") or 0),
+            "sizing": s.get("sizing") or "flat",
+            "flat_usdc": float(s.get("flat_usdc") if s.get("flat_usdc") is not None else 25),
+            "mirror_sells": bool(s.get("mirror_sells", True)),
+            "tp_pct": float(s.get("tp_pct") or 0),
+            "sl_pct": float(s.get("sl_pct") or 0),
+            "trailing_pct": float(s.get("trailing_pct") or 0),
+            "dump_guard": bool(s.get("dump_guard", True)),
+        },
+    }
 
 
 def wallet_view(store, chat_id) -> dict:

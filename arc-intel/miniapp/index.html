@@ -181,19 +181,40 @@
     <section id="sec-copy" class="hide">
       <div class="card">
         <div class="row" style="justify-content:space-between">
-          <div class="mut" data-i18n="copy_title">Copytrading — replica a un líder con tu wallet del bot</div>
+          <div class="mut" data-i18n="copy_title">🎮 Copy-trade — replica a tus wallets seguidas</div>
           <button class="ghost" id="copyrefresh">↻</button>
         </div>
         <div id="copyout" style="margin-top:8px"></div>
       </div>
       <div class="card">
-        <div class="mut" data-i18n="copy_form_title">Seguir una wallet</div>
-        <input id="copyleader" placeholder="0x… líder (40 hex)" style="width:100%;margin-top:6px">
+        <div class="mut">➕ <span data-i18n="copy_form_title">Añadir wallet</span></div>
+        <input id="copyleader" placeholder="0x… wallet a seguir (40 hex)" style="width:100%;margin-top:6px">
         <div class="row" style="margin-top:6px">
-          <input id="copyper" type="number" placeholder="max/op USD" style="flex:1">
-          <input id="copytotal" type="number" placeholder="presupuesto USD" style="flex:1">
+          <input id="copyflat" type="number" placeholder="tamaño flat USD (opcional)" style="flex:1">
+          <button class="ghost" id="copyadd" data-i18n="copy_add">Añadir</button>
         </div>
-        <button class="primary" id="copysave" style="margin-top:8px" data-i18n="copy_activate">Activar</button>
+        <div id="copyaddout" class="mut" style="margin-top:6px"></div>
+      </div>
+      <div class="card">
+        <div class="mut">🎛️ <span data-i18n="copy_filters">Filtros</span> <span class="mut" style="font-size:11px" data-i18n="copy_filters_sub">(aplican a todas las wallets)</span></div>
+        <div class="row" style="margin-top:6px">
+          <span class="mut" style="font-size:12px">min buy $</span><input id="cfmin" type="number" style="width:70px">
+          <span class="mut" style="font-size:12px">max open</span><input id="cfmax" type="number" style="width:60px">
+        </div>
+        <div class="row" style="margin-top:6px">
+          <select id="cfsizing" style="flex:1"><option value="flat">flat</option><option value="proportional">proportional</option></select>
+          <input id="cfflat" type="number" placeholder="flat USD" style="width:90px">
+        </div>
+        <div class="row" style="margin-top:6px;align-items:center">
+          <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="cfmirror"><span class="mut" style="font-size:12px">🪞 <span data-i18n="copy_mirror">Mirror sells</span></span></label>
+          <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="cfdump"><span class="mut" style="font-size:12px">🚨 dump guard</span></label>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <span class="mut" style="font-size:12px">TP%</span><input id="cftp" type="number" style="width:56px">
+          <span class="mut" style="font-size:12px">SL%</span><input id="cfsl" type="number" style="width:56px">
+          <span class="mut" style="font-size:12px">Trail%</span><input id="cftr" type="number" style="width:56px">
+        </div>
+        <button class="primary" id="copysave" style="margin-top:8px" data-i18n="copy_save">Guardar filtros</button>
         <div id="copysaveout" class="mut" style="margin-top:6px"></div>
       </div>
     </section>
@@ -232,11 +253,12 @@
         ref_referred: "Invitados", ref_accrued: "Acumulado", ref_pending: "Pendiente de pago",
         ref_by_user: "Por usuario referido",
         ref_hint: "30% de la comisión (1%) de por vida. Se paga en USDC.",
-        tab_copy: "Copiar", copy_title: "Copytrading — replica a un líder con tu wallet del bot",
-        copy_form_title: "Seguir una wallet", copy_activate: "Activar",
-        copy_none: "No copias a nadie.", copy_stop: "Detener",
-        copy_leader: "Líder", copy_per: "Máx/op", copy_budget: "Presupuesto",
-        copy_spent: "Gastado", copy_remaining: "Restante",
+        tab_copy: "Copiar",
+        copy_title: "🎮 Copy-trade — replica a tus wallets seguidas",
+        copy_form_title: "Añadir wallet", copy_add: "Añadir",
+        copy_filters: "Filtros", copy_filters_sub: "(aplican a todas las wallets)",
+        copy_mirror: "Mirror sells", copy_save: "Guardar filtros",
+        copy_none: "Aún no sigues ninguna wallet.",
         copy_nocustody: "Necesitas tu wallet del bot (Cartera) con USDC para operar.",
         copy_dryrun: "Modo simulación (dry-run): no ejecuta operaciones reales todavía.",
         pozo_label: "🏆 Pozo de la ronda", pozo_ends: "termina en", pozo_see: "Ver ranking",
@@ -260,11 +282,12 @@
         ref_referred: "Invited", ref_accrued: "Accrued", ref_pending: "Pending payout",
         ref_by_user: "By referred user",
         ref_hint: "30% of the 1% fee, for life. Paid in USDC.",
-        tab_copy: "Copy", copy_title: "Copytrading — mirror a leader with your bot wallet",
-        copy_form_title: "Follow a wallet", copy_activate: "Activate",
-        copy_none: "You are not copying anyone.", copy_stop: "Stop",
-        copy_leader: "Leader", copy_per: "Max/trade", copy_budget: "Budget",
-        copy_spent: "Spent", copy_remaining: "Remaining",
+        tab_copy: "Copy",
+        copy_title: "🎮 Copy-trade — mirror your tracked wallets",
+        copy_form_title: "Add wallet", copy_add: "Add",
+        copy_filters: "Filters", copy_filters_sub: "(apply to every wallet)",
+        copy_mirror: "Mirror sells", copy_save: "Save filters",
+        copy_none: "No tracked wallets yet.",
         copy_nocustody: "You need your bot wallet (Wallet tab) with USDC to trade.",
         copy_dryrun: "Simulation mode (dry-run): no real trades yet.",
         pozo_label: "🏆 Round prize pool", pozo_ends: "ends in", pozo_see: "See ranking",
@@ -285,11 +308,12 @@
         ref_referred: "已邀请", ref_accrued: "累计", ref_pending: "待支付",
         ref_by_user: "按被推荐用户",
         ref_hint: "终身赚取 1% 手续费的 30%。以 USDC 支付。",
-        tab_copy: "跟单", copy_title: "跟单 — 用你的机器人钱包复制领袖交易",
-        copy_form_title: "关注一个钱包", copy_activate: "启用",
-        copy_none: "你尚未跟单任何人。", copy_stop: "停止",
-        copy_leader: "领袖", copy_per: "单笔上限", copy_budget: "预算",
-        copy_spent: "已用", copy_remaining: "剩余",
+        tab_copy: "跟单",
+        copy_title: "🎮 跟单 — 复制你关注的钱包",
+        copy_form_title: "添加钱包", copy_add: "添加",
+        copy_filters: "过滤器", copy_filters_sub: "（适用于所有钱包）",
+        copy_mirror: "跟卖", copy_save: "保存过滤器",
+        copy_none: "你尚未关注任何钱包。",
         copy_nocustody: "你需要机器人钱包（钱包页）并持有 USDC 才能交易。",
         copy_dryrun: "模拟模式（dry-run）：暂不执行真实交易。",
         pozo_label: "🏆 本轮奖池", pozo_ends: "结束于", pozo_see: "查看排行",
@@ -411,7 +435,8 @@
       $("alrrefresh").onclick = () => loadAlerts();
       $("refrefresh").onclick = () => loadReferral();
       $("copyrefresh").onclick = () => loadCopy();
-      $("copysave").onclick = () => saveCopy();
+      $("copyadd").onclick = () => addCopyWallet();
+      $("copysave").onclick = () => saveCopySettings();
 
       const KIND_LABEL = {dev_sell: "DEV-SELL", compound: "COMPOSITE", volume_spike: "VOL SPIKE",
         liquidity_removal: "LP REMOVAL", large_sell: "LARGE SELL", thin_market: "THIN"};
@@ -708,6 +733,7 @@
           `<div class="mut" style="font-size:12px;margin-top:4px">${esc(t("ref_hint"))}</div>`;
       }
 
+      let COPY = null;
       async function loadCopy() {
         $("copyout").innerHTML = '<span class="mut">…</span>';
         const { status, body } = await api("/copy");
@@ -715,29 +741,36 @@
           $("copyout").innerHTML = `<span class="bad">Error: ${status}${status === 401 ? " (abre en Telegram)" : ""}</span>`;
           return;
         }
+        COPY = body;
         let note = body.dry_run ? `<div class="mut" style="font-size:12px;margin-top:4px">${esc(t("copy_dryrun"))}</div>` : "";
         if (!body.custody) note += `<div class="bad" style="font-size:12px;margin-top:4px">${esc(t("copy_nocustody"))}</div>`;
-        const c = body.copy;
-        if (!c) { $("copyout").innerHTML = `<span class="mut">${esc(t("copy_none"))}</span>${note}`; return; }
-        $("copyout").innerHTML =
-          `<div class="kv"><span>${esc(t("copy_leader"))}</span><b>${esc(c.leader.slice(0, 10))}…${esc(c.leader.slice(-4))}</b></div>` +
-          `<div class="kv"><span>${esc(t("copy_per"))}</span><b>$${c.max_per_trade.toFixed(0)}</b></div>` +
-          `<div class="kv"><span>${esc(t("copy_budget"))}</span><b>$${c.max_total.toFixed(0)}</b></div>` +
-          `<div class="kv"><span>${esc(t("copy_spent"))}</span><b>$${c.spent.toFixed(2)}</b></div>` +
-          `<div class="kv"><span>${esc(t("copy_remaining"))}</span><b>$${c.remaining.toFixed(2)}</b></div>` +
-          `<div class="row" style="margin-top:8px">` +
-          `<button class="ghost" id="copytoggle">${c.enabled ? "⏸" : "▶️"}</button>` +
-          `<button class="ghost" id="copystop">${esc(t("copy_stop"))}</button></div>` + note;
-        $("copytoggle").onclick = async () => {
-          await api("/copy/toggle", { method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ on: !c.enabled }) });
+        const ws = body.wallets || [];
+        $("copyout").innerHTML = (ws.length
+          ? ws.map(w => `<div class="kv"><span>${w.enabled ? "🟢" : "⏸"} ${esc(w.leader.slice(0, 10))}…${esc(w.leader.slice(-4))}</span>` +
+              `<span><button class="ghost cwtgl" data-l="${esc(w.leader)}" style="font-size:11px">${w.enabled ? "⏸" : "▶️"}</button> ` +
+              `<button class="ghost cwrm" data-l="${esc(w.leader)}" style="font-size:11px">🗑</button></span></div>`).join("")
+          : `<span class="mut">${esc(t("copy_none"))}</span>`) + note;
+        const s = body.settings || {};
+        $("cfmin").value = s.min_buy_usdc || 0;
+        $("cfmax").value = s.max_open || 0;
+        $("cfsizing").value = s.sizing || "flat";
+        $("cfflat").value = s.flat_usdc || 25;
+        $("cfmirror").checked = !!s.mirror_sells;
+        $("cfdump").checked = !!s.dump_guard;
+        $("cftp").value = s.tp_pct || 0;
+        $("cfsl").value = s.sl_pct || 0;
+        $("cftr").value = s.trailing_pct || 0;
+        document.querySelectorAll(".cwrm").forEach(b => b.onclick = async () => {
+          await api("/copy/wallet/remove", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ leader: b.dataset.l }) });
           loadCopy();
-        };
-        $("copystop").onclick = async () => {
-          await api("/copy/off", { method: "POST",
-            headers: { "Content-Type": "application/json" }, body: "{}" });
+        });
+        document.querySelectorAll(".cwtgl").forEach(b => b.onclick = async () => {
+          const w = (COPY.wallets || []).find(x => x.leader === b.dataset.l);
+          await api("/copy/wallet/toggle", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ leader: b.dataset.l, on: !(w && w.enabled) }) });
           loadCopy();
-        };
+        });
       }
 
       function fmtClock(sec) {
@@ -761,18 +794,37 @@
       $("pozobtn").onclick = () => { $("pozorank").classList.toggle("hide"); loadPozo(); };
       $("pozorefresh").onclick = () => loadPozo();
 
-      async function saveCopy() {
+      async function addCopyWallet() {
         const leader = ($("copyleader").value || "").trim().toLowerCase();
-        if (!/^0x[0-9a-f]{40}$/.test(leader)) { $("copysaveout").textContent = "CA inválida."; return; }
-        const per = parseFloat($("copyper").value || "25");
-        const total = parseFloat($("copytotal").value || "100");
-        $("copysaveout").textContent = "…";
-        const r = await api("/copy", { method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ leader, max_per_trade: per, max_total: total }) });
-        $("copysaveout").innerHTML = (r.status === 200 && r.body && r.body.copy)
+        if (!/^0x[0-9a-f]{40}$/.test(leader)) { $("copyaddout").textContent = "CA inválida."; return; }
+        const flat = parseFloat($("copyflat").value || "0") || null;
+        $("copyaddout").textContent = "…";
+        const r = await api("/copy/wallet", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leader, flat_usdc: flat }) });
+        $("copyaddout").innerHTML = (r.status === 200)
           ? '<span class="ok">✅</span>'
           : `<span class="bad">Error: ${esc((r.body && r.body.error) || r.status)}</span>`;
-        if (r.status === 200) loadCopy();
+        if (r.status === 200) { $("copyleader").value = ""; $("copyflat").value = ""; loadCopy(); }
+      }
+
+      async function saveCopySettings() {
+        const body = {
+          min_buy_usdc: parseFloat($("cfmin").value || "0") || 0,
+          max_open: parseInt($("cfmax").value || "0") || 0,
+          sizing: $("cfsizing").value,
+          flat_usdc: parseFloat($("cfflat").value || "25") || 25,
+          mirror_sells: !!$("cfmirror").checked,
+          dump_guard: !!$("cfdump").checked,
+          tp_pct: parseFloat($("cftp").value || "0") || 0,
+          sl_pct: parseFloat($("cfsl").value || "0") || 0,
+          trailing_pct: parseFloat($("cftr").value || "0") || 0,
+        };
+        $("copysaveout").textContent = "…";
+        const r = await api("/copy/settings", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body) });
+        $("copysaveout").innerHTML = (r.status === 200)
+          ? '<span class="ok">✅ Guardado.</span>'
+          : `<span class="bad">Error: ${esc((r.body && r.body.error) || r.status)}</span>`;
       }
 
       async function saveExitPlanFromBuy(tok) {

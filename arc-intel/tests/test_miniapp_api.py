@@ -104,14 +104,14 @@ class MiniAppApiTests(unittest.TestCase):
             store.close()
 
     def test_copy_view(self):
-        self.assertIsNone(copy_view(None))
-        v = copy_view({"leader": TOK.upper(), "max_per_trade": 25, "max_total": 100, "spent": 40,
-                       "slippage": 3, "enabled": 1, "last_block": 123})
-        self.assertEqual(v["leader"], TOK.lower())
-        self.assertEqual(v["max_per_trade"], 25.0)
-        self.assertEqual(v["remaining"], 60.0)
-        self.assertTrue(v["enabled"])
-        self.assertEqual(v["last_block"], 123)
+        v = copy_view([{"leader": TOK.upper(), "flat_usdc": 10, "enabled": 1}],
+                      {"min_buy_usdc": 5, "max_open": 2, "sizing": "flat", "mirror_sells": 0})
+        self.assertEqual(v["wallets"][0]["leader"], TOK.lower())
+        self.assertEqual(v["wallets"][0]["flat_usdc"], 10)
+        self.assertEqual(v["settings"]["min_buy_usdc"], 5.0)
+        self.assertEqual(v["settings"]["max_open"], 2)
+        self.assertFalse(v["settings"]["mirror_sells"])
+        self.assertEqual(copy_view([], None)["settings"]["flat_usdc"], 25.0)
 
 
 if __name__ == "__main__":

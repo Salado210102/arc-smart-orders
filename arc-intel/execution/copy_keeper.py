@@ -1,26 +1,25 @@
-"""Copy-trading engine: mirror a leader wallet's indexed trades with the follower's bot wallet.
+"""Copy-trading engine (multi-wallet): mirror the trades of every tracked leader wallet with the
+follower's bot wallet (custodial "Modo Maestro").
 
-Custodial "Modo Maestro": the bot signs with the follower's encrypted custody key. Best-effort:
-every guard is in place so one bad leader / missing pool / custody error never breaks the loop.
+Global filters (`copy_settings`) apply to all wallets: min buy, max open positions, sizing
+(flat/proportional), mirror sells. Protection defaults (TP/SL/trailing/dump guard) are attached to
+every copied fill.
 
-DRY-RUN: set `ARC_INTEL_COPY_DRY_RUN=1` (or pass dry_run=True) to log the intended mirror without
-executing anything. Dormant without a custody wallet + `ARC_INTEL_SESSION_ENC_KEY`.
-
-Sells mirror by fully closing the follower's position in that token. Buys are bounded by the
-per-trade cap and the remaining budget (`execution.copy`).
+DRY-RUN: `ARC_INTEL_COPY_DRY_RUN=1` (or dry_run=True) logs the intended mirror without executing.
+Dormant without a custody wallet + `ARC_INTEL_SESSION_ENC_KEY`.
 """
 from __future__ import annotations
 
 import os
 import time
 
-from .copy import CopyConfig, decide
+from .copy import CopySettings, decide
 
 STABLE_DEFAULT = "0x3600000000000000000000000000000000000000"
 
 
 def default_executor(store, storage, *, logger=None):
-    """Real executor using the custodial quick wallet. Returns a callable (sub, trade, decision)."""
+    """Real executor using the custodial quick wallet. Callable(chat, wallet, trade, decision, settings)."""
     from execution import custody as C
     from execution.eip712 import new_nonce
     from execution.quotes import buy_quote, sell_quote
@@ -31,8 +30,7 @@ def default_executor(store, storage, *, logger=None):
     enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
     stable = os.environ.get("ARC_INTEL_STABLE", STABLE_DEFAULT)
 
-    def _exec(sub, trade, decision):
-        chat = str(sub["follower_chat"])
+    def _exec(chat, wallet, trade, decision, settings):
         c = store.get_custody(chat)
         if not c or not enc:
             return None
@@ -45,7 +43,7 @@ def default_executor(store, storage, *, logger=None):
         except Exception:
             return None
         dec = tokenmeta.rpc_decimals(tok)
-        slip = float(sub.get("slippage") or 3.0)
+        slip = 3.0
         if decision["action"] == "buy":
             price = latest_price(storage, tok) or 0
             if price <= 0:
@@ -61,6 +59,14 @@ def default_executor(store, storage, *, logger=None):
             store.record_fill(f"{(txh or '')}:copybuy", chat, tok, "buy",
                               float(q.get("expected_out") or 0), float(decision["usdc"]),
                               ts=int(time.time()))
+            try:  # protection defaults attached to this copied fill
+                if settings.tp_pct or settings.sl_pct or settings.trailing_pct:
+                    store.set_exit_plan(chat, tok, settings.sl_pct, settings.tp_pct,
+                                        settings.trailing_pct)
+                if settings.dump_guard:
+                    store.set_state(f"autoprotect:{chat}", "1")
+            except Exception:
+                pass
             return {"tx": txh, "qty": q.get("expected_out"), "usdc": decision["usdc"]}
         if decision["action"] == "sell":
             bal = C.erc20_balance(tok, c["address"])
@@ -83,22 +89,26 @@ def default_executor(store, storage, *, logger=None):
 
 def run_copy_engine(store, storage, *, head: int = 0, dry_run=None, logger=None, executor=None,
                     on_exec=None, limit: int = 20) -> dict:
-    """One pass: for every enabled follower, mirror the leader's trades newer than `last_block`."""
+    """One pass: for every tracked wallet, mirror the leader's trades newer than `last_block`."""
     logger = logger or (lambda d: None)
     if dry_run is None:
         dry_run = os.environ.get("ARC_INTEL_COPY_DRY_RUN") == "1"
-    subs = store.list_copy_subs(enabled_only=True)
-    summary = {"subs": len(subs), "trades": 0, "executed": 0, "skipped": 0, "errors": 0}
-    if not subs:
+    wallets = store.list_all_copy_wallets(enabled_only=True)
+    summary = {"wallets": len(wallets), "trades": 0, "executed": 0, "skipped": 0, "errors": 0}
+    if not wallets:
         return summary
     exec_fn = executor or default_executor(store, storage, logger=logger)
-    for sub in subs:
-        leader = sub["leader"]
-        last = int(sub.get("last_block") or 0)
+    settings_cache, open_cache = {}, {}
+    for w in wallets:
+        follower, leader = w["follower_chat"], w["leader"]
+        if follower not in settings_cache:
+            settings_cache[follower] = CopySettings.from_row(store.get_copy_settings(follower))
+            open_cache[follower] = len(store.list_positions(follower))
+        eff = settings_cache[follower].with_flat(w.get("flat_usdc"))
+        last = int(w.get("last_block") or 0)
         if last <= 0:
-            # First run: jump to the current head and copy nothing historical.
-            last = int(head or 0)
-            store.set_copy_last_block(sub["follower_chat"], last)
+            last = int(head or 0)   # first run: jump to head, copy nothing historical
+            store.set_copy_wallet_last_block(follower, leader, last)
             if last <= 0:
                 continue
         try:
@@ -108,7 +118,6 @@ def run_copy_engine(store, storage, *, head: int = 0, dry_run=None, logger=None,
             logger({"copy_error": {"leader": leader, "err": "fetch:" + str(e)[:100]}})
             continue
         advanced = last
-        spent = float(sub.get("spent") or 0.0)
         for t in trades:
             blk = int((t or {}).get("block") or 0)
             if blk <= last:
@@ -116,10 +125,8 @@ def run_copy_engine(store, storage, *, head: int = 0, dry_run=None, logger=None,
             summary["trades"] += 1
             tok = str(t.get("token") or "").lower()
             try:
-                pos = store.get_position(sub["follower_chat"], tok)
-                cfg = CopyConfig(max_per_trade=sub["max_per_trade"], max_total=sub["max_total"],
-                                 spent=spent, slippage_pct=float(sub.get("slippage") or 3.0))
-                d = decide(t, cfg, pos["qty"])
+                pos = store.get_position(follower, tok)
+                d = decide(t, eff, pos["qty"], open_cache[follower], holding=pos["qty"] > 0)
             except Exception as e:
                 summary["errors"] += 1
                 logger({"copy_error": {"token": tok, "err": "decide:" + str(e)[:100]}})
@@ -134,27 +141,26 @@ def run_copy_engine(store, storage, *, head: int = 0, dry_run=None, logger=None,
                 logger({"copy_dry": {"leader": leader, "token": tok, "decision": d}})
                 continue
             try:
-                res = exec_fn(sub, t, d)
+                res = exec_fn(follower, w, t, d, eff)
             except Exception as e:
                 summary["errors"] += 1
                 logger({"copy_error": {"leader": leader, "token": tok, "err": str(e)[:120]}})
                 break  # do not advance past a failed trade -> retry next cycle
             if res:
                 summary["executed"] += 1
-                if d["action"] == "buy":
-                    spent += float(d["usdc"])
-                    store.bump_copy_spent(sub["follower_chat"], float(d["usdc"]))
                 advanced = max(advanced, blk)
+                if d["action"] == "buy":
+                    open_cache[follower] = len(store.list_positions(follower))
                 logger({"copy_exec": {"leader": leader, "token": tok, "action": d["action"],
                                       "tx": (res or {}).get("tx", "")}})
                 if on_exec:
                     try:
-                        on_exec(sub, t, d, res)
+                        on_exec(follower, w, t, d, res)
                     except Exception:
                         pass
             else:
                 summary["skipped"] += 1
                 advanced = max(advanced, blk)
         if advanced != last:
-            store.set_copy_last_block(sub["follower_chat"], advanced)
+            store.set_copy_wallet_last_block(follower, leader, advanced)
     return summary

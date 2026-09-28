@@ -168,31 +168,95 @@ def referral_screen(store, chat, lang) -> dict:
     return {"text": text, "inline": rows, "parse_mode": "HTML"}
 
 
-def _copy_command(store, chat, args, now_block, lang) -> str:
-    """Add/show a copytrade subscription (follow a leader wallet; mirror with the bot wallet)."""
-    if not args:
-        sub = store.get_copy_sub(chat)
-        if not sub:
-            return i18n.t("copy_none", lang)
-        return i18n.t("copy_added", lang).format(
-            leader=sub["leader"], per=f"{sub['max_per_trade']:.0f}",
-            total=f"{sub['max_total']:.0f}", spent=f"{sub['spent']:.2f}")
-    leader = args[0].lower()
-    if not _valid_addr(leader):
-        return i18n.t("copy_bad", lang)
-    per, total = 25.0, 100.0
+def _short(addr: str) -> str:
+    a = str(addr or "")
+    return a if len(a) <= 14 else (a[:8] + "\u2026" + a[-4:])
+
+
+def copy_screen(store, chat, lang) -> dict:
+    wallets = store.list_copy_wallets(chat)
+    lines = [i18n.t("copy_title", lang)]
+    lines.append(i18n.t("copy_hint", lang))
+    if wallets:
+        for w in wallets:
+            lines.append(("\U0001F7E2 " if w["enabled"] else "\u23F8 ") +
+                         f"<code>{_short(w['leader'])}</code>")
+    else:
+        lines.append("\n" + i18n.t("copy_none", lang))
+    rows = [[{"text": i18n.t("copy_add_wallet", lang), "data": "copy:add"}],
+            [{"text": i18n.t("copy_filters", lang), "data": "copy:filters"}]]
+    for w in wallets:
+        rows.append([{"text": ("\u23F8 " if w["enabled"] else "\u25B6\uFE0F ") + _short(w["leader"]),
+                      "data": f"copy:tgl:{w['leader']}"},
+                     {"text": "\U0001F5D1", "data": f"copy:rm:{w['leader']}"}])
+    return {"text": "\n".join(lines), "inline": rows, "parse_mode": "HTML"}
+
+
+def copy_filters_screen(store, chat, lang) -> dict:
+    s = store.get_copy_settings(chat)
+    mo = s["max_open"] or "\u221E"
+    text = i18n.t("copy_filters_text", lang).format(
+        min=f"{s['min_buy_usdc']:.0f}", maxopen=mo, sizing=s["sizing"], size=f"{s['flat_usdc']:.0f}",
+        mirror=("ON" if s["mirror_sells"] else "OFF"))
+    rows = [
+        [{"text": i18n.t("copy_min", lang).format(v=f"{s['min_buy_usdc']:.0f}"), "data": "copy:set:min"},
+         {"text": i18n.t("copy_maxopen", lang).format(v=mo), "data": "copy:set:maxopen"}],
+        [{"text": i18n.t("copy_size", lang).format(v=f"{s['flat_usdc']:.0f}"), "data": "copy:set:size"},
+         {"text": i18n.t("copy_sizing", lang).format(v=s["sizing"]), "data": "copy:sizing"}],
+        [{"text": i18n.t("copy_mirror", lang).format(
+            v=("\U0001F7E2 ON" if s["mirror_sells"] else "\u26AA OFF")), "data": "copy:mirror"}],
+        [{"text": i18n.t("copy_protect_btn", lang), "data": "copy:protect"}],
+        [{"text": i18n.t("btn_ref_back", lang), "data": "copy:home"}],
+    ]
+    return {"text": text, "inline": rows, "parse_mode": "HTML", "edit": True}
+
+
+def copy_protect_screen(store, chat, lang) -> dict:
+    s = store.get_copy_settings(chat)
+    text = i18n.t("copy_protect_text", lang).format(
+        tp=f"{s['tp_pct']:.0f}", sl=f"{s['sl_pct']:.0f}", trail=f"{s['trailing_pct']:.0f}",
+        dg=("ON" if s["dump_guard"] else "OFF"))
+    rows = [
+        [{"text": i18n.t("copy_tp", lang).format(v=f"{s['tp_pct']:.0f}"), "data": "copy:prot:tp"},
+         {"text": i18n.t("copy_sl", lang).format(v=f"{s['sl_pct']:.0f}"), "data": "copy:prot:sl"}],
+        [{"text": i18n.t("copy_trail", lang).format(v=f"{s['trailing_pct']:.0f}"), "data": "copy:prot:trail"}],
+        [{"text": i18n.t("copy_dump", lang).format(
+            v=("\U0001F7E2 ON" if s["dump_guard"] else "\u26AA OFF")), "data": "copy:prot:dump"}],
+        [{"text": i18n.t("btn_ref_back", lang), "data": "copy:filters"}],
+    ]
+    return {"text": text, "inline": rows, "parse_mode": "HTML", "edit": True}
+
+
+def _copy_input(store, chat, text, now_block, lang) -> dict:
+    field = store.get_state(f"awaiting_copy:{chat}", "")
+    store.set_state(f"awaiting_copy:{chat}", "")
+    raw = (text or "").strip()
+    if field == "wallet":
+        addr = raw.lower()
+        if not _valid_addr(addr):
+            return {"text": i18n.t("copy_bad", lang), "parse_mode": "HTML"}
+        store.add_copy_wallet(chat, addr, now_block=int(now_block or 0))
+        return copy_screen(store, chat, lang)
     try:
-        if len(args) > 1:
-            per = max(1.0, float(args[1]))
-        if len(args) > 2:
-            total = max(per, float(args[2]))
-    except (TypeError, ValueError):
-        return i18n.t("copy_bad", lang)
-    store.add_copy_sub(chat, leader, max_per_trade=per, max_total=total,
-                       now_block=int(now_block or 0))
-    sub = store.get_copy_sub(chat)
-    return i18n.t("copy_added", lang).format(
-        leader=leader, per=f"{per:.0f}", total=f"{total:.0f}", spent=f"{sub['spent']:.2f}")
+        val = float(raw.replace("$", "").replace("%", "").strip())
+        if val < 0:
+            raise ValueError
+    except ValueError:
+        return {"text": i18n.t("copy_bad_num", lang), "parse_mode": "HTML"}
+    if field == "min":
+        store.set_copy_settings(chat, min_buy_usdc=val)
+        return copy_filters_screen(store, chat, lang)
+    if field == "maxopen":
+        store.set_copy_settings(chat, max_open=int(val))
+        return copy_filters_screen(store, chat, lang)
+    if field == "size":
+        store.set_copy_settings(chat, flat_usdc=val, sizing="flat")
+        return copy_filters_screen(store, chat, lang)
+    if field in ("tp", "sl", "trail"):
+        key = {"tp": "tp_pct", "sl": "sl_pct", "trail": "trailing_pct"}[field]
+        store.set_copy_settings(chat, **{key: val})
+        return copy_protect_screen(store, chat, lang)
+    return copy_screen(store, chat, lang)
 
 
 def _fmt_left(sec) -> str:
@@ -266,8 +330,10 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
     """Like `command_reply`, but returns a dict {text, inline} for menu commands.
 
     Kept separate so `command_reply` stays a pure str (existing tests/consumers unchanged)."""
-    norm = _route(text, chat_id, store)
     lang = _lang(store, chat_id)
+    if store.get_state(f"awaiting_copy:{chat_id}", ""):
+        return _copy_input(store, chat_id, text, now_block, lang)
+    norm = _route(text, chat_id, store)
     cmd = (norm.split() or [""])[0].lower().split("@")[0]
     if cmd == "/language":
         return {"text": i18n.t("language_choose", lang), "inline": i18n.language_buttons()}
@@ -285,6 +351,8 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
         return {"text": reply, "inline": btns, "parse_mode": "HTML"}
     if cmd == "/pozo":
         return contest_screen(store, chat_id, lang)
+    if cmd in ("/copytrade", "/copy"):
+        return copy_screen(store, chat_id, lang)
     if cmd in ("/start", "/menu"):
         s = _pozo_summary(store)
         rows = i18n.menu_buttons(lang)
@@ -535,10 +603,11 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
     if cmd == "/pozo":
         return contest_screen(store, chat_id, lang)["text"]
     if cmd in ("/copytrade", "/copy"):
-        return _copy_command(store, chat_id, parts[1:], now_block, lang)
+        return copy_screen(store, chat_id, lang)["text"]
     if cmd == "/copyoff":
-        return (i18n.t("copy_off", lang) if store.remove_copy_sub(chat_id)
-                else i18n.t("copy_none", lang))
+        for w in store.list_copy_wallets(chat_id):
+            store.remove_copy_wallet(chat_id, w["leader"])
+        return i18n.t("copy_off", lang)
     if cmd == "/connect":
         if not _valid_addr(arg):
             return i18n.t("connect_prompt", lang)
@@ -828,6 +897,43 @@ def _handle_callback(data, chat, store, token_exists, check_fn, now_block,
         screen = referral_screen(store, chat, lang)
         screen["edit"] = True
         return screen
+    if data == "copy:home":
+        return copy_screen(store, chat, lang)
+    if data == "copy:add":
+        store.set_state(f"awaiting_copy:{chat}", "wallet")
+        return {"text": i18n.t("copy_paste_wallet", lang), "parse_mode": "HTML"}
+    if data == "copy:filters":
+        return copy_filters_screen(store, chat, lang)
+    if data == "copy:sizing":
+        st = store.get_copy_settings(chat)
+        store.set_copy_settings(chat, sizing=("proportional" if st["sizing"] == "flat" else "flat"))
+        return copy_filters_screen(store, chat, lang)
+    if data == "copy:mirror":
+        st = store.get_copy_settings(chat)
+        store.set_copy_settings(chat, mirror_sells=(not st["mirror_sells"]))
+        return copy_filters_screen(store, chat, lang)
+    if data == "copy:protect":
+        return copy_protect_screen(store, chat, lang)
+    if data.startswith("copy:set:"):
+        store.set_state(f"awaiting_copy:{chat}", data.split(":", 2)[2])
+        return {"text": i18n.t("copy_enter_value", lang), "parse_mode": "HTML"}
+    if data.startswith("copy:prot:"):
+        field = data.split(":", 2)[2]
+        if field == "dump":
+            st = store.get_copy_settings(chat)
+            store.set_copy_settings(chat, dump_guard=(not st["dump_guard"]))
+            return copy_protect_screen(store, chat, lang)
+        store.set_state(f"awaiting_copy:{chat}", field)
+        return {"text": i18n.t("copy_enter_value", lang), "parse_mode": "HTML"}
+    if data.startswith("copy:rm:"):
+        store.remove_copy_wallet(chat, data.split(":", 2)[2])
+        return copy_screen(store, chat, lang)
+    if data.startswith("copy:tgl:"):
+        leader = data.split(":", 2)[2]
+        w = store.get_copy_wallet(chat, leader)
+        if w:
+            store.set_copy_wallet_enabled(chat, leader, not w["enabled"])
+        return copy_screen(store, chat, lang)
     if data.startswith("buymenu:"):
         tok = data.split(":", 1)[1]
         btns = [[{"text": "$10", "data": f"buyamt:{tok}:10"},

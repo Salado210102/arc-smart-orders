@@ -419,6 +419,20 @@ auditoría + hot key acotada; no es lo primero).
   `contest_round_published`/`mark_contest_round`/`record_contest_winner`/`list_contest_winners`. Tests
   **+4**. Suite **375 passed** (1 fallo ambiental local). **Nota:** el canal debe configurarse
   (`ARC_INTEL_CHANNEL=-100…`); hoy **dormido** hasta entonces.
+- **2026-09-27 (copytrade v2 — multi-wallet + filtros, estilo Maestro/Banana)** — Rediseño según la
+  referencia visual: **varias wallets** seguidas por usuario (`copy_wallets`) + **filtros globales**
+  (`copy_settings`): `min_buy_usdc` (solo compras ≥ $X; 0 = todas), `max_open` (máx. posiciones
+  abiertas; 0 = ilimitado), `sizing` (**flat** o **proportional**), `mirror_sells`, y **protección por
+  defecto** (`tp_pct`/`sl_pct`/`trailing_pct`/`dump_guard`) **adjunta a cada fill copiado** (usa
+  `exit_plans` + Auto-Protect). Núcleo puro `execution/copy.py` (`CopySettings`, `plan_size`, `decide`
+  con `below_min`/`max_open`/`mirror_off`/`no_position`); motor `execution/copy_keeper.py` itera
+  **todas** las wallets con su override `flat_usdc`. **Bot**: pantalla **Copy-trade** con `➕ Añadir
+  wallet` (pegar dirección) y `🎛️ Filtros` (min buy / max open / tamaño flat-proporcional / mirror
+  sells / protección) + lista de wallets con pausar/borrar; entradas por estado `awaiting_copy`. **Mini
+  App**: pestaña **Copy** con wallets (pausar/borrar), formulario de añadir y panel de filtros; cabecera
+  **`Cache-Control: no-store`** para evitar que Telegram sirva una versión antigua. Endpoints: `GET
+  /copy`, `POST /copy/wallet`, `/copy/wallet/remove`, `/copy/wallet/toggle`, `/copy/settings`. Tests
+  reescritos/adjustados. Suite **377 passed** (1 fallo ambiental local). Sigue **dry-run** hasta mainnet.
   `copy_subs` + `add/get/list/remove/set_enabled/bump_spent/set_last_block`. Bot: comandos
   **`/copytrade <addr> [max_por_op] [presupuesto]`** y **`/copyoff`**; botón del menú **Copytrade**
   ahora **funcional** (`cmd:/copytrade`); comando registrado EN/ES/ZH. Thread propio en el loop

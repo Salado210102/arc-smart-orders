@@ -133,12 +133,18 @@ class SubscriptionStore:
             "CREATE TABLE IF NOT EXISTS contest_winners ("
             "round_id INTEGER, category TEXT, user TEXT, volume REAL, prize REAL, "
             "PRIMARY KEY (round_id, category))")
-        # copy-trading: follow a leader wallet and mirror its trades with the bot wallet
+        # copy-trading: tracked leader wallets (many per follower) + global filters
         self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS copy_subs ("
-            "follower_chat TEXT PRIMARY KEY, leader TEXT, max_per_trade REAL, max_total REAL, "
-            "spent REAL DEFAULT 0, slippage REAL DEFAULT 3, enabled INTEGER DEFAULT 1, "
-            "last_block INTEGER DEFAULT 0, created_ts INTEGER)")
+            "CREATE TABLE IF NOT EXISTS copy_wallets ("
+            "follower_chat TEXT, leader TEXT, flat_usdc REAL, enabled INTEGER DEFAULT 1, "
+            "last_block INTEGER DEFAULT 0, created_ts INTEGER, "
+            "PRIMARY KEY (follower_chat, leader))")
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS copy_settings ("
+            "follower_chat TEXT PRIMARY KEY, min_buy_usdc REAL DEFAULT 0, max_open INTEGER DEFAULT 0, "
+            "sizing TEXT DEFAULT 'flat', flat_usdc REAL DEFAULT 25, mirror_sells INTEGER DEFAULT 1, "
+            "tp_pct REAL DEFAULT 0, sl_pct REAL DEFAULT 0, trailing_pct REAL DEFAULT 0, "
+            "dump_guard INTEGER DEFAULT 1, updated_ts INTEGER)")
         for _col in ("signature TEXT", "sign_token TEXT", "sig_payload TEXT",
                      "kind TEXT DEFAULT 'sell'", "tx_hash TEXT", "attempts INTEGER DEFAULT 0"):
             try:
@@ -914,59 +920,102 @@ class SubscriptionStore:
                     "FROM referral_credits WHERE owner_chat=? ORDER BY created_ts DESC LIMIT ?",
                     (str(owner_chat), int(limit))).fetchall()]
 
-    # --- copy trading (follow a leader wallet; mirror with the bot wallet) ---
-    def add_copy_sub(self, follower, leader, max_per_trade=25.0, max_total=100.0, slippage=3.0,
-                     now_block=0) -> None:
+    # --- copy trading: tracked leader wallets ---
+    def add_copy_wallet(self, follower, leader, flat_usdc=None, now_block=0) -> None:
         self.conn.execute(
-            "INSERT INTO copy_subs(follower_chat,leader,max_per_trade,max_total,spent,slippage,"
-            "enabled,last_block,created_ts) VALUES(?,?,?,?,0,?,1,?,?) "
-            "ON CONFLICT(follower_chat) DO UPDATE SET leader=excluded.leader, "
-            "max_per_trade=excluded.max_per_trade, max_total=excluded.max_total, "
-            "slippage=excluded.slippage, enabled=1",
-            (str(follower), str(leader).lower(), float(max_per_trade), float(max_total),
-             float(slippage), int(now_block or 0), int(time.time())))
+            "INSERT INTO copy_wallets(follower_chat,leader,flat_usdc,enabled,last_block,created_ts) "
+            "VALUES(?,?,?,1,?,?) ON CONFLICT(follower_chat,leader) DO UPDATE SET "
+            "flat_usdc=excluded.flat_usdc, enabled=1",
+            (str(follower), str(leader).lower(),
+             (None if flat_usdc is None else float(flat_usdc)), int(now_block or 0),
+             int(time.time())))
         self.conn.commit()
 
-    def _copy_row(self, r) -> dict | None:
+    _COW_COLS = "follower_chat,leader,flat_usdc,enabled,last_block,created_ts"
+
+    def _copy_wallet_row(self, r) -> dict | None:
         if not r:
             return None
-        return {"follower_chat": r[0], "leader": r[1], "max_per_trade": float(r[2] or 0),
-                "max_total": float(r[3] or 0), "spent": float(r[4] or 0), "slippage": float(r[5] or 0),
-                "enabled": bool(r[6]), "last_block": int(r[7] or 0), "created_ts": int(r[8] or 0)}
+        return {"follower_chat": r[0], "leader": r[1],
+                "flat_usdc": (None if r[2] is None else float(r[2])),
+                "enabled": bool(r[3]), "last_block": int(r[4] or 0), "created_ts": int(r[5] or 0)}
 
-    _COPY_COLS = ("follower_chat,leader,max_per_trade,max_total,spent,slippage,enabled,last_block,"
-                  "created_ts")
+    def get_copy_wallet(self, follower, leader) -> dict | None:
+        return self._copy_wallet_row(self.conn.execute(
+            "SELECT " + self._COW_COLS + " FROM copy_wallets WHERE follower_chat=? AND leader=?",
+            (str(follower), str(leader).lower())).fetchone())
 
-    def get_copy_sub(self, follower) -> dict | None:
-        return self._copy_row(self.conn.execute(
-            "SELECT " + self._COPY_COLS + " FROM copy_subs WHERE follower_chat=?",
-            (str(follower),)).fetchone())
+    def list_copy_wallets(self, follower) -> list:
+        return [self._copy_wallet_row(r) for r in self.conn.execute(
+            "SELECT " + self._COW_COLS + " FROM copy_wallets WHERE follower_chat=? "
+            "ORDER BY created_ts", (str(follower),)).fetchall()]
 
-    def list_copy_subs(self, enabled_only=True) -> list:
-        q = "SELECT " + self._COPY_COLS + " FROM copy_subs"
+    def list_all_copy_wallets(self, enabled_only=True) -> list:
+        q = "SELECT " + self._COW_COLS + " FROM copy_wallets"
         if enabled_only:
             q += " WHERE enabled=1"
-        return [self._copy_row(r) for r in self.conn.execute(q).fetchall()]
+        return [self._copy_wallet_row(r) for r in self.conn.execute(q).fetchall()]
 
-    def remove_copy_sub(self, follower) -> bool:
-        cur = self.conn.execute("DELETE FROM copy_subs WHERE follower_chat=?", (str(follower),))
+    def remove_copy_wallet(self, follower, leader) -> bool:
+        cur = self.conn.execute("DELETE FROM copy_wallets WHERE follower_chat=? AND leader=?",
+                                (str(follower), str(leader).lower()))
         self.conn.commit()
         return cur.rowcount > 0
 
-    def set_copy_enabled(self, follower, enabled: bool) -> bool:
-        cur = self.conn.execute("UPDATE copy_subs SET enabled=? WHERE follower_chat=?",
-                                (1 if enabled else 0, str(follower)))
+    def set_copy_wallet_enabled(self, follower, leader, enabled: bool) -> bool:
+        cur = self.conn.execute("UPDATE copy_wallets SET enabled=? WHERE follower_chat=? AND leader=?",
+                                (1 if enabled else 0, str(follower), str(leader).lower()))
         self.conn.commit()
         return cur.rowcount > 0
 
-    def bump_copy_spent(self, follower, amount: float) -> None:
-        self.conn.execute("UPDATE copy_subs SET spent=coalesce(spent,0)+? WHERE follower_chat=?",
-                          (float(amount), str(follower)))
+    def set_copy_wallet_last_block(self, follower, leader, block: int) -> None:
+        self.conn.execute("UPDATE copy_wallets SET last_block=? WHERE follower_chat=? AND leader=?",
+                          (int(block), str(follower), str(leader).lower()))
         self.conn.commit()
 
-    def set_copy_last_block(self, follower, block: int) -> None:
-        self.conn.execute("UPDATE copy_subs SET last_block=? WHERE follower_chat=?",
-                          (int(block), str(follower)))
+    # --- copy trading: global filters (one row per follower) ---
+    _CS_COLS = ("follower_chat,min_buy_usdc,max_open,sizing,flat_usdc,mirror_sells,tp_pct,sl_pct,"
+                "trailing_pct,dump_guard,updated_ts")
+
+    def get_copy_settings(self, follower) -> dict:
+        r = self.conn.execute("SELECT " + self._CS_COLS + " FROM copy_settings WHERE follower_chat=?",
+                              (str(follower),)).fetchone()
+        if not r:
+            return {"follower_chat": str(follower), "min_buy_usdc": 0.0, "max_open": 0,
+                    "sizing": "flat", "flat_usdc": 25.0, "mirror_sells": True, "tp_pct": 0.0,
+                    "sl_pct": 0.0, "trailing_pct": 0.0, "dump_guard": True, "updated_ts": 0}
+        return {"follower_chat": r[0], "min_buy_usdc": float(r[1] or 0), "max_open": int(r[2] or 0),
+                "sizing": r[3] or "flat",
+                "flat_usdc": float(r[4] if r[4] is not None else 25.0),
+                "mirror_sells": bool(r[5]), "tp_pct": float(r[6] or 0), "sl_pct": float(r[7] or 0),
+                "trailing_pct": float(r[8] or 0), "dump_guard": bool(r[9]), "updated_ts": int(r[10] or 0)}
+
+    def set_copy_settings(self, follower, **kw) -> None:
+        cur = self.get_copy_settings(follower)
+
+        def _pick(key, default):
+            return kw[key] if key in kw and kw[key] is not None else cur.get(key, default)
+
+        f = {"min_buy_usdc": float(_pick("min_buy_usdc", 0.0)),
+             "max_open": int(_pick("max_open", 0)),
+             "sizing": str(_pick("sizing", "flat")),
+             "flat_usdc": float(_pick("flat_usdc", 25.0)),
+             "mirror_sells": 1 if _pick("mirror_sells", True) else 0,
+             "tp_pct": float(_pick("tp_pct", 0.0)),
+             "sl_pct": float(_pick("sl_pct", 0.0)),
+             "trailing_pct": float(_pick("trailing_pct", 0.0)),
+             "dump_guard": 1 if _pick("dump_guard", True) else 0}
+        self.conn.execute(
+            "INSERT INTO copy_settings(follower_chat,min_buy_usdc,max_open,sizing,flat_usdc,"
+            "mirror_sells,tp_pct,sl_pct,trailing_pct,dump_guard,updated_ts) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(follower_chat) DO UPDATE SET "
+            "min_buy_usdc=excluded.min_buy_usdc, max_open=excluded.max_open, sizing=excluded.sizing, "
+            "flat_usdc=excluded.flat_usdc, mirror_sells=excluded.mirror_sells, tp_pct=excluded.tp_pct, "
+            "sl_pct=excluded.sl_pct, trailing_pct=excluded.trailing_pct, "
+            "dump_guard=excluded.dump_guard, updated_ts=excluded.updated_ts",
+            (str(follower), f["min_buy_usdc"], f["max_open"], f["sizing"], f["flat_usdc"],
+             f["mirror_sells"], f["tp_pct"], f["sl_pct"], f["trailing_pct"], f["dump_guard"],
+             int(time.time())))
         self.conn.commit()
 
     def close(self) -> None:

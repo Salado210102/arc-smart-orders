@@ -166,15 +166,24 @@ class CommandTests(unittest.TestCase):
         self.assertTrue(any(b.get("data") == "ref:stats" for b in flat))
 
     def test_copytrade_command_lifecycle(self):
-        self.assertIn("copytrade", self.reply("/copytrade").lower())
-        r = self.reply(f"/copytrade {ADDR} 10 50")
-        self.assertIn("Copytrading", r)
-        sub = self.store.get_copy_sub(1)
-        self.assertEqual(sub["leader"], ADDR)
-        self.assertEqual(sub["max_per_trade"], 10)
-        self.assertEqual(sub["max_total"], 50)
-        self.assertIn("stopped", self.reply("/copyoff").lower())
-        self.assertIsNone(self.store.get_copy_sub(1))
+        self.assertIn("Copy-trade", self.reply("/copytrade"))
+        # add a wallet via the inline flow (copy:add -> paste address)
+        r = _handle_callback("copy:add", 1, self.store, self.exists, self.check, 1000)
+        self.assertIn("Paste", r["text"])
+        command_reply_rich(ADDR, 1, self.store, self.exists, self.check, 1000)
+        self.assertIsNotNone(self.store.get_copy_wallet(1, ADDR))
+        # filters screen + toggle mirror sells
+        f = _handle_callback("copy:filters", 1, self.store, self.exists, self.check, 1000)
+        self.assertIn("filters", f["text"].lower())
+        _handle_callback("copy:mirror", 1, self.store, self.exists, self.check, 1000)
+        self.assertFalse(self.store.get_copy_settings(1)["mirror_sells"])
+        # edit min buy
+        _handle_callback("copy:set:min", 1, self.store, self.exists, self.check, 1000)
+        command_reply_rich("50", 1, self.store, self.exists, self.check, 1000)
+        self.assertEqual(self.store.get_copy_settings(1)["min_buy_usdc"], 50.0)
+        # remove the wallet
+        _handle_callback(f"copy:rm:{ADDR}", 1, self.store, self.exists, self.check, 1000)
+        self.assertIsNone(self.store.get_copy_wallet(1, ADDR))
 
     def test_referral_stats_button_and_screen(self):
         code = self.store.ensure_referral_code(1, "ABCDEFGH")

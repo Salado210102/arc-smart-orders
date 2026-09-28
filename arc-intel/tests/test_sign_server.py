@@ -171,7 +171,7 @@ class SignServerTests(unittest.TestCase):
                 self.fail(f"expected 401 for {path}")
             except urllib.error.HTTPError as e:
                 self.assertEqual(e.code, 401)
-        for path in ("/copy", "/copy/off", "/copy/toggle"):
+        for path in ("/copy/wallet", "/copy/wallet/remove", "/copy/wallet/toggle", "/copy/settings"):
             req = urllib.request.Request(self._url(path), data=b"{}",
                                          headers={"Content-Type": "application/json"})
             try:

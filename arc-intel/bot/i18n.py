@@ -237,40 +237,95 @@ TEXTS: dict[str, dict[str, str]] = {
         "es": "Aún no hay volumen referido. Comparte tu enlace para empezar a ganar.",
         "zh": "暂无推荐交易量。分享你的链接即可开始赚取。",
     },
+    "copy_title": {
+        "en": "\U0001F3AE <b>Copy-trade</b>\nMirrors the buys of tracked wallets with your bot wallet.",
+        "es": "\U0001F3AE <b>Copy-trade</b>\nReplica las compras de las wallets seguidas con tu wallet del bot.",
+        "zh": "\U0001F3AE <b>\u8ddf\u5355</b>\n\u7528\u4f60\u7684\u673a\u5668\u4eba\u94b1\u5305\u590d\u5236\u8ddf\u8e2a\u94b1\u5305\u7684\u4e70\u5165\u3002",
+    },
+    "copy_hint": {
+        "en": "Filters: min size, max open, proportional sizing, mirror sells.",
+        "es": "Filtros: tama\u00f1o m\u00ednimo, m\u00e1x. abiertas, tama\u00f1o proporcional, replicar ventas.",
+        "zh": "\u8fc7\u6ee4\uff1a\u6700\u5c0f\u91d1\u989d\u3001\u6700\u5927\u6301\u4ed3\u3001\u6bd4\u4f8b\u4ed3\u4f4d\u3001\u8ddf\u5356\u3002",
+    },
     "copy_none": {
-        "en": ("\U0001F465 <b>Copytrade</b>\nFollow a wallet and the bot mirrors its trades with your "
-               "bot wallet.\n\nUse: <code>/copytrade 0x\u2026 [max_per_trade] [max_total]</code>\n"
-               "Example: <code>/copytrade 0xabc\u2026 25 100</code>"),
-        "es": ("\U0001F465 <b>Copytrade</b>\nSigue una cartera y el bot replica sus operaciones con tu "
-               "wallet del bot.\n\nUso: <code>/copytrade 0x\u2026 [max_por_op] [presupuesto]</code>\n"
-               "Ejemplo: <code>/copytrade 0xabc\u2026 25 100</code>"),
-        "zh": ("\U0001F465 <b>跟单</b>\n关注一个钱包，机器人将用你的机器人钱包复制其交易。\n\n"
-               "用法：<code>/copytrade 0x\u2026 [单笔上限] [总预算]</code>\n"
-               "示例：<code>/copytrade 0xabc\u2026 25 100</code>"),
+        "en": "No tracked wallets yet.",
+        "es": "A\u00fan no sigues ninguna wallet.",
+        "zh": "\u5c1a\u672a\u8ddf\u8e2a\u4efb\u4f55\u94b1\u5305\u3002",
     },
-    "copy_added": {
-        "en": ("\u2705 Copytrading <code>{leader}</code>\n"
-               "Max per trade: <b>${per}</b> \u00b7 Budget: <b>${total}</b> \u00b7 Spent: <b>${spent}</b>\n"
-               "Mirrors <b>new</b> trades only. Stop with /copyoff.\n\n"
-               "<i>High risk. Needs a bot wallet (Mini App \u2192 Cartera) with USDC.</i>"),
-        "es": ("\u2705 Copytrade a <code>{leader}</code>\n"
-               "M\u00e1x por operaci\u00f3n: <b>${per}</b> \u00b7 Presupuesto: <b>${total}</b> \u00b7 "
-               "Gastado: <b>${spent}</b>\nReplica solo operaciones <b>nuevas</b>. Para con /copyoff.\n\n"
-               "<i>Alto riesgo. Necesita wallet del bot (Mini App \u2192 Cartera) con USDC.</i>"),
-        "zh": ("\u2705 跟单 <code>{leader}</code>\n"
-               "单笔上限：<b>${per}</b> \u00b7 预算：<b>${total}</b> \u00b7 已用：<b>${spent}</b>\n"
-               "仅复制<b>新</b>交易。使用 /copyoff 停止。\n\n"
-               "<i>高风险。需要机器人钱包（Mini App \u2192 钱包）并有 USDC。</i>"),
+    "copy_add_wallet": {"en": "\u2795 Add wallet", "es": "\u2795 A\u00f1adir wallet",
+                        "zh": "\u2795 \u6dfb\u52a0\u94b1\u5305"},
+    "copy_filters": {"en": "\U0001F39B\uFE0F Filters", "es": "\U0001F39B\uFE0F Filtros",
+                     "zh": "\U0001F39B\uFE0F \u8fc7\u6ee4\u5668"},
+    "copy_paste_wallet": {
+        "en": "\U0001F4E5 Paste the wallet address to track (0x + 40 hex).",
+        "es": "\U0001F4E5 Pega la direcci\u00f3n de la wallet a seguir (0x + 40 hex).",
+        "zh": "\U0001F4E5 \u7c98\u8d34\u8981\u8ddf\u8e2a\u7684\u94b1\u5305\u5730\u5740\uff080x + 40 \u4f4d\u5341\u516d\u8fdb\u5236\uff09\u3002",
     },
+    "copy_enter_value": {
+        "en": "\u270F\uFE0F Send the value (number).",
+        "es": "\u270F\uFE0F Env\u00eda el valor (n\u00famero).",
+        "zh": "\u270F\uFE0F \u53d1\u9001\u6570\u503c\u3002",
+    },
+    "copy_bad": {
+        "en": "Invalid address. Send 0x + 40 hex.",
+        "es": "Direcci\u00f3n inv\u00e1lida. Env\u00eda 0x + 40 hex.",
+        "zh": "\u5730\u5740\u65e0\u6548\u3002\u8bf7\u53d1\u9001 0x + 40 \u4f4d\u5341\u516d\u8fdb\u5236\u3002",
+    },
+    "copy_bad_num": {
+        "en": "Invalid number.",
+        "es": "N\u00famero inv\u00e1lido.",
+        "zh": "\u6570\u503c\u65e0\u6548\u3002",
+    },
+    "copy_filters_text": {
+        "en": ("\U0001F39B\uFE0F <b>Copy-trade filters</b> (apply to every tracked wallet)\n"
+               "\u2022 Copy only buys \u2265 <b>${min}</b> by the leader\n"
+               "\u2022 Max open copied positions: <b>{maxopen}</b>\n"
+               "\u2022 Size: <b>{sizing}</b> (flat ${size})\n"
+               "\u2022 Mirror sells: <b>{mirror}</b>\n\n"
+               "Protection defaults (TP / SL / trailing / dump guard) are attached to every copied fill."),
+        "es": ("\U0001F39B\uFE0F <b>Filtros de copy-trade</b> (aplican a todas las wallets)\n"
+               "\u2022 Copiar solo compras \u2265 <b>${min}</b> del l\u00edder\n"
+               "\u2022 M\u00e1x. posiciones abiertas: <b>{maxopen}</b>\n"
+               "\u2022 Tama\u00f1o: <b>{sizing}</b> (flat ${size})\n"
+               "\u2022 Replicar ventas: <b>{mirror}</b>\n\n"
+               "La protecci\u00f3n por defecto (TP / SL / trailing / dump guard) se aplica a cada compra copiada."),
+        "zh": ("\U0001F39B\uFE0F <b>\u8ddf\u5355\u8fc7\u6ee4\u5668</b>\uff08\u9002\u7528\u4e8e\u6240\u6709\u94b1\u5305\uff09\n"
+               "\u2022 \u4ec5\u590d\u5236\u9886\u8896\u2265 <b>${min}</b> \u7684\u4e70\u5165\n"
+               "\u2022 \u6700\u5927\u6301\u4ed3\uff1a<b>{maxopen}</b>\n"
+               "\u2022 \u4ed3\u4f4d\uff1a<b>{sizing}</b>\uff08\u56fa\u5b9a ${size}\uff09\n"
+               "\u2022 \u8ddf\u5356\uff1a<b>{mirror}</b>\n\n"
+               "\u9ed8\u8ba4\u4fdd\u62a4\uff08TP / SL / \u8ddf\u8e2a / \u9632\u5d29\u76d8\uff09\u9644\u52a0\u5230\u6bcf\u7b14\u590d\u5236\u4e70\u5165\u3002"),
+    },
+    "copy_min": {"en": "min buy ${v} \u270F\uFE0F", "es": "min buy ${v} \u270F\uFE0F",
+                 "zh": "\u6700\u5c0f\u4e70\u5165 ${v} \u270F\uFE0F"},
+    "copy_maxopen": {"en": "max open {v} \u270F\uFE0F", "es": "max open {v} \u270F\uFE0F",
+                     "zh": "\u6700\u5927\u6301\u4ed3 {v} \u270F\uFE0F"},
+    "copy_size": {"en": "flat size ${v} \u270F\uFE0F", "es": "tama\u00f1o flat ${v} \u270F\uFE0F",
+                  "zh": "\u56fa\u5b9a\u4ed3\u4f4d ${v} \u270F\uFE0F"},
+    "copy_sizing": {"en": "size: {v} \U0001F4CF", "es": "tama\u00f1o: {v} \U0001F4CF",
+                    "zh": "\u4ed3\u4f4d\uff1a{v} \U0001F4CF"},
+    "copy_mirror": {"en": "\U0001FA9E Mirror sells: {v}", "es": "\U0001FA9E Replicar ventas: {v}",
+                    "zh": "\U0001FA9E \u8ddf\u5356\uff1a{v}"},
+    "copy_protect_btn": {"en": "\U0001F6E1\uFE0F Protection", "es": "\U0001F6E1\uFE0F Protecci\u00f3n",
+                         "zh": "\U0001F6E1\uFE0F \u4fdd\u62a4"},
+    "copy_protect_text": {
+        "en": ("\U0001F6E1\uFE0F <b>Protection defaults</b> (attached to every copied buy)\n"
+               "TP <b>{tp}%</b> \u00b7 SL <b>{sl}%</b> \u00b7 trailing <b>{trail}%</b> \u00b7 dump guard <b>{dg}</b>"),
+        "es": ("\U0001F6E1\uFE0F <b>Protecci\u00f3n por defecto</b> (se aplica a cada compra copiada)\n"
+               "TP <b>{tp}%</b> \u00b7 SL <b>{sl}%</b> \u00b7 trailing <b>{trail}%</b> \u00b7 dump guard <b>{dg}</b>"),
+        "zh": ("\U0001F6E1\uFE0F <b>\u9ed8\u8ba4\u4fdd\u62a4</b>\uff08\u9644\u52a0\u5230\u6bcf\u7b14\u590d\u5236\u4e70\u5165\uff09\n"
+               "TP <b>{tp}%</b> \u00b7 SL <b>{sl}%</b> \u00b7 \u8ddf\u8e2a <b>{trail}%</b> \u00b7 \u9632\u5d29\u76d8 <b>{dg}</b>"),
+    },
+    "copy_tp": {"en": "TP {v}% \u270F\uFE0F", "es": "TP {v}% \u270F\uFE0F", "zh": "TP {v}% \u270F\uFE0F"},
+    "copy_sl": {"en": "SL {v}% \u270F\uFE0F", "es": "SL {v}% \u270F\uFE0F", "zh": "SL {v}% \u270F\uFE0F"},
+    "copy_trail": {"en": "Trailing {v}% \u270F\uFE0F", "es": "Trailing {v}% \u270F\uFE0F",
+                   "zh": "\u8ddf\u8e2a {v}% \u270F\uFE0F"},
+    "copy_dump": {"en": "\U0001F6A8 Dump guard: {v}", "es": "\U0001F6A8 Dump guard: {v}",
+                  "zh": "\U0001F6A8 \u9632\u5d29\u76d8\uff1a{v}"},
     "copy_off": {
         "en": "\U0001F6D1 Copytrading stopped.",
         "es": "\U0001F6D1 Copytrade detenido.",
-        "zh": "\U0001F6D1 已停止跟单。",
-    },
-    "copy_bad": {
-        "en": "Invalid address. Usage: /copytrade 0x + 40 hex [max_per_trade] [max_total]",
-        "es": "Direcci\u00f3n inv\u00e1lida. Uso: /copytrade 0x + 40 hex [max_por_op] [presupuesto]",
-        "zh": "\u5730\u5740\u65e0\u6548\u3002\u7528\u6cd5\uff1a/copytrade 0x + 40 \u4f4d\u5341\u516d\u8fdb\u5236 [\u5355\u7b14\u4e0a\u9650] [\u603b\u9884\u7b97]",
+        "zh": "\U0001F6D1 \u5df2\u505c\u6b62\u8ddf\u5355\u3002",
     },
     "pozo_line": {
         "en": "\U0001F3C6 Prize pool: <b>${pozo:.2f}</b> \u00b7 ends in <b>{left}</b>",
