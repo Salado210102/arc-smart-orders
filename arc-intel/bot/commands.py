@@ -195,6 +195,49 @@ def _copy_command(store, chat, args, now_block, lang) -> str:
         leader=leader, per=f"{per:.0f}", total=f"{total:.0f}", spent=f"{sub['spent']:.2f}")
 
 
+def _fmt_left(sec) -> str:
+    sec = max(0, int(sec))
+    return f"{sec // 3600}h {(sec % 3600) // 60}m"
+
+
+def _pozo_summary(store) -> dict:
+    """Live prize-pool numbers for the current contest round (from bot fills only)."""
+    from monetization import contest as CT
+    w = CT.round_window(time.time())
+    trader = store.volume_by_user_since(w["start"])
+    aff = store.referred_volume_by_user_since(w["start"])
+    total = sum(trader.values())
+    return {"left": w["seconds_left"], "pozo": CT.pozo(total), "total": total}
+
+
+def _pozo_button(store, lang) -> dict:
+    s = _pozo_summary(store)
+    return {"text": i18n.t("pozo_btn", lang).format(pozo=s["pozo"]), "data": "cmd:/pozo"}
+
+
+def contest_screen(store, chat, lang) -> dict:
+    from monetization import contest as CT
+    w = CT.round_window(time.time())
+    trader = store.volume_by_user_since(w["start"])
+    aff = store.referred_volume_by_user_since(w["start"])
+    st = CT.standings(trader, aff, top=5)
+
+    def lines(rows):
+        if not rows:
+            return i18n.t("contest_empty", lang)
+        return "\n".join(f"#{r['rank']} <b>{_html.escape(CT.mask_user(r['user']))}</b> \u2014 "
+                         f"${r['volume']:,.0f}" for r in rows)
+
+    me_t = CT.rank_of(trader, chat)["rank"]
+    me_a = CT.rank_of(aff, chat)["rank"]
+    text = i18n.t("contest_text", lang).format(
+        left=_fmt_left(w["seconds_left"]), pozo=st["pozo"], total=st["total_volume"],
+        trader_lines=lines(st["trader_top"]), aff_lines=lines(st["affiliate_top"]),
+        me_trader=me_t, me_affiliate=me_a)
+    return {"text": text, "inline": [[{"text": i18n.t("btn_app", lang), "web_app": i18n.MINIAPP_URL}]],
+            "parse_mode": "HTML"}
+
+
 def referral_stats_screen(store, chat, lang) -> dict:
     """Per-referred-user breakdown: who traded, how much, and what you earned."""
     s = store.referral_summary(chat)
@@ -237,8 +280,15 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
         btns = i18n.menu_buttons(lang)
         btns.append([{"text": i18n.t("btn_docs", lang), "url": i18n.DOCS_URL}])
         return {"text": reply, "inline": btns, "parse_mode": "HTML"}
+    if cmd == "/pozo":
+        return contest_screen(store, chat_id, lang)
     if cmd in ("/start", "/menu"):
-        return {"text": reply, "inline": i18n.menu_buttons(lang), "parse_mode": "HTML"}
+        s = _pozo_summary(store)
+        rows = i18n.menu_buttons(lang)
+        rows.insert(0, [_pozo_button(store, lang)])
+        text = i18n.t("pozo_line", lang).format(pozo=s["pozo"],
+                                                left=_fmt_left(s["left"])) + "\n\n" + reply
+        return {"text": text, "inline": rows, "parse_mode": "HTML"}
     if cmd == "/check":
         parts2 = norm.split()
         if len(parts2) > 1 and _valid_addr(parts2[1]):
@@ -247,7 +297,7 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
             return card
         return {"text": reply, "parse_mode": "HTML"}
     if cmd in ("/list", "/stats", "/wallet", "/connect", "/link_wallet", "/unlink_wallet",
-               "/copytrade", "/copy", "/copyoff"):
+               "/copytrade", "/copy", "/copyoff", "/pozo"):
         return {"text": reply, "parse_mode": "HTML"}
     return reply
 
@@ -479,6 +529,8 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
         return head + "\n\n" + i18n.t("wallet_text", lang)
     if cmd == "/referral":
         return referral_screen(store, chat_id, lang)["text"]
+    if cmd == "/pozo":
+        return contest_screen(store, chat_id, lang)["text"]
     if cmd in ("/copytrade", "/copy"):
         return _copy_command(store, chat_id, parts[1:], now_block, lang)
     if cmd == "/copyoff":

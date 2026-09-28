@@ -1,4 +1,5 @@
 import json
+import time
 import unittest
 
 from bot.store import SubscriptionStore
@@ -143,11 +144,17 @@ class CommandTests(unittest.TestCase):
         r = command_reply_rich("/start", 1, self.store, self.exists, self.check, 1000)
         self.assertIsInstance(r, dict)
         self.assertTrue(r["inline"])
-        # Maestro-style grid: 10 rows; row 0 is the Mini App button (web_app)
-        self.assertEqual(len(r["inline"]), 10)
-        self.assertIn("web_app", r["inline"][0][0])
-        self.assertEqual(len(r["inline"][1]), 2)
+        # Maestro-style grid: 11 rows; row 0 is the live prize-pool button, then the Mini App
+        self.assertEqual(len(r["inline"]), 11)
+        self.assertEqual(r["inline"][0][0]["data"], "cmd:/pozo")
+        self.assertTrue(any("web_app" in b for row in r["inline"] for b in row))
         self.assertIn("SNIPER IA", r["text"])
+
+    def test_pozo_command_and_menu_line(self):
+        self.store.record_fill("tx1:buy", 1, ADDR, "buy", 1.0, 100.0, ts=int(time.time()))
+        self.assertIn("Pool", self.reply("/pozo"))
+        r = command_reply_rich("/start", 1, self.store, self.exists, self.check, 1000)
+        self.assertIn("Prize pool", r["text"])
 
     def test_referral_screen(self):
         r = command_reply_rich("/referral", 1, self.store, self.exists, self.check, 1000)

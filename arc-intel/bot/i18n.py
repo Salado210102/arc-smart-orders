@@ -272,6 +272,44 @@ TEXTS: dict[str, dict[str, str]] = {
         "es": "Direcci\u00f3n inv\u00e1lida. Uso: /copytrade 0x + 40 hex [max_por_op] [presupuesto]",
         "zh": "\u5730\u5740\u65e0\u6548\u3002\u7528\u6cd5\uff1a/copytrade 0x + 40 \u4f4d\u5341\u516d\u8fdb\u5236 [\u5355\u7b14\u4e0a\u9650] [\u603b\u9884\u7b97]",
     },
+    "pozo_line": {
+        "en": "\U0001F3C6 Prize pool: <b>${pozo:.2f}</b> \u00b7 ends in <b>{left}</b>",
+        "es": "\U0001F3C6 Pozo de la ronda: <b>${pozo:.2f}</b> \u00b7 termina en <b>{left}</b>",
+        "zh": "\U0001F3C6 \u5956\u6c60\uff1a<b>${pozo:.2f}</b> \u00b7 \u7ed3\u675f\u4e8e <b>{left}</b>",
+    },
+    "pozo_btn": {
+        "en": "\U0001F3C6 Pool ${pozo:.2f}",
+        "es": "\U0001F3C6 Pozo ${pozo:.2f}",
+        "zh": "\U0001F3C6 \u5956\u6c60 ${pozo:.2f}",
+    },
+    "contest_text": {
+        "en": ("\U0001F3C6 <b>Volume contest</b> \u00b7 ends in <b>{left}</b>\n"
+               "Pool: <b>${pozo:.2f}</b> (50/50 trader \u00b7 affiliate)\n"
+               "Round volume: <b>${total:,.0f}</b>\n\n"
+               "\U0001F7E2 <b>Trader</b>\n{trader_lines}\n\n"
+               "\U0001F465 <b>Affiliate</b>\n{aff_lines}\n\n"
+               "Your rank \u2014 trader #{me_trader} \u00b7 affiliate #{me_affiliate}\n\n"
+               "<i>Merit by volume (no lottery). Not financial advice.</i>"),
+        "es": ("\U0001F3C6 <b>Concurso por volumen</b> \u00b7 termina en <b>{left}</b>\n"
+               "Pozo: <b>${pozo:.2f}</b> (50/50 trader \u00b7 afiliado)\n"
+               "Volumen de la ronda: <b>${total:,.0f}</b>\n\n"
+               "\U0001F7E2 <b>Trader</b>\n{trader_lines}\n\n"
+               "\U0001F465 <b>Afiliado</b>\n{aff_lines}\n\n"
+               "Tu puesto \u2014 trader #{me_trader} \u00b7 afiliado #{me_affiliate}\n\n"
+               "<i>M\u00e9rito por volumen (sin azar). No es consejo financiero.</i>"),
+        "zh": ("\U0001F3C6 <b>\u4ea4\u6613\u91cf\u7ade\u8d5b</b> \u00b7 \u7ed3\u675f\u4e8e <b>{left}</b>\n"
+               "\u5956\u6c60\uff1a<b>${pozo:.2f}</b>\uff08\u4ea4\u6613\u8005/\u63a8\u8350\u4eba\u5404 50%\uff09\n"
+               "\u672c\u8f6e\u4ea4\u6613\u91cf\uff1a<b>${total:,.0f}</b>\n\n"
+               "\U0001F7E2 <b>\u4ea4\u6613\u8005</b>\n{trader_lines}\n\n"
+               "\U0001F465 <b>\u63a8\u8350\u4eba</b>\n{aff_lines}\n\n"
+               "\u4f60\u7684\u6392\u540d \u2014 \u4ea4\u6613\u8005 #{me_trader} \u00b7 \u63a8\u8350\u4eba #{me_affiliate}\n\n"
+               "<i>\u6309\u4ea4\u6613\u91cf\u8ba1\u540d\uff08\u65e0\u62bd\u5956\uff09\u3002\u975e\u6295\u8d44\u5efa\u8bae\u3002</i>"),
+    },
+    "contest_empty": {
+        "en": "no volume yet",
+        "es": "sin volumen a\u00fan",
+        "zh": "\u6682\u65e0\u4ea4\u6613\u91cf",
+    },
 }
 
 

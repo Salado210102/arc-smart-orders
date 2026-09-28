@@ -404,6 +404,11 @@ auditoría + hot key acotada; no es lo primero).
   desplegable (refresco 30 s). Tests **+7** (`tests/test_contest.py`) + auth. Suite **371 passed**
   (1 fallo ambiental local). **Pendiente**: publicación automática del ganador (canal oficial) 1 h
   tras el cierre y liquidación; el pozo es informativo hasta que el cobro del fee esté activo.
+- **2026-09-27 (pozo también en Telegram)** — El banner del pozo llega al **bot**: comando
+  **`/pozo`** (`contest_screen`: pozo, volumen de la ronda, rankings trader/afiliado enmascarados y tu
+  puesto) y **botón dinámico "🏆 Pozo $X"** en el menú de `/start` (que abre `/pozo`), además de una
+  **línea de pozo + contador** encabezando el mensaje de bienvenida. Registrado EN/ES/ZH. Suite
+  **372 passed** (1 fallo ambiental local).
   `copy_subs` + `add/get/list/remove/set_enabled/bump_spent/set_last_block`. Bot: comandos
   **`/copytrade <addr> [max_por_op] [presupuesto]`** y **`/copyoff`**; botón del menú **Copytrade**
   ahora **funcional** (`cmd:/copytrade`); comando registrado EN/ES/ZH. Thread propio en el loop
