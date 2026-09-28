@@ -17,6 +17,7 @@
 | Caza rápida (TP/SL/Trailing) | `/check` → Protect (paper) | pestaña **Posiciones** (SL/TP/Trail por posición) | parcial |
 | **Auto-Protect** | `/settings` (toggle) | pestaña **Cartera** (toggle) | ✅ |
 | Wallet custodial (Modo Maestro) | `/wallet` (enlace), Mini App | pestaña **Cartera** (crear/retirar/vender) | ✅ |
+| **Posiciones custodiales + RUGGED** | **`/portfolio`** (estado RUGGED/dev-sold, PnL, realized, vender 25/50/75/100%) | pestaña **Posiciones** (badge RUGGED, PnL, SL/TP/Trail, vender) | ✅ |
 | Wallet watch-only | `/connect`, `/link_wallet` | pestaña **Cartera** (mostrar) | ✅ |
 | Referidos + estadísticas | `/referral` (código, enlace, stats) | pestaña **Cartera** (tarjeta + desglose) | ✅ |
 | Pozo del concurso | `/pozo` + botón dinámico en el menú | banner superior + ranking | ✅ |

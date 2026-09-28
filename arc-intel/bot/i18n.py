@@ -397,6 +397,27 @@ TEXTS: dict[str, dict[str, str]] = {
                "\u8d39\u7387\uff1a<b>{fee}%</b>\n30 \u5929\u4ea4\u6613\u91cf\uff1a${vol}\n\n"
                "<i>\u6309\u4ea4\u6613\u91cf\u5347\u7ea7 VIP\uff1b\u88ab\u63a8\u8350\u7528\u6237 30 \u5929\u5185 0.90%\u3002</i>"),
     },
+    "btn_portfolio": {"en": "\U0001F4BC Bot wallet", "es": "\U0001F4BC Cartera bot",
+                      "zh": "\U0001F4BC \u673a\u5668\u4eba\u94b1\u5305"},
+    "portfolio_title": {
+        "en": "\U0001F4BC <b>Bot-wallet positions</b>",
+        "es": "\U0001F4BC <b>Posiciones de tu wallet del bot</b>",
+        "zh": "\U0001F4BC <b>\u673a\u5668\u4eba\u94b1\u5305\u6301\u4ed3</b>",
+    },
+    "portfolio_empty": {
+        "en": "No positions in your bot wallet yet.",
+        "es": "A\u00fan no tienes posiciones en tu wallet del bot.",
+        "zh": "\u673a\u5668\u4eba\u94b1\u5305\u4e2d\u6682\u65e0\u6301\u4ed3\u3002",
+    },
+    "portfolio_nocustody": {
+        "en": "You don't have a bot wallet yet. Create it in the Mini App \u2192 Wallet.",
+        "es": "A\u00fan no tienes wallet del bot. Cr\u00e9ala en la Mini App \u2192 Cartera.",
+        "zh": "\u4f60\u8fd8\u6ca1\u6709\u673a\u5668\u4eba\u94b1\u5305\u3002\u8bf7\u5728 Mini App \u2192 \u94b1\u5305 \u4e2d\u521b\u5efa\u3002",
+    },
+    "custsell_ok": {"en": "\u2705 Sold at market.", "es": "\u2705 Vendido a mercado.",
+                    "zh": "\u2705 \u5df2\u6309\u5e02\u4ef7\u5356\u51fa\u3002"},
+    "custsell_err": {"en": "Could not sell: {err}", "es": "No se pudo vender: {err}",
+                     "zh": "\u65e0\u6cd5\u5356\u51fa\uff1a{err}"},
 }
 
 
@@ -428,6 +449,7 @@ def menu_buttons(lang: str = DEFAULT) -> list:
         [b("btn_alerts", "cmd:/list"), b("btn_check", "cmd:/check")],
         [b("btn_stats", "cmd:/stats"), b("btn_pending", "cmd:/pending")],
         [b("btn_positions", "cmd:/positions"), b("btn_settings", "cmd:/settings")],
+        [b("btn_portfolio", "cmd:/portfolio")],
         [b("btn_wallet", "cmd:/connect"), b("btn_help", "cmd:/help")],
         [b("btn_signals", "soon:Signals"), b("btn_copytrade", "cmd:/copytrade")],
         [b("btn_bridge", "cmd:/bridge"), b("btn_premium", "soon:Premium")],

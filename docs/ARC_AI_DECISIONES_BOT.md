@@ -462,6 +462,13 @@ auditoría + hot key acotada; no es lo primero).
   prueba a tu chat). **Pillow instalado en el VPS** (12.3). Mini App ya cubre el equivalente (banner del
   pozo + ranking) → **paridad OK**. Tests `tests/test_poster.py` (+3). Suite **392 passed** (1 fallo
   ambiental local).
+- **2026-09-27 (posiciones custodiales + RUGGED en el bot)** — Se cierra el último hueco de paridad.
+  Nuevo comando **`/portfolio`** (y botón **💼 Cartera bot** en el menú): lista las posiciones de la
+  **wallet del bot** con **badge 🪦 RUGGED / ⚠ dev-sold** (`store.token_risk_status`), **avg**, **PnL**
+  (precio vía `price_fn`) y **realized**, más botones de **venta 25/50/75/100%** (callback `custsell`)
+  que ejecutan la venta custodial en el propio bot (`custsell_fn` en el loop, misma ruta que la Mini
+  App). Textos i18n `portfolio_*`/`custsell_*`/`btn_portfolio`. Paridad **completa** (Mini App ya lo
+  tenía). Tests +4. Suite **395 passed** (1 fallo ambiental local).
   `copy_subs` + `add/get/list/remove/set_enabled/bump_spent/set_last_block`. Bot: comandos
   **`/copytrade <addr> [max_por_op] [presupuesto]`** y **`/copyoff`**; botón del menú **Copytrade**
   ahora **funcional** (`cmd:/copytrade`); comando registrado EN/ES/ZH. Thread propio en el loop

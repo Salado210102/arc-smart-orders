@@ -104,6 +104,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "pozo", "description": "Prize pool & ranking"},
         {"command": "bridge", "description": "Bridge USDC to Arc"},
         {"command": "tier", "description": "My fee tier"},
+        {"command": "portfolio", "description": "Bot-wallet positions"},
         {"command": "language", "description": "Language"},
         {"command": "disclaimer", "description": "Disclaimer"},
         {"command": "help", "description": "Help"},
@@ -124,6 +125,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "pozo", "description": "Pozo y ranking"},
         {"command": "bridge", "description": "Puentea USDC a Arc"},
         {"command": "tier", "description": "Mi tarifa"},
+        {"command": "portfolio", "description": "Posiciones (cartera bot)"},
         {"command": "language", "description": "Idioma"},
         {"command": "disclaimer", "description": "Aviso legal"},
         {"command": "help", "description": "Ayuda"},
@@ -144,6 +146,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "pozo", "description": "\u5956\u6c60\u4e0e\u6392\u540d"},
         {"command": "bridge", "description": "\u8de8\u94fe USDC \u5230 Arc"},
         {"command": "tier", "description": "\u6211\u7684\u8d39\u7387"},
+        {"command": "portfolio", "description": "\u673a\u5668\u4eba\u94b1\u5305\u6301\u4ed3"},
         {"command": "language", "description": "\u8bed\u8a00"},
         {"command": "disclaimer", "description": "\u514d\u8d23\u58f0\u660e"},
         {"command": "help", "description": "\u5e2e\u52a9"},
@@ -730,6 +733,40 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
     def symbol_fn(tok: str) -> str:
         return sym_lc.get((tok or "").lower()) or tokenmeta.rpc_symbol(tok)
 
+    def custsell_fn(chat, token, pct) -> str:
+        """Sell a % of a bot-wallet holding from the bot (same path as the Mini App)."""
+        import time as _t
+        from execution import custody as C
+        from execution.quotes import sell_quote
+        from execution.eip712 import new_nonce
+        from execution.sessions import decrypt_secret
+        from .miniapp_data import load_pool, latest_price
+        enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
+        c = store.get_custody(chat)
+        if not c or not enc:
+            return "no_wallet"
+        tok = (token or "").lower()
+        pool = load_pool(storage, tok)
+        if not pool:
+            return "no_pool"
+        bal = C.erc20_balance(tok, c["address"])
+        if bal <= 0:
+            return "no_position"
+        amount_in = int(bal * float(pct) / 100.0)
+        price = latest_price(storage, tok) or 0
+        dec = tokenmeta.rpc_decimals(tok)
+        q = sell_quote(qty=amount_in / (10 ** dec), price=price, token_decimals=dec, floor_pct=30)
+        pk = decrypt_secret(c["enc_secret"], enc)
+        C.ensure_permit2_approval(pk, tok)
+        txh = C.swap(pk, pool=pool, token_in=tok, amount_in=amount_in, min_out=q["min_out_base"],
+                     recipient=c["address"], order_nonce=new_nonce(), deadline=int(_t.time()) + 600)
+        try:
+            store.record_fill(f"{(txh or '')}:sell", chat, tok, "sell", amount_in / (10 ** dec),
+                              (amount_in / (10 ** dec)) * price, ts=int(_t.time()))
+        except Exception:
+            pass
+        return "ok" if txh else "error"
+
     def worker():
         while not stop.is_set():
             try:
@@ -737,7 +774,7 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
                 # picked up within ~poll interval instead of waiting on a hung long-poll.
                 n = poll_once(tok, cmd_store, transport, token_exists, check_fn, clock["block"],
                               recent_fn=recent_fn, paper_price_fn=price_fn, symbol_fn=symbol_fn,
-                              sender=sender, timeout=2)
+                              sender=sender, custsell_fn=custsell_fn, timeout=2)
                 if not n:
                     time.sleep(0.3)
             except Exception as exc:

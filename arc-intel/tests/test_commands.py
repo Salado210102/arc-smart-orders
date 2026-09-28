@@ -144,8 +144,8 @@ class CommandTests(unittest.TestCase):
         r = command_reply_rich("/start", 1, self.store, self.exists, self.check, 1000)
         self.assertIsInstance(r, dict)
         self.assertTrue(r["inline"])
-        # Maestro-style grid: 11 rows; row 0 is the live prize-pool button, then the Mini App
-        self.assertEqual(len(r["inline"]), 11)
+        # Maestro-style grid: 12 rows; row 0 is the live prize-pool button, then the Mini App
+        self.assertEqual(len(r["inline"]), 12)
         self.assertEqual(r["inline"][0][0]["data"], "cmd:/pozo")
         self.assertTrue(any("web_app" in b for row in r["inline"] for b in row))
         self.assertIn("SNIPER IA", r["text"])
@@ -155,6 +155,33 @@ class CommandTests(unittest.TestCase):
         self.assertIn("Pool", self.reply("/pozo"))
         r = command_reply_rich("/start", 1, self.store, self.exists, self.check, 1000)
         self.assertIn("Prize pool", r["text"])
+
+    def test_portfolio_screen_rugged_and_sell(self):
+        self.store.save_custody(1, "0x" + "a" * 40, "enc")
+        self.store.add_holding(1, ADDR)
+        self.store.record_fill("t:buy", 1, ADDR, "buy", 10.0, 100.0, ts=1)
+        self.store.add_alert({"token": ADDR, "kind": "liquidity_removal", "severity": "high",
+                              "block": 9, "message": "lp"})
+        r = command_reply_rich("/portfolio", 1, self.store, self.exists, self.check, 1000,
+                               paper_price_fn=lambda t: [(1, 0.5)])
+        self.assertIn("RUGGED", r["text"])
+        self.assertTrue(any(b.get("data", "").startswith("custsell:")
+                            for row in r["inline"] for b in row))
+
+    def test_custsell_callback(self):
+        calls = []
+
+        def fake_sell(chat, token, pct):
+            calls.append((chat, token, pct))
+            return "ok"
+
+        r = _handle_callback(f"custsell:{ADDR}:50", 1, self.store, self.exists, self.check, 1000,
+                             custsell_fn=fake_sell)
+        self.assertIn("Sold", r["text"])
+        self.assertEqual(calls, [(1, ADDR, 50.0)])
+
+    def test_portfolio_needs_custody(self):
+        self.assertIn("bot wallet", self.reply("/portfolio"))
 
     def test_token_risk_status(self):
         self.store.add_alert({"token": ADDR, "kind": "liquidity_removal", "severity": "high",

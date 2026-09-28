@@ -171,6 +171,35 @@ def referral_screen(store, chat, lang) -> dict:
     return {"text": text, "inline": rows, "parse_mode": "HTML"}
 
 
+def portfolio_screen(store, chat, lang, price_fn=None) -> dict:
+    """Bot-wallet (custody) positions with RUGGED / dev-sold status and honest PnL."""
+    if not store.get_custody(chat):
+        return {"text": i18n.t("portfolio_nocustody", lang), "parse_mode": "HTML"}
+    holds = store.list_holdings(chat)
+    if not holds:
+        return {"text": i18n.t("portfolio_empty", lang), "parse_mode": "HTML"}
+    lines = [i18n.t("portfolio_title", lang)]
+    rows = []
+    for tok in holds[:15]:
+        pos = store.get_position(chat, tok)
+        status = store.token_risk_status(tok)
+        price = _paper_price(price_fn, tok)
+        avg = float(pos.get("avg_cost") or 0)
+        realized = float(pos.get("realized") or 0)
+        pct = ((price / avg - 1.0) * 100.0) if (avg > 0 and price > 0) else 0.0
+        badge = (" \U0001F480 RUGGED" if status == "rugged"
+                 else (" \u26A0 dev-sold" if status == "dev_sell" else ""))
+        short = tok[:10] + "\u2026"
+        lines.append(f"\n<b>{short}</b>{badge}\n  avg ${avg:.6g} \u00b7 PnL {pct:+.1f}% \u00b7 "
+                     f"realized ${realized:.2f}")
+        rows.append([{"text": "\U0001F534 25%", "data": f"custsell:{tok}:25"},
+                     {"text": "50%", "data": f"custsell:{tok}:50"},
+                     {"text": "75%", "data": f"custsell:{tok}:75"},
+                     {"text": "100%", "data": f"custsell:{tok}:100"}])
+    rows.append([{"text": i18n.t("btn_app", lang), "web_app": i18n.MINIAPP_URL}])
+    return {"text": "\n".join(lines), "inline": rows, "parse_mode": "HTML"}
+
+
 def tier_screen(store, chat, lang) -> dict:
     from .miniapp_api import tier_view
     v = tier_view(store, chat)
@@ -383,6 +412,8 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
         return bridge_screen(store, chat_id, lang)
     if cmd in ("/tier", "/fee"):
         return tier_screen(store, chat_id, lang)
+    if cmd == "/portfolio":
+        return portfolio_screen(store, chat_id, lang, paper_price_fn)
     if cmd in ("/start", "/menu"):
         s = _pozo_summary(store)
         rows = i18n.menu_buttons(lang)
@@ -638,6 +669,8 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
         return bridge_screen(store, chat_id, lang)["text"]
     if cmd in ("/tier", "/fee"):
         return tier_screen(store, chat_id, lang)["text"]
+    if cmd == "/portfolio":
+        return portfolio_screen(store, chat_id, lang, paper_price_fn)["text"]
     if cmd == "/copyoff":
         for w in store.list_copy_wallets(chat_id):
             store.remove_copy_wallet(chat_id, w["leader"])
@@ -900,8 +933,18 @@ def _answer_callback(bot_token, callback_id) -> bool:
 
 
 def _handle_callback(data, chat, store, token_exists, check_fn, now_block,
-                     recent_fn=None, paper_price_fn=None, symbol_fn=None):
+                     recent_fn=None, paper_price_fn=None, symbol_fn=None, custsell_fn=None):
     lang = _lang(store, chat)
+    if data.startswith("custsell:"):
+        try:
+            _, tok, pct = data.split(":")
+            assert custsell_fn is not None
+            res = custsell_fn(chat, tok, float(pct))
+        except Exception as e:
+            res = "error:" + str(e)[:60]
+        ok = res == "ok"
+        return {"text": (i18n.t("custsell_ok", lang) if ok
+                         else i18n.t("custsell_err", lang).format(err=res)), "parse_mode": "HTML"}
     if data.startswith("lang:"):
         code = data.split(":", 1)[1]
         if code in i18n.LANGS:
@@ -1061,7 +1104,7 @@ def _log_command(chat, cmd, reply) -> None:
 
 def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
               recent_fn=None, paper_price_fn=None, symbol_fn=None, sender=None,
-              timeout: int = 25) -> int:
+              custsell_fn=None, timeout: int = 25) -> int:
     if sender is None:
         sender = DirectSender(transport)
     try:
@@ -1105,7 +1148,7 @@ def poll_once(bot_token, store, transport, token_exists, check_fn, now_block,
                 try:
                     reply = _handle_callback(data, chat, store, token_exists, check_fn, now_block,
                                              recent_fn=recent_fn, paper_price_fn=paper_price_fn,
-                                             symbol_fn=symbol_fn)
+                                             symbol_fn=symbol_fn, custsell_fn=custsell_fn)
                 except Exception as exc:
                     reply = f"Error handling action: {type(exc).__name__}"
                 if isinstance(reply, dict) and reply.get("edit") and message_id is not None:
