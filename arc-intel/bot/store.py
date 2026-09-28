@@ -438,6 +438,10 @@ class SubscriptionStore:
         self.conn.execute("DELETE FROM custody WHERE chat=?", (str(chat),))
         self.conn.commit()
 
+    def list_custody_addresses(self) -> list:
+        return [(r[0], r[1]) for r in self.conn.execute(
+            "SELECT chat, address FROM custody WHERE status='active'").fetchall()]
+
     # --- session keys (Opción 3) ---
     def save_session(self, chat, session_key, enc_secret, executor, pool_id, token_in,
                      max_per_order, max_total, min_out_floor, expiry, status="active") -> None:

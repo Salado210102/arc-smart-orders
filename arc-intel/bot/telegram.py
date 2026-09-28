@@ -102,6 +102,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "referral", "description": "Referrals (earn 30%)"},
         {"command": "copytrade", "description": "Copytrade a wallet"},
         {"command": "pozo", "description": "Prize pool & ranking"},
+        {"command": "bridge", "description": "Bridge USDC to Arc"},
         {"command": "language", "description": "Language"},
         {"command": "disclaimer", "description": "Disclaimer"},
         {"command": "help", "description": "Help"},
@@ -120,6 +121,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "referral", "description": "Referidos (gana 30%)"},
         {"command": "copytrade", "description": "Copytrade de una cartera"},
         {"command": "pozo", "description": "Pozo y ranking"},
+        {"command": "bridge", "description": "Puentea USDC a Arc"},
         {"command": "language", "description": "Idioma"},
         {"command": "disclaimer", "description": "Aviso legal"},
         {"command": "help", "description": "Ayuda"},
@@ -138,6 +140,7 @@ def set_bot_commands(token: str, timeout: int = 10) -> bool:
         {"command": "referral", "description": "\u63a8\u8350\uff08\u8d5a\u53d6 30%\uff09"},
         {"command": "copytrade", "description": "\u8ddf\u5355\u94b1\u5305"},
         {"command": "pozo", "description": "\u5956\u6c60\u4e0e\u6392\u540d"},
+        {"command": "bridge", "description": "\u8de8\u94fe USDC \u5230 Arc"},
         {"command": "language", "description": "\u8bed\u8a00"},
         {"command": "disclaimer", "description": "\u514d\u8d23\u58f0\u660e"},
         {"command": "help", "description": "\u5e2e\u52a9"},
@@ -757,6 +760,21 @@ def run_incremental(dsn: str, db: str, interval: float, cycles: int, start_block
             stop.wait(30)
 
     threading.Thread(target=copy_worker, daemon=True).start()
+
+    # Bridge arrival watcher (own thread): notify when USDC lands in a bot wallet.
+    def bridge_worker():
+        while not stop.is_set():
+            try:
+                from .bridge import poll_deposits
+                from . import tokenmeta as _tm
+                n = poll_deposits(store, transport, thr, balance_fn=_tm.erc20_balance, logger=logger)
+                if n:
+                    logger({"bridge_notified": n})
+            except Exception:
+                pass
+            stop.wait(60)
+
+    threading.Thread(target=bridge_worker, daemon=True).start()
 
     try:
         while cycles <= 0 or k < cycles:

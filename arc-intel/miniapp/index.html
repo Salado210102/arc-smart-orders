@@ -162,6 +162,13 @@
         </div>
         <div id="refout" style="margin-top:8px"></div>
       </div>
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div class="mut" data-i18n="bridge_title">🌉 Bridge USDC a Arc</div>
+          <button class="ghost" id="bridgerefresh">↻</button>
+        </div>
+        <div id="bridgeout" style="margin-top:8px"></div>
+      </div>
     </section>
 
     <section id="sec-alr" class="hide">
@@ -261,6 +268,10 @@
         copy_none: "Aún no sigues ninguna wallet.",
         copy_nocustody: "Necesitas tu wallet del bot (Cartera) con USDC para operar.",
         copy_dryrun: "Modo simulación (dry-run): no ejecuta operaciones reales todavía.",
+        bridge_title: "🌉 Bridge USDC a Arc",
+        bridge_instr: "Envía USDC desde Base/Arbitrum/Solana a esta dirección de Arc (Circle CCTP):",
+        bridge_waiting: "Te aviso cuando llegue.",
+        bridge_open: "Abrir bridge", bridge_noaddr: "Crea tu wallet del bot primero.",
         pozo_label: "🏆 Pozo de la ronda", pozo_ends: "termina en", pozo_see: "Ver ranking",
         pozo_ranking: "Ranking de la ronda (trader · afiliado)",
         pozo_trader: "Trader", pozo_affiliate: "Afiliado", pozo_none: "Aún sin volumen esta ronda.",
@@ -290,6 +301,10 @@
         copy_none: "No tracked wallets yet.",
         copy_nocustody: "You need your bot wallet (Wallet tab) with USDC to trade.",
         copy_dryrun: "Simulation mode (dry-run): no real trades yet.",
+        bridge_title: "🌉 Bridge USDC to Arc",
+        bridge_instr: "Send USDC from Base/Arbitrum/Solana to this Arc address (Circle CCTP):",
+        bridge_waiting: "I'll notify you when it arrives.",
+        bridge_open: "Open bridge", bridge_noaddr: "Create your bot wallet first.",
         pozo_label: "🏆 Round prize pool", pozo_ends: "ends in", pozo_see: "See ranking",
         pozo_ranking: "Round ranking (trader · affiliate)",
         pozo_trader: "Trader", pozo_affiliate: "Affiliate", pozo_none: "No volume this round yet.",
@@ -316,6 +331,10 @@
         copy_none: "你尚未关注任何钱包。",
         copy_nocustody: "你需要机器人钱包（钱包页）并持有 USDC 才能交易。",
         copy_dryrun: "模拟模式（dry-run）：暂不执行真实交易。",
+        bridge_title: "🌉 跨链 USDC 到 Arc",
+        bridge_instr: "从 Base/Arbitrum/Solana 向此 Arc 地址发送 USDC（Circle CCTP）：",
+        bridge_waiting: "到账后我会通知你。",
+        bridge_open: "打开跨链桥", bridge_noaddr: "请先创建机器人钱包。",
         pozo_label: "🏆 本轮奖池", pozo_ends: "结束于", pozo_see: "查看排行",
         pozo_ranking: "本轮排行（交易者 · 推荐人）",
         pozo_trader: "交易者", pozo_affiliate: "推荐人", pozo_none: "本轮暂无交易量。",
@@ -423,7 +442,7 @@
         }
         if (POS_TIMER) { clearInterval(POS_TIMER); POS_TIMER = null; }
         if (name === "pos") { loadPositions(); POS_TIMER = setInterval(() => loadPositions().catch(() => {}), 10000); }
-        if (name === "wal") { loadWallet(); loadCustody(); loadReferral(); }
+        if (name === "wal") { loadWallet(); loadCustody(); loadReferral(); loadBridge(); }
         if (name === "alr") loadAlerts();
         if (name === "copy") loadCopy();
       }
@@ -434,6 +453,7 @@
       $("tab-copy").onclick = () => tab("copy");
       $("alrrefresh").onclick = () => loadAlerts();
       $("refrefresh").onclick = () => loadReferral();
+      $("bridgerefresh").onclick = () => loadBridge();
       $("copyrefresh").onclick = () => loadCopy();
       $("copyadd").onclick = () => addCopyWallet();
       $("copysave").onclick = () => saveCopySettings();
@@ -731,6 +751,17 @@
               body.breakdown.map(b => `<div class="kv"><span>${esc(b.buyer)}</span><b>$${(b.commission_usdc || 0).toFixed(2)}</b></div>`).join("")
             : "") +
           `<div class="mut" style="font-size:12px;margin-top:4px">${esc(t("ref_hint"))}</div>`;
+      }
+
+      async function loadBridge() {
+        const { status, body } = await api("/bridge");
+        if (status !== 200 || !body) { $("bridgeout").innerHTML = ""; return; }
+        if (!body.address) { $("bridgeout").innerHTML = `<span class="mut">${esc(t("bridge_noaddr"))}</span>`; return; }
+        $("bridgeout").innerHTML =
+          `<div class="mut" style="font-size:12px">${esc(t("bridge_instr"))}</div>` +
+          `<div style="word-break:break-all;margin-top:4px"><code>${esc(body.address)}</code></div>` +
+          `<div class="mut" style="font-size:12px;margin-top:4px">${esc(t("bridge_waiting"))}</div>` +
+          (body.link ? `<a class="ghost" style="display:inline-block;margin-top:8px;padding:8px 12px;border-radius:8px" href="${esc(body.link)}" target="_blank">${esc(t("bridge_open"))}</a>` : "");
       }
 
       let COPY = null;

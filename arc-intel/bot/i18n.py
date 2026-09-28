@@ -95,8 +95,8 @@ TEXTS: dict[str, dict[str, str]] = {
                     "zh": "\U0001F4C8 信号 \u00B7 即将"},
     "btn_copytrade": {"en": "\U0001F465 Copytrade", "es": "\U0001F465 Copytrade",
                       "zh": "\U0001F465 跟单"},
-    "btn_bridge": {"en": "\U0001F309 Bridge \u00B7 soon", "es": "\U0001F309 Bridge \u00B7 pronto",
-                   "zh": "\U0001F309 跨链桥 \u00B7 即将"},
+    "btn_bridge": {"en": "\U0001F309 Bridge", "es": "\U0001F309 Bridge",
+                   "zh": "\U0001F309 跨链桥"},
     "btn_premium": {"en": "\U0001F48E Premium \u00B7 soon", "es": "\U0001F48E Premium \u00B7 pronto",
                     "zh": "\U0001F48E 高级 \u00B7 即将"},
     "soon_text": {"en": "\U0001F6A7 Coming soon.", "es": "\U0001F6A7 Próximamente.", "zh": "\U0001F6A7 即将上线。"},
@@ -365,6 +365,25 @@ TEXTS: dict[str, dict[str, str]] = {
         "es": "sin volumen a\u00fan",
         "zh": "\u6682\u65e0\u4ea4\u6613\u91cf",
     },
+    "bridge_text": {
+        "en": ("\U0001F309 <b>Bridge USDC to Arc</b>\n"
+               "Send USDC from <b>{chains}</b> to your bot wallet on Arc using an official bridge "
+               "(Circle CCTP):\n\n<code>{addr}</code>\n\n"
+               "I'll notify you the moment it arrives. Non-custodial: you bridge with your own wallet."),
+        "es": ("\U0001F309 <b>Puentea USDC a Arc</b>\n"
+               "Env\u00eda USDC desde <b>{chains}</b> a tu wallet del bot en Arc con un bridge oficial "
+               "(Circle CCTP):\n\n<code>{addr}</code>\n\n"
+               "Te aviso en cuanto llegue. No-custodial: puenteas con tu propia wallet."),
+        "zh": ("\U0001F309 <b>\u8de8\u94fe USDC \u5230 Arc</b>\n"
+               "\u4f7f\u7528\u5b98\u65b9\u8de8\u94fe\u6865\uff08Circle CCTP\uff09\u5c06 USDC \u4ece <b>{chains}</b> "
+               "\u53d1\u9001\u5230\u4f60\u5728 Arc \u4e0a\u7684\u673a\u5668\u4eba\u94b1\u5305\uff1a\n\n<code>{addr}</code>\n\n"
+               "\u5230\u8d26\u540e\u6211\u4f1a\u7acb\u5373\u901a\u77e5\u4f60\u3002\u975e\u6258\u7ba1\uff1a\u4f60\u7528\u81ea\u5df1\u7684\u94b1\u5305\u8de8\u94fe\u3002"),
+    },
+    "bridge_open": {
+        "en": "\U0001F517 Open bridge",
+        "es": "\U0001F517 Abrir bridge",
+        "zh": "\U0001F517 \u6253\u5f00\u8de8\u94fe\u6865",
+    },
 }
 
 
@@ -398,7 +417,7 @@ def menu_buttons(lang: str = DEFAULT) -> list:
         [b("btn_positions", "cmd:/positions"), b("btn_settings", "cmd:/settings")],
         [b("btn_wallet", "cmd:/connect"), b("btn_help", "cmd:/help")],
         [b("btn_signals", "soon:Signals"), b("btn_copytrade", "cmd:/copytrade")],
-        [b("btn_bridge", "soon:Bridge"), b("btn_premium", "soon:Premium")],
+        [b("btn_bridge", "cmd:/bridge"), b("btn_premium", "soon:Premium")],
         [b("btn_referral", "cmd:/referral")],
         # equal-length, no flags -> identical button widths across clients
         [{"text": "English", "data": "lang:en"},

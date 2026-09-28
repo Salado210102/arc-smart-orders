@@ -787,6 +787,20 @@ class Handler(BaseHTTPRequestHandler):
                 store.close()
             return self._send(200, {**copy_view(wallets, settings), "custody": has_custody,
                                     "dry_run": os.environ.get("ARC_INTEL_COPY_DRY_RUN") == "1"})
+        if u.path == "/bridge":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            from .bridge import bridge_link, SUPPORTED_SOURCES
+            store = SubscriptionStore(DB)
+            try:
+                c = store.get_custody(uid)
+            finally:
+                store.close()
+            addr = (c or {}).get("address", "")
+            base = os.environ.get("ARC_INTEL_BRIDGE_URL", "")
+            return self._send(200, {"address": addr, "chains": list(SUPPORTED_SOURCES),
+                                    "link": bridge_link(base, addr)})
         if u.path == "/contest":
             uid = self._auth_user()
             if uid is None:

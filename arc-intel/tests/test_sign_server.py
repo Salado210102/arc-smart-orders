@@ -165,7 +165,7 @@ class SignServerTests(unittest.TestCase):
             self.assertEqual(e.code, 401)
 
     def test_referral_and_copy_require_auth(self):
-        for path in ("/referral", "/copy", "/contest"):
+        for path in ("/referral", "/copy", "/contest", "/bridge"):
             try:
                 urllib.request.urlopen(self._url(path))
                 self.fail(f"expected 401 for {path}")

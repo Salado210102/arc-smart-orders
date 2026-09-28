@@ -168,6 +168,20 @@ def referral_screen(store, chat, lang) -> dict:
     return {"text": text, "inline": rows, "parse_mode": "HTML"}
 
 
+def bridge_screen(store, chat, lang) -> dict:
+    c = store.get_custody(chat)
+    addr = (c or {}).get("address", "")
+    text = i18n.t("bridge_text", lang).format(addr=addr or "\u2014",
+                                              chains=" \u00b7 ".join(("Base", "Arbitrum", "Solana")))
+    rows = []
+    link = os.environ.get("ARC_INTEL_BRIDGE_URL", "")
+    if link and addr:
+        rows.append([{"text": i18n.t("bridge_open", lang), "url": link}])
+    if addr:
+        rows.append([{"text": i18n.t("btn_app", lang), "web_app": i18n.MINIAPP_URL}])
+    return {"text": text, "inline": rows, "parse_mode": "HTML"}
+
+
 def _short(addr: str) -> str:
     a = str(addr or "")
     return a if len(a) <= 14 else (a[:8] + "\u2026" + a[-4:])
@@ -353,6 +367,8 @@ def command_reply_rich(text: str, chat_id, store, token_exists, check_fn, now_bl
         return contest_screen(store, chat_id, lang)
     if cmd in ("/copytrade", "/copy"):
         return copy_screen(store, chat_id, lang)
+    if cmd == "/bridge":
+        return bridge_screen(store, chat_id, lang)
     if cmd in ("/start", "/menu"):
         s = _pozo_summary(store)
         rows = i18n.menu_buttons(lang)
@@ -604,6 +620,8 @@ def command_reply(text: str, chat_id, store, token_exists, check_fn, now_block: 
         return contest_screen(store, chat_id, lang)["text"]
     if cmd in ("/copytrade", "/copy"):
         return copy_screen(store, chat_id, lang)["text"]
+    if cmd == "/bridge":
+        return bridge_screen(store, chat_id, lang)["text"]
     if cmd == "/copyoff":
         for w in store.list_copy_wallets(chat_id):
             store.remove_copy_wallet(chat_id, w["leader"])
