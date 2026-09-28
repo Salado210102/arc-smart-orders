@@ -1,6 +1,6 @@
 import unittest
 
-from bot.miniapp_api import (age_text, alert_view, alerts_view, build_token_card,
+from bot.miniapp_api import (age_text, alert_view, alerts_view, build_token_card, copy_view,
                              format_price, format_usd, portfolio_summary, position_view,
                              position_views, wallet_view)
 from bot.store import SubscriptionStore
@@ -102,6 +102,16 @@ class MiniAppApiTests(unittest.TestCase):
             self.assertEqual(v["count"], 1)
         finally:
             store.close()
+
+    def test_copy_view(self):
+        self.assertIsNone(copy_view(None))
+        v = copy_view({"leader": TOK.upper(), "max_per_trade": 25, "max_total": 100, "spent": 40,
+                       "slippage": 3, "enabled": 1, "last_block": 123})
+        self.assertEqual(v["leader"], TOK.lower())
+        self.assertEqual(v["max_per_trade"], 25.0)
+        self.assertEqual(v["remaining"], 60.0)
+        self.assertTrue(v["enabled"])
+        self.assertEqual(v["last_block"], 123)
 
 
 if __name__ == "__main__":

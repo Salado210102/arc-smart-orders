@@ -151,6 +151,22 @@ def alerts_view(alerts: list) -> list:
     return [alert_view(a) for a in alerts]
 
 
+def copy_view(sub) -> dict | None:
+    """Normalize a copy-trading subscription row for the Mini App (or None)."""
+    if not sub:
+        return None
+    total = float(sub.get("max_total") or 0.0)
+    spent = float(sub.get("spent") or 0.0)
+    return {"leader": (sub.get("leader") or "").lower(),
+            "max_per_trade": float(sub.get("max_per_trade") or 0.0),
+            "max_total": total,
+            "spent": spent,
+            "remaining": max(0.0, total - spent),
+            "slippage": float(sub.get("slippage") or 0.0),
+            "enabled": bool(sub.get("enabled")),
+            "last_block": int(sub.get("last_block") or 0)}
+
+
 def wallet_view(store, chat_id) -> dict:
     """Linked wallet + auto-followed tokens (from wallet tracking)."""
     addr = store.get_linked_wallet(chat_id)

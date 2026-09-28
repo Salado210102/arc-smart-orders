@@ -164,6 +164,22 @@ class SignServerTests(unittest.TestCase):
         except urllib.error.HTTPError as e:
             self.assertEqual(e.code, 401)
 
+    def test_referral_and_copy_require_auth(self):
+        for path in ("/referral", "/copy"):
+            try:
+                urllib.request.urlopen(self._url(path))
+                self.fail(f"expected 401 for {path}")
+            except urllib.error.HTTPError as e:
+                self.assertEqual(e.code, 401)
+        for path in ("/copy", "/copy/off", "/copy/toggle"):
+            req = urllib.request.Request(self._url(path), data=b"{}",
+                                         headers={"Content-Type": "application/json"})
+            try:
+                urllib.request.urlopen(req)
+                self.fail(f"expected 401 for {path}")
+            except urllib.error.HTTPError as e:
+                self.assertEqual(e.code, 401)
+
     def test_session_authorize_requires_auth(self):
         body = json.dumps({"token": "0x" + "1" * 40}).encode()
         req = urllib.request.Request(self._url("/session/authorize"), data=body,

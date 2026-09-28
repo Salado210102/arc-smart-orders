@@ -770,6 +770,19 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"code": code, "link": refs.referral_link(botu, code),
                                     "pct": refs.REFERRAL_PCT_BPS / 100.0, "credits": credits,
                                     "breakdown": breakdown, **s})
+        if u.path == "/copy":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            from .miniapp_api import copy_view
+            store = SubscriptionStore(DB)
+            try:
+                sub = store.get_copy_sub(uid)
+                has_custody = store.get_custody(uid) is not None
+            finally:
+                store.close()
+            return self._send(200, {"copy": copy_view(sub), "custody": has_custody,
+                                    "dry_run": os.environ.get("ARC_INTEL_COPY_DRY_RUN") == "1"})
         if u.path == "/buy_quote":
             uid = self._auth_user()
             if uid is None:
@@ -852,6 +865,60 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "bad_json"})
             code, resp = self._sell(uid, data)
             return self._send(code, resp)
+        if u.path == "/copy":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send(400, {"error": "bad_json"})
+            leader = (data.get("leader") or "").lower()
+            if not ADDR_RE.match(leader):
+                return self._send(400, {"error": "bad_address"})
+            try:
+                per = max(1.0, float(data.get("max_per_trade") or 25))
+                total = max(per, float(data.get("max_total") or 100))
+                slip = float(data.get("slippage") or 3)
+            except (TypeError, ValueError):
+                return self._send(400, {"error": "bad_amount"})
+            from .miniapp_api import copy_view
+            store = SubscriptionStore(DB)
+            try:
+                now_block = int(store.get_state("alert_cursor", "0") or 0)
+                store.add_copy_sub(uid, leader, max_per_trade=per, max_total=total, slippage=slip,
+                                   now_block=now_block)
+                sub = store.get_copy_sub(uid)
+                has_custody = store.get_custody(uid) is not None
+            finally:
+                store.close()
+            return self._send(200, {"copy": copy_view(sub), "custody": has_custody})
+        if u.path == "/copy/off":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            store = SubscriptionStore(DB)
+            try:
+                ok = store.remove_copy_sub(uid)
+            finally:
+                store.close()
+            return self._send(200, {"ok": ok})
+        if u.path == "/copy/toggle":
+            uid = self._auth_user()
+            if uid is None:
+                return self._send(401, {"error": "unauthorized"})
+            n = int(self.headers.get("Content-Length") or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send(400, {"error": "bad_json"})
+            store = SubscriptionStore(DB)
+            try:
+                ok = store.set_copy_enabled(uid, bool(data.get("on")))
+            finally:
+                store.close()
+            return self._send(200, {"ok": ok, "enabled": bool(data.get("on"))})
         if u.path == "/autoprotect":
             uid = self._auth_user()
             if uid is None:
