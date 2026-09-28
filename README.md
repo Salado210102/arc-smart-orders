@@ -43,6 +43,32 @@ One repo, full stack:
 - **MEV suite (draft)** → [`docs/MEV_SUITE_OVERVIEW.md`](docs/MEV_SUITE_OVERVIEW.md)
 - **Python SDK** → [`sdk-python/`](sdk-python/)
 
+## `arc-intel` — SNIPER IA (Arc risk bot + Mini App)
+
+Telegram bot + Mini App for Arc: **risk/safety alerts** (dev-sell, compound, liquidity removal, large
+sell) and **custodial "Modo Maestro" trading** (a per-user bot wallet, key encrypted at rest).
+
+| Area | What | Where | State |
+|---|---|---|---|
+| **Alerts** | 24/7 indexer → risk alerts for held tokens (with a `🔴 Vender` button) | `arc-intel/indexer/`, `arc-intel/bot/telegram.py` | ✅ live |
+| **Custody (Modo Maestro)** | per-user bot wallet; instant buy/sell + withdraw; **withdrawal brakes**: fresh `initData` (300 s), **TOTP 2FA**, registered addresses (24 h delay), daily cap, **freeze** ("No fui yo"), global **kill-switch** | `arc-intel/bot/sign_server.py`, `arc-intel/execution/custody.py` | ✅ live (testnet) |
+| **Single signer** | the **only** module that decrypts keys (MultiFernet, append-only audit, per-wallet caps) | `arc-intel/execution/signer.py` | ✅ |
+| **Mini App (TMA)** | Compra / Posiciones / Cartera / Alertas / Copy; Safety Score, live PnL, **RUGGED** badge, bridge, referrals, fee tiers, contest pozo banner | `arc-intel/miniapp/index.html`, `arc-intel/bot/sign_server.py` | ✅ live (`app.basepump.dev`) |
+| **Executor V2/V3** | non-custodial executor: scoped **sessions** + **pool policy** (`allowedPools`/`allowedHooks`, `allowAllPools` **testnet-only**) | `arc-intel/executor/src/ArcIntelExecutorV{2,3}.sol` | ✅ testnet (V3 `0xBD1a80…`) |
+| **Session keys (Opción 3)** | scoped on-chain session key (no per-order signature); **kept but deprecated** in favour of custody for speed | `arc-intel/execution/sessions.py` | 🧪 optional |
+| **Copy-trading** | multi-wallet mirror with filters (min buy, max open, sizing, mirror sells) | `arc-intel/execution/copy_keeper.py` | ✅ (dry-run) |
+| **Contest** | 2 rounds/day UTC; pozo = 10% of round fees; **anti-wash** (min size, round-trips, own tokens, same-funding merge); **prize payout behind a disabled feature flag** | `arc-intel/monetization/contest.py`, `antiwash.py` | ✅ informational |
+| **Research** | **not validated** (no edge); never imported by `bot/`/`execution/` (test-enforced) | `arc-intel/research/` | 🧪 research only |
+
+**Not connected / unresolved (honest):**
+- **Real trading = mainnet + audit**: data is **mainnet** (5042) while the executor/relayer/wallet are
+  **testnet** (5042002), so mainnet tokens don't exist on testnet; copy-trading runs in **dry-run**.
+- **Fees are not collected yet** → referrals (30%), the contest pozo, and fee tiers are **informational**.
+- **Winner channel** (`ARC_INTEL_CHANNEL`) not configured (broadcast to bot subscribers works).
+- Dedicated RPC (rate limits make the Safety Score partial), and the modules below (Smart Orders,
+  Launchpad, MEV) are **separate** from `arc-intel`.
+- **Optional** (documented, not applied): `unchecked-transfer` → SafeERC20 in V2/V3 (change deferred).
+
 ## MEV suite (draft)
 
 Three atomic, capital-efficient strategies in [`contracts/src/mev/`](contracts/src/mev/) with off-chain

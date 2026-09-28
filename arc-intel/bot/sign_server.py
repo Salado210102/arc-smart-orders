@@ -1048,8 +1048,8 @@ class Handler(BaseHTTPRequestHandler):
             store = SubscriptionStore(DB)
             try:
                 w = CT.round_window(time.time())
-                trader = store.volume_by_user_since(w["start"])
-                aff = store.referred_volume_by_user_since(w["start"])
+                trader = store.contest_volume_between(w["start"], w["end"])
+                aff = store.contest_referred_volume_between(w["start"], w["end"])
                 st = CT.standings(trader, aff, top=10)
 
                 def _named(rows):

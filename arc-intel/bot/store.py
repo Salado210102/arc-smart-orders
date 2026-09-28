@@ -707,6 +707,41 @@ class SubscriptionStore:
             (int(start), int(end))).fetchall()
         return {r[0]: float(r[1] or 0.0) for r in rows}
 
+    def contest_fills_between(self, start, end, limit: int = 200000) -> list:
+        rows = self.conn.execute(
+            "SELECT fill_id,user,token,side,usdc,ts FROM fills "
+            "WHERE ts>=? AND ts<? AND fill_id NOT LIKE 'paper%' LIMIT ?",
+            (int(start), int(end), int(limit))).fetchall()
+        return [{"fill_id": r[0], "user": r[1], "token": r[2], "side": r[3],
+                 "usdc": float(r[4] or 0.0), "ts": int(r[5] or 0)} for r in rows]
+
+    def contest_volume_between(self, start, end, *, min_notional: float = 5.0,
+                               own_tokens=(), window_s: int = 60) -> dict:
+        """Trader volume with anti-wash filters (min size, round-trips, own tokens)."""
+        from monetization.antiwash import volume_by_user
+        return volume_by_user(self.contest_fills_between(start, end), min_notional=min_notional,
+                              own_tokens=own_tokens, window_s=window_s)
+
+    def contest_referred_volume_between(self, start, end, *, min_notional: float = 5.0,
+                                        own_tokens=(), window_s: int = 60) -> dict:
+        """Affiliate volume: filtered fills grouped by the buyer's referrer."""
+        from monetization.antiwash import filter_fills
+        keep = filter_fills(self.contest_fills_between(start, end), min_notional=min_notional,
+                            own_tokens=own_tokens, window_s=window_s)
+        out: dict = {}
+        for f in keep:
+            owner = self.get_referrer(f["user"])
+            if owner:
+                out[owner] = out.get(owner, 0.0) + f["usdc"]
+        return out
+
+    def prize_payout_enabled(self) -> bool:
+        import os as _os
+        return self.get_state("prize_payout", _os.environ.get("ARC_INTEL_PRIZE_PAYOUT", "0")) == "1"
+
+    def set_prize_payout(self, enabled: bool) -> None:
+        self.set_state("prize_payout", "1" if enabled else "0")
+
     def contest_round_published(self, round_id) -> bool:
         return self.conn.execute("SELECT 1 FROM contest_rounds WHERE round_id=?",
                                  (int(round_id),)).fetchone() is not None

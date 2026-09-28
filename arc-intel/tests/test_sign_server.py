@@ -30,6 +30,10 @@ class SignServerTests(unittest.TestCase):
         from cryptography.fernet import Fernet
         self._old_enc = os.environ.get("ARC_INTEL_SESSION_ENC_KEY")
         os.environ["ARC_INTEL_SESSION_ENC_KEY"] = Fernet.generate_key().decode()
+        # Hermetic: serve the repo's Mini App (no /root/arc-intel path dependency).
+        self._old_miniapp = os.environ.get("ARC_INTEL_MINIAPP")
+        os.environ["ARC_INTEL_MINIAPP"] = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "miniapp", "index.html"))
         ss._RATE.clear()
         self.db = tempfile.mktemp(suffix=".db")
         ss.DB = self.db
@@ -52,6 +56,10 @@ class SignServerTests(unittest.TestCase):
             os.environ.pop("ARC_INTEL_SESSION_ENC_KEY", None)
         else:
             os.environ["ARC_INTEL_SESSION_ENC_KEY"] = self._old_enc
+        if getattr(self, "_old_miniapp", None) is None:
+            os.environ.pop("ARC_INTEL_MINIAPP", None)
+        else:
+            os.environ["ARC_INTEL_MINIAPP"] = self._old_miniapp
         ss._RATE.clear()
         try:
             os.remove(self.db)

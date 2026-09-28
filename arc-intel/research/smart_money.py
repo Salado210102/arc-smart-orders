@@ -1,9 +1,12 @@
-"""Smart-money research (rigorous, honest): score wallets by REALIZED PnL on a training window,
-then measure (walk-forward) whether their buys in a LATER window predict positive forward returns.
+"""Smart-money research (rigorous, honest) — **NOT validated, NOT for production**.
 
-Only ship if measured edge exists. Read-only.
+⚠️ Do NOT import this from `bot/` or `execution/`. It is research only: it scores wallets by a
+fast USD-flow **proxy** that *ignores open positions* (a wallet that only bought and never sold is
+not penalised), then runs a walk-forward test of whether those wallets' buys predict forward returns.
 
-Usage: python -m indexer.smart_money --dsn <dsn> --train-end 22700000 --test-end 23080000
+Measured result (see `docs/ARC_AI_SMART_MONEY.md`): **NO edge** — do not ship as a trading signal.
+
+Usage: python -m research.smart_money --dsn <dsn> --train-end 22700000 --test-end 23080000
 """
 from __future__ import annotations
 
@@ -16,7 +19,7 @@ def wallet_scores(storage, upto_block: int, min_trades: int = 8) -> tuple[dict, 
     """Fast SQL proxy: per wallet, USD bought vs sold. 'Winner' = sold_usd - bought_usd > 0.
 
     (Realized-PnL average-cost is more precise but far slower; this proxy is good enough to test
-    whether past-winner buys predict future returns at all.)
+    whether past-winner buys predict future returns at all — and it does NOT, per the walk-forward.)
     """
     conn = storage.pool.getconn()
     try:
@@ -101,7 +104,7 @@ def _report(name, sigs, px, hb):
 
 
 def run(dsn, train_end, test_end):
-    from .pg_storage import PostgresStorage
+    from indexer.pg_storage import PostgresStorage
     st = PostgresStorage(dsn)
     print("scoring wallets on legs <=", train_end, flush=True)
     smart, agg = wallet_scores(st, train_end)

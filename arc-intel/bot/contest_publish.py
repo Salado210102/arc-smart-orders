@@ -15,8 +15,8 @@ def display_name(store, user: str) -> str:
 
 
 def _results(store, prev):
-    trader_v = store.volume_by_user_between(prev["start"], prev["end"])
-    aff_v = store.referred_volume_between(prev["start"], prev["end"])
+    trader_v = store.contest_volume_between(prev["start"], prev["end"])
+    aff_v = store.contest_referred_volume_between(prev["start"], prev["end"])
     s = CT.settle(trader_v, aff_v)
 
     def row(w, prize):
@@ -34,6 +34,23 @@ def _send(transport, chat, png, caption, html) -> bool:
             pass
     transport.send(chat, html, parse_mode="HTML")
     return True
+
+
+def settle_prizes(store, round_id, *, enabled=None, logger=None) -> dict:
+    """Pay the round's winners in USDC. **DISABLED by default** (feature flag).
+
+    Enable only when asked: `ARC_INTEL_PRIZE_PAYOUT=1` or `store.set_prize_payout(True)`.
+    The real USDC payout is intentionally **not implemented** yet (needs the live fee treasury on
+    mainnet); this is a guarded stub so nothing pays until the flag is explicitly turned on.
+    """
+    en = store.prize_payout_enabled() if enabled is None else bool(enabled)
+    if not en:
+        if logger:
+            logger({"prize_payout_skipped": round_id, "reason": "disabled"})
+        return {"paid": False, "reason": "disabled"}
+    if logger:
+        logger({"prize_payout_pending": round_id, "reason": "not_implemented"})
+    return {"paid": False, "reason": "not_implemented"}
 
 
 def publish_round(store, transport, now, channel, *, logger=None, round_hours: int = CT.ROUND_HOURS,
@@ -75,9 +92,12 @@ def publish_round(store, transport, now, channel, *, logger=None, round_hours: i
         if w:
             store.record_contest_winner(prev["id"], cat, w["user"], w["volume"], w["prize"])
     winners = (1 if trader else 0) + (1 if aff else 0)
+    payout = settle_prizes(store, prev["id"], logger=logger)   # feature-flagged (off by default)
     if logger:
-        logger({"contest_published": prev["id"], "sent": sent, "winners": winners})
-    return {"round": prev["id"], "pozo": s["pozo"], "sent": sent, "winners": winners}
+        logger({"contest_published": prev["id"], "sent": sent, "winners": winners,
+                "prize_payout": payout})
+    return {"round": prev["id"], "pozo": s["pozo"], "sent": sent, "winners": winners,
+            "prize_payout": payout}
 
 
 def _preview_png():
