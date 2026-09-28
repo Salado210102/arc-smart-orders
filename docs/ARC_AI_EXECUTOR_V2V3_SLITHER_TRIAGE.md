@@ -1,7 +1,15 @@
 # Slither Triage — ArcIntelExecutor V2 / V3
 
 > Revisión estática de `ArcIntelExecutorV2.sol` y `ArcIntelExecutorV3.sol` (Bloque B, B1).
-> **Contratos sin cambios** por Slither. Compilación vía Foundry (`via_ir`), solc 0.8.26.
+> Compilación vía Foundry (`via_ir`), solc 0.8.26.
+
+> **UPDATE 2026-09-28 (post-review hardening).** Tras aplicar las recomendaciones del reviewer
+> (**SafeERC20** en los transfers y **`amountOut` medido por el delta del PoolManager**), Slither ya
+> **no reporta** `unchecked-transfer` ni `reentrancy-balance`. Estado actual (**11 results**, idéntico en
+> V2 y V3): `assembly` (Info), `cyclomatic-complexity` (Info), **`incorrect-equality`** (Info — el
+> `data.length == 0` del patrón SafeERC20), **`low-level-calls`** (Info — el `token.call` de SafeERC20),
+> `naming-convention` (Info), `timestamp` (Low), `unused-return` (Info). **Sin High ni Medium.**
+> Evidencia: unit **54 passed**; invariantes V2/V3 **5000×100 passed**.
 
 ## Run
 - Tool: **Slither** (`/usr/local/bin/slither`), `--compile-force-framework foundry`.

@@ -14,7 +14,7 @@ contract DeployV3 is Script {
 
         vm.startBroadcast(pk);
         bytes32[] memory pools = new bytes32[](0);
-        ArcIntelExecutorV3 v3 = new ArcIntelExecutorV3(poolManager, safeOwner, pools, false);
+        ArcIntelExecutorV3 v3 = new ArcIntelExecutorV3(poolManager, safeOwner, pools);
         vm.stopBroadcast();
 
         // B2: mainnet MUST NOT have allowAllPools (policy = allowedHooks per launchpad + allowedPools).

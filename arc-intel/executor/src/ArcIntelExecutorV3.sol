@@ -17,7 +17,11 @@ contract ArcIntelExecutorV3 is IUnlockCallback {
 
     IPoolManager public immutable poolManager;
     address public immutable owner;
-    bool public immutable isTestnet;   // when false, `allowAllPools` cannot be enabled (B3)
+
+    /// @notice True unless on Arc mainnet (5042) — gates testnet-only conveniences (reviewer: use block.chainid).
+    function isTestnet() public view returns (bool) {
+        return block.chainid != 5042;
+    }
 
     //  EIP-712 domain: cached at deploy, recomputed if the chain id changes (fork-safe).
     bytes32 private immutable _DOMAIN_SEPARATOR;
@@ -126,11 +130,10 @@ contract ArcIntelExecutorV3 is IUnlockCallback {
         _locked = false;
     }
 
-    constructor(address poolManager_, address owner_, bytes32[] memory initialPools, bool testnet_) {
+    constructor(address poolManager_, address owner_, bytes32[] memory initialPools) {
         if (poolManager_ == address(0) || owner_ == address(0)) revert ZeroAddr();
         poolManager = IPoolManager(poolManager_);
         owner = owner_;
-        isTestnet = testnet_;
         _CHAIN_ID = block.chainid;
         _DOMAIN_SEPARATOR = _computeDomainSeparator();
         for (uint256 i = 0; i < initialPools.length; i++) {
@@ -174,7 +177,7 @@ contract ArcIntelExecutorV3 is IUnlockCallback {
     }
 
     function setAllowAllPools(bool allowAll) external onlyOwner {
-        if (allowAll && !isTestnet) revert AllowAllNotAllowed();   // B3: mainnet keeps pool/hook policy
+        if (allowAll && !isTestnet()) revert AllowAllNotAllowed();   // mainnet (5042) keeps pool/hook policy
         allowAllPools = allowAll;
         emit AllowAllSet(allowAll);
     }
@@ -262,7 +265,7 @@ contract ArcIntelExecutorV3 is IUnlockCallback {
 
         amountOut = _swapAndSettle(order.key, order.zeroForOne, amountIn, order.recipient, order.minOut);
         uint256 leftover = IERC20Min(tokenIn).balanceOf(address(this));
-        if (leftover > 0) IERC20Min(tokenIn).transfer(user, leftover);
+        if (leftover > 0) _safeTransfer(tokenIn, user, leftover);
         emit Filled(user, poolId, amountIn, amountOut, order.orderNonce);
     }
 
@@ -298,7 +301,7 @@ contract ArcIntelExecutorV3 is IUnlockCallback {
 
         amountOut = _swapAndSettle(o.key, o.zeroForOne, o.amountIn, o.recipient, o.minOut);
         uint256 leftover = IERC20Min(tokenIn).balanceOf(address(this));
-        if (leftover > 0) IERC20Min(tokenIn).transfer(o.user, leftover);
+        if (leftover > 0) _safeTransfer(tokenIn, o.user, leftover);
         emit SessionFilled(o.user, sessionKey, poolId, o.amountIn, amountOut, o.orderNonce);
     }
 
@@ -311,11 +314,9 @@ contract ArcIntelExecutorV3 is IUnlockCallback {
         address recipient,
         uint256 minOut
     ) private returns (uint256 amountOut) {
-        address tokenOut = zeroForOne ? key.currency1 : key.currency0;
-        uint256 outBefore = IERC20Min(tokenOut).balanceOf(recipient);
-        poolManager.unlock(abi.encode(key, zeroForOne, amountIn, recipient));
-        uint256 outAfter = IERC20Min(tokenOut).balanceOf(recipient);
-        amountOut = outAfter > outBefore ? outAfter - outBefore : 0;
+        // amountOut is the swap's own balance delta (from unlockCallback), NOT a recipient balance diff.
+        bytes memory res = poolManager.unlock(abi.encode(key, zeroForOne, amountIn, recipient));
+        amountOut = abi.decode(res, (uint256));
         if (amountOut < minOut) revert InsufficientOutput(amountOut, minOut);
     }
 
@@ -376,12 +377,19 @@ contract ArcIntelExecutorV3 is IUnlockCallback {
         if (amount1 > 0) poolManager.take(key.currency1, recipient, uint128(amount1));
         if (amount0 < 0) _settle(key.currency0, uint128(-amount0));
         if (amount1 < 0) _settle(key.currency1, uint128(-amount1));
-        return "";
+        uint256 out = amount0 > 0 ? uint256(uint128(amount0)) : uint256(uint128(amount1));
+        return abi.encode(out);
+    }
+
+    function _safeTransfer(address token, address to, uint256 amount) private {
+        (bool ok, bytes memory data) =
+            token.call(abi.encodeWithSelector(IERC20Min.transfer.selector, to, amount));
+        require(ok && (data.length == 0 || abi.decode(data, (bool))), "transfer_failed");
     }
 
     function _settle(address currency, uint256 amount) private {
         poolManager.sync(currency);
-        IERC20Min(currency).transfer(address(poolManager), amount);
+        _safeTransfer(currency, address(poolManager), amount);
         poolManager.settle();
     }
 }

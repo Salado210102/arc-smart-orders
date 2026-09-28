@@ -229,7 +229,7 @@ contract ArcIntelExecutorV3Invariants is StdInvariant, Test {
 
         bytes32[] memory pools = new bytes32[](1);
         pools[0] = poolId;
-        exec = new ArcIntelExecutorV3(address(pm), address(handler), pools, true); // owner=handler, testnet
+        exec = new ArcIntelExecutorV3(address(pm), address(handler), pools); // owner=handler
         handler.setExecutor(exec);
 
         permit2 = new MockPermit2();

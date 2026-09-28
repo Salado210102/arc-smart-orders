@@ -211,9 +211,15 @@ Applied:
   totp_already_set`); rotation only via **`POST /custody/totp/rotate`** with the **current code**; withdraw and
   address-add now require a **confirmed** TOTP (not just a stored secret). Tests added.
 
+Done **(code + tests; NOT redeployed yet — awaiting approval to redeploy)**:
+- **V2/V3 hardening** (reviewer recommendations): `isTestnet` derived from **`block.chainid`** (mainnet 5042
+  can't enable `allowAllPools`); **SafeERC20-style `_safeTransfer`** on all transfers; `amountOut` measured
+  from the **PoolManager swap delta** (not recipient balance). Evidence: unit **54 passed**, invariants
+  **V2/V3 5000×100 passed**, **Slither no longer reports** `unchecked-transfer` / `reentrancy-balance`
+  (only Info/Low remain).
+
 Pending (need approval / decisions):
-- **V2/V3 code** (awaiting explicit OK): `isTestnet` → derive from `block.chainid`; **SafeERC20**; measure
-  `amountOut` from the **PoolManager delta** (not recipient balance); then redeploy + invariants + Slither.
+- **Redeploy V2/V3** with the hardening above (testnet) + real **Safe** owner for mainnet.
 - **Hook policy for mainnet** (Argus = one hook per token): verify hook provenance (factory/codehash).
 - **CSP:** vendor libraries locally (pinned) and use an **own domain** (not `app.basepump.dev`).
 - **Key management:** signer in its own process/user; KMS/HSM medium-term. **Legal**: license/KYC/AML review.

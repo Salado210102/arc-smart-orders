@@ -39,7 +39,7 @@ contract ArcIntelExecutorV3Test is Test {
 
         pm = new MockPoolManager();
         bytes32[] memory pools = new bytes32[](0); // no pools pre-allowed
-        exec = new ArcIntelExecutorV3(address(pm), safe, pools, true);   // testnet: allowAll permitted
+        exec = new ArcIntelExecutorV3(address(pm), safe, pools);   // chainid 31337 != 5042 -> isTestnet()
 
         permit2 = new MockPermit2();
         vm.etch(exec.PERMIT2(), address(permit2).code);
@@ -138,8 +138,9 @@ contract ArcIntelExecutorV3Test is Test {
     }
 
     function testMainnetCannotAllowAll() public {
+        vm.chainId(5042);   // simulate Arc mainnet
         bytes32[] memory pools = new bytes32[](0);
-        ArcIntelExecutorV3 mainnetExec = new ArcIntelExecutorV3(address(pm), safe, pools, false);
+        ArcIntelExecutorV3 mainnetExec = new ArcIntelExecutorV3(address(pm), safe, pools);
         assertFalse(mainnetExec.isTestnet());
         vm.prank(safe);
         vm.expectRevert(ArcIntelExecutorV3.AllowAllNotAllowed.selector);
